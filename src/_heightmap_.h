@@ -1,0 +1,20 @@
+#ifndef HEIGHTMAP_H
+#define HEIGHTMAP_H
+
+
+#ifndef TERRAIN_NUM_SQUARES
+	#define TERRAIN_NUM_SQUARES 128
+#endif
+#ifndef TERRAIN_SQUARE_SIZE
+	#define TERRAIN_SQUARE_SIZE 2.0f
+#endif
+#define WORLD_SIZE (TERRAIN_NUM_SQUARES * TERRAIN_SQUARE_SIZE)
+#ifndef DEFAULT_SCALE
+	#define DEFAULT_SCALE 1.0f
+#endif
+#ifndef TERRAIN_HEIGHT_SCALE
+	#define TERRAIN_HEIGHT_SCALE 10.0f
+#endif
+
+
+#endif /* HEIGHTMAP_H */
