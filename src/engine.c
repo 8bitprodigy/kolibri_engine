@@ -1,14 +1,15 @@
 #include <raylib.h>
 #include "_engine_.h"
+#include "_entity_.h"
 #include "head.h"
 
 typedef struct
 Engine
 {
-	Head   *heads[MAX_NUM_HEADS];
-	Entity *entities;
-	Scene  *scene;
-
+	Head       *heads[MAX_NUM_HEADS];
+	EntityNode *entities;
+	Scene      *scene;
+	
 	uint64 frame_num;
 	uint   head_count;
 	uint   entity_count;
@@ -90,6 +91,7 @@ Engine_run(Engine *self)
 
 		self->frame_num++;
 	}
+	if (self->Exit) self->Exit(self);
 }
 
 
@@ -127,18 +129,22 @@ Engine_render(Engine *self)
 {
 	/* Loop through Heads */
 	for (int i = 0; i < self->head_count; i++) {
-		BeginDrawing();
-			Head_PreRender(self->heads[i])
-			if (engine->PreRender)  engine->PreRender(self);
-			
-			Head_Render(self->heads[i])
-			if (engine->Render)     engine->Render(self);
-			
-			Head_PostRender(self->heads[i])
-			if (engine->PostRender) engine->PostRender(self);
-		EndDrawing();
+		Head *current_head = self->heads[i];
+		
+		BeginTextureMode(&Head_getViewport(current_head));
+			Head_PreRender(current_head)
+			BeginMode3D(&Head_getCamera(current_head));
+				Head_Render(current_head);
+			EndMode3D();
+			Head_PostRender(current_head);
+		EndTextureMode();	
 	}
 	/* End loop through Heads */
+	if (engine->PreRender)  engine->PreRender(self);
+	BeginDrawing()
+		if (engine->Render)     engine->Render(self);
+	EndDrawing()
+	if (engine->PostRender) engine->PostRender(self);
 }
 
 

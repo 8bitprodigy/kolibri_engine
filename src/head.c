@@ -68,6 +68,7 @@ Head_free(Head *Self)
 		Clean up stuff first!
 		Gotta make a way to clean up user_data -- probably a callback
 	*/
+	UnloadRenderTexture(Self->viewport);
 	free(Self);
 }
 

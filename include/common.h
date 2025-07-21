@@ -3,6 +3,7 @@
 
 #include <raylib.h>
 #include <raymath.h>
+#include <rlgl.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -38,6 +39,8 @@ typedef struct Engine Engine;
 typedef struct Entity Entity;
 typedef struct Head   Head;
 
+/* Common callbacks */
+
 typedef struct
 Vector2i
 {
@@ -54,6 +57,17 @@ Vector2i
 	};
 }
 Vector2i;
+
+typedef struct
+Xform
+{
+	Vector3 
+		position, 
+		rotation,
+		scale,
+		skew;
+}
+Xform;
 
 
 typedef uint64_t     uint64;

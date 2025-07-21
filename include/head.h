@@ -11,7 +11,6 @@ typedef struct Engine Engine;
 
 typedef void (*HeadCallback)(   Head *head, Engine *engine);
 typedef void (*HeadCallback_1f)(Head *head, Engine *engine, float delta);
-typedef void (*FreeUserDataCallback)(void *user_data);
 
 
 Head *Head_new(  
