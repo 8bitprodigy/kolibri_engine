@@ -13,7 +13,7 @@ enum {
 }
 
 typedef void (*EntityCallback)(   Entity *entity);
-typedef void (*EntityCallback_2e)(Entity *entity, Entity *entity);
+typedef void (*EntityCallback_1e)(Entity *entity, Entity *entity);
 typedef void (*EntityCallback_1f)(Entity *entity, float   delta);
 
 typedef struct 
@@ -27,7 +27,7 @@ Entity
     EntityCallback    Setup;
     EntityCallback    Enter;
     EntityCallback_1f Update;
-    EntityCallback_2e OnCollision;
+    EntityCallback_1e OnCollision;
     EntityCallback    Exit;
     EntityCallback    Free;
     
@@ -64,8 +64,8 @@ Entity;
 
 Entity  *Entity_new(      const Entity *template_entity, Engine *engine);
 void     Entity_free(           Entity *entity);
-void     Entity_addToScene(     Scene  *scene, Entity *entity);
-void     Entity_removeFromScene(Scene  *scene, Entity *entity);
+void     Entity_addToScene(     Scene  *scene,           Entity *entity);
+void     Entity_removeFromScene(Scene  *scene,           Entity *entity);
 void     Entity_updateAll(      float   dt);
 uint64   Entity_getUniqueID(    Entity *entity);
 

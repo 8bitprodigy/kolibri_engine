@@ -24,19 +24,35 @@ Entity_new(const Entity *entity, Engine *engine)
 	}
 
 	Entity *base = PRIVATE_TO_ENTITY(node);
-
 	*base = *entity;
 
 	base->user_data = NULL;
 	base->engine    = engine;
 
-	node = latest_ID++;
+	node->unique_ID = latest_ID++;
 	
 	insertEntityNode(node, Engine__getEntities(engine));
+
+	if (base->Setup) base->Setup(base);
 }
 
 
+void
+Entity_free(Entity *self)
+{
+	EntityNode__free(ENTITY_TO_PRIVATE(self));
+}
 
+
+void
+EntityNode__free(EntityNode *self)
+{
+	Entity *entity = PRIVATE_TO_ENTITY(self);
+
+	entity->Free(entity);
+
+	free(self);
+}
 
 
 void

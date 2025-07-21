@@ -2,7 +2,7 @@
 
 
 #define ENTITY_TO_PRIVATE(e) (((EntityNode*)((char*)(e) - offsetof(EntityNode, base)))
-#define PRIVATE_TO_ENTITY(p) (&(p)->base)
+#define PRIVATE_TO_ENTITY(p) ((p)->base)
 
 
 typedef struct
@@ -19,4 +19,4 @@ EntityNode
 EntityNode;
 
 
-
+void EntityNode__free(EntityNode *entity_node);

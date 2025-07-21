@@ -99,9 +99,9 @@ void
 Engine_update(Engine *self)
 {
 	int i = 0;
-	Entity 
-		*entities = self->entities,
-		*entity;
+	EntityNode 
+		*entity_nodes = self->entities,
+		*node;
 	
 	float delta = GetFrameTime();
 	self->delta = delta;
@@ -113,12 +113,14 @@ Engine_update(Engine *self)
 
 	if (self->paused || self->request_exit) return;
 
-	entity = entities;
+	node = entity_nodes;
 	do {
-		/* Update entity */
-		/* Get next entity */
+		Entity *entity = PRIVATE_TO_ENTITY(node)
+		if (entity->Update) entity->Update(entity);
+
+		node = node->next;
 		i++;
-	} while (entity != entities);
+	} while (node != entity_nodes);
 
 	self->frame_num++;
 }
