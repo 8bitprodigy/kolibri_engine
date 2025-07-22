@@ -23,6 +23,9 @@ Entity_new(const Entity *entity, Engine *engine)
 		return NULL;
 	}
 
+	node->next = node;
+	node->prev = node;
+
 	Entity *base = PRIVATE_TO_ENTITY(node);
 	*base = *entity;
 
@@ -58,7 +61,7 @@ EntityNode__free(EntityNode *self)
 void
 insertEntityNode(EntityNode *node, EntityNode *to)
 {
-	if (!entity || !to) {
+	if (!node || !to) {
 		ERR_OUT("insertEntity() received a NULL pointer as argument");
 		return;
 	}

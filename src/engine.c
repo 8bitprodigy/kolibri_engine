@@ -10,10 +10,12 @@ Engine
 	EntityNode *entities;
 	Scene      *scene;
 	
-	uint64 frame_num;
-	uint   head_count;
-	uint   entity_count;
-	float  delta;
+	uint64     frame_num;
+	uint       head_count;
+	const uint HEAD_COUNT_MAX;
+	uint       entity_count;
+	const uint ENTITY_COUNT_MAX;
+	float      delta;
 
 	union {
 		uint8 bit_flags;
@@ -30,11 +32,11 @@ Engine
 	};
 
 	EngineCallback    Setup;
+	EngineCallback    Run;
 	EngineCallback_1f Update;
-	EngineCallback    PreRender;
 	EngineCallback    Render;
-	EngineCallback    PostRender;
 	EngineCallback    Exit;
+	EngineCallback    Free;
 }
 Engine;
 
@@ -45,11 +47,11 @@ Engine;
 Engine *
 Engine_new(
 	EngineCallback    Setup_Callback, 
+	EngineCallback    Run_Callback, 
 	EngineCallback_1f Update_Callback, 
-	EngineCallback    Prerender_Callback, 
 	EngineCallback    Render_Callback, 
-	EngineCallback    Postrender_Callback,
-	EngineCallback    Exit_Callback
+	EngineCallback    Exit_Callback,
+	EngineCallback    Free_Callback
 )
 {
 	Engine *engine = malloc(sizeof(Engine));
@@ -72,17 +74,20 @@ Engine_new(
 	engine->request_exit = false;
 
 	engine->Setup        = Setup_Callback
+	engine->Run          = Run_Callback
 	engine->Update       = Update_Callback;
-	engine->PreRender    = Prerender_Callback;
 	engine->Render       = Render_Callback;
-	engine->PostRender   = Postrender_Callback;
 	engine->Exit         = Exit_Callback;
+	engine->Free         = Free_Callback;
+
+	if (engine->Setup) engine->Setup(engine);
 }
 
 
 void
 Engine_run(Engine *self)
 {
+	if (self->Run) self->Run(self);
 	while(!self->request_exit) {
 		self->request_exit = WindowShouldClose();
 
@@ -109,19 +114,18 @@ Engine_update(Engine *self)
 	for (int i = 0; i < self->head_count; i++) {
 		Head_Update(self->heads[i])
 	}
-	if (engine->Update) engine->Update(self, delta);
 
 	if (self->paused || self->request_exit) return;
 
 	node = entity_nodes;
 	do {
 		Entity *entity = PRIVATE_TO_ENTITY(node)
-		if (entity->Update) entity->Update(entity);
+		if (entity->Update) entity->Update(entity, delta);
 
 		node = node->next;
 		i++;
 	} while (node != entity_nodes);
-
+	if (engine->Update) engine->Update(self, delta);
 	self->frame_num++;
 }
 
@@ -142,11 +146,9 @@ Engine_render(Engine *self)
 		EndTextureMode();	
 	}
 	/* End loop through Heads */
-	if (engine->PreRender)  engine->PreRender(self);
 	BeginDrawing()
 		if (engine->Render)     engine->Render(self);
 	EndDrawing()
-	if (engine->PostRender) engine->PostRender(self);
 }
 
 
@@ -157,17 +159,17 @@ Engine_pause(Engine *self, bool paused)
 }
 
 
-void
-Engine_requestExit(Engine *self)
-{
-	self->request_exit = true;
-}
-
-
 bool
 Engine_isPaused(Engine *self)
 {
 	return self->paused;
+}
+
+
+void
+Engine_requestExit(Engine *self)
+{
+	self->request_exit = true;
 }
 
 

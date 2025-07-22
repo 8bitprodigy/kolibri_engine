@@ -25,14 +25,14 @@ Head;
 
 Head *
 Head_new(
-    Engine      *engine,
 	int          Controller_ID,
     Callback     Setup,
     Callback_1f  Update,
     Callback     PreRender,
     Callback     Render,
     Callback     PostRender,
-    Callback     Exit
+    Callback     Exit,
+    Engine      *engine
 )
 {
 	Head *head = malloc(sizeof(Head));
@@ -77,6 +77,13 @@ Camera *
 Head_getCamera(Head *Self)
 {
 	return &Self->camera;
+}
+
+
+Engine *
+Head_getCamera(Head *Self)
+{
+	return &Self->engine;
 }
 
 

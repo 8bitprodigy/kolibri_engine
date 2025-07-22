@@ -1,28 +1,40 @@
 #ifndef SCENE_H
 #define SCENE_H
 
-typedef struct 
-{
-    void   *map_data;           // Game casts this
-    Entity *entity_ring;
-    void   *persistent_data;    // Player data between scenes
-} 
-Scene;
+
+#include "common.h"
+
 
 // Map loading callback type
 typedef bool (*MapLoaderCallback)(const char *filename, void **map_data, Entity **entities);
 
-void Scene_init(              Scene      *scene);
-void Scene_cleanup(           Scene      *scene);
-void Scene_setActive(         Scene      *scene);
-Scene *Scene_getActive(       void);
-bool Scene_load(              const char *filename, Scene             *scene);
-void Scene_registerMapLoader( const char *map_type, MapLoaderCallback  loader);
-void Scene_setPersistentData( void       *data);
-void *Scene_getPersistentData(void);
+typedef struct Scene Scene;
+typedef struct
+MapType
+{
+    char             *name;
+    
+    void            (*Setup)(         Scene *scene, void    *map_data);
+    void            (*Enter)(         Scene *scene);
+    void            (*Update)(        Scene *scene, float    delta);
+    CollisionResult (*CheckCollision)(Scene *scene, Entity  *entity, Vector3 to); 
+    CollisionResult (*Raycast)(       Scene *scene, Vector3  from,   Vector3 to); 
+    void            (*Render)(        Scene *scene, Head    *head);
+    void            (*Exit)(          Scene *scene);
+    void            (*Free)(          Scene *scene, void *map_data);
+}
+MapType;
 
-bool Scene_checkCollision(Scene *scene, Entity *entity);
-void Scene_render(        Scene *scene, Head   *head);
+
+Scene          *Scene_new( const MapType *scene_type, void *data, Engine *engine);
+void            Scene_free(Scene *scene);
+
+void            Scene_enter(         Scene *scene);
+void            Scene_update(        Scene *scene, float    delta);
+CollisionResult Scene_checkCollision(Scene *scene, Entity  *entity, Vector3 to);
+CollisionResult Scene_raycast(       Scene *scene, Vector3  from,   Vector3 to);
+void            Scene_render(        Scene *scene, Head    *head);
+void            Scene_exit(          Scene *scene);
 
 
 #endif /* SCENE_H */

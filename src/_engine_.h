@@ -5,8 +5,9 @@
 #include "engine.h"
 
 
-void Engine__addHead(    Engine *engine, Head *head);
-void Engine__getEntities(Engine *engine);
+void    Engine__addHead(    Engine *engine, Head *head);
+Entity *Engine__getEntities(Engine *engine);
+Scene  *Engine__getScene(   Engine *engine);
 
 
 #endif /* ENGINE_PRIVATE_H */

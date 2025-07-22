@@ -34,12 +34,37 @@
 #define V3_ZERO ((Vector3){0.0f, 0.0f, 0.0f})
 #define V3_UP   ((Vector3){0.0f, 1.0f, 0.0f})
 
+/*
+	COMMON ENUMERATIONS
+*/
+enum {
+    POSITION,
+    ROTATION,
+    SCALE,
+    SKEW,
+}
+
 
 typedef struct Engine Engine;
 typedef struct Entity Entity;
 typedef struct Head   Head;
 
-/* Common callbacks */
+/* 
+	COMMON TYPES
+*/
+/* Structs */
+typedef struct 
+CollisionResult 
+{
+    Vector3 position;     /* Where collision occurred */
+    Vector3 normal;       /* Surface normal at hit point */
+    float   distance;     /* Distance to collision */
+    int     material_id;  /* For different surface types */
+    void*   user_data;    /* Scene-specific data (material, etc.) */
+    Entity* entity;       /* If hit an entity (NULL for terrain) */
+    bool    hit;
+}
+CollisionResult;
 
 typedef struct
 Vector2i
@@ -69,7 +94,7 @@ Xform
 }
 Xform;
 
-
+/* Value Types */
 typedef uint64_t     uint64;
 typedef uint16_t     uint16;
 typedef uint8_t      uint8;

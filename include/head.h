@@ -14,18 +14,19 @@ typedef void (*HeadCallback_1f)(Head *head, Engine *engine, float delta);
 
 
 Head *Head_new(  
-    Engine          *engine,
 	int              Controller_ID,
     HeadCallback     Setup,
     HeadCallback_1f  update,
     HeadCallback     prerender,
     HeadCallback     render,
     HeadCallback     postrender,
-    HeadCallback     Exit
+    HeadCallback     Exit,
+    Engine          *engine,
 );
 void Head_free(        Head *head);
 
 Camera        *Head_getCamera(  Head *head);
+Engine        *Head_getEngine(  Head *head);
 RenderTexture *Head_getViewport(Head *head);
 void           Head_setViewport(Head *head, int   width,     int                  height);
 void          *Head_getUserData(Head *head);
