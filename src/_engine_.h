@@ -5,7 +5,7 @@
 #include "engine.h"
 
 
-void    Engine__addHead(    Engine *engine, Head *head);
+Head   *Engine__getHeads(   Engine *engine);
 Entity *Engine__getEntities(Engine *engine);
 Scene  *Engine__getScene(   Engine *engine);
 

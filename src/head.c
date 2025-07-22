@@ -4,6 +4,7 @@
 typedef struct Engine Engine;
 
 typedef struct 
+Head
 {
     Camera3D              camera;
     RenderTexture         viewport;
@@ -13,26 +14,35 @@ typedef struct
     void                 *user_data;
     FreeUserDataCallback *FreeUserData;
 
+    struct Head
+		*prev,
+		*next;
+
 	HeadCallback          Setup;
 	HeadCallback_1f       Update;
 	HeadCallback          PreRender;
 	HeadCallback          Render;
 	HeadCallback          PostRender;
 	HeadCallback          Exit;
+	HeadCallback          Free;
 } 
 Head;
 
 
+/*
+	CONSTRUCTOR
+*/
 Head *
 Head_new(
-	int          Controller_ID,
-    Callback     Setup,
-    Callback_1f  Update,
-    Callback     PreRender,
-    Callback     Render,
-    Callback     PostRender,
-    Callback     Exit,
-    Engine      *engine
+	int              Controller_ID,
+    HeadCallback     Setup,
+    HeadCallback_1f  Update,
+    HeadCallback     PreRender,
+    HeadCallback     Render,
+    HeadCallback     PostRender,
+    HeadCallback     Exit,
+    HeadCallback     Free,
+    Engine          *engine
 )
 {
 	Head *head = malloc(sizeof(Head));
@@ -54,25 +64,64 @@ Head_new(
 		PreRender,
 		Render,
 		PostRender,
-		Exit
+		Exit,
+		Free
 	)
 
-	Engine__addHead(engine, head);
+	insertHead(head, Engine__getHead(engine));
 }
-
-
+/*
+	DESTRUCTOR
+*/
 void
 Head_free(Head *Self)
 {
-	/*
-		Clean up stuff first!
-		Gotta make a way to clean up user_data -- probably a callback
-	*/
+	if(
 	UnloadRenderTexture(Self->viewport);
 	free(Self);
 }
 
 
+/*
+	PRIVATE METHODS
+*/
+void
+insertHead(Head *head, Scene *to)
+{
+	if (!head || !to) {
+		ERR_OUT("insertEntity() received a NULL pointer as argument");
+		return;
+	}
+    
+	if (!to->prev || !to->next) {
+		ERR_OUT("insertEntity() received improperly initialized EntityNode `to`.");
+		return;
+	}
+    
+	Scene *last = to->prev;
+    
+	last->next = head;
+	to->prev   = head;
+	
+	head->next = to;
+	head->prev = last;
+}
+
+
+void
+removeHead(Head *head)
+{
+	EntityNode *head_1 = head->prev;
+	EntityNode *head_2 = head->next;
+
+	head_1->next = head_2;
+	head_2->prev = head_1;
+}
+
+
+/*
+	PUBLIC METHODS
+*/
 Camera *
 Head_getCamera(Head *Self)
 {
@@ -125,7 +174,8 @@ Head_setCallbacks(
     HeadCallback     prerender,
     HeadCallback     render,
     HeadCallback     postrender,
-    HeadCallback     Exit
+    HeadCallback     Exit,
+    HeadCallback     Free
 )
 {
 	head->Setup      = Setup;
@@ -134,6 +184,7 @@ Head_setCallbacks(
 	head->Render     = Render;
 	head->PostRender = PostRender;
 	head->Exit       = Exit;
+	head->Free       = Free;
 }
 
 
@@ -145,7 +196,8 @@ Head_setCallbacksConditional(
     HeadCallback     prerender,
     HeadCallback     render,
     HeadCallback     postrender,
-    HeadCallback     Exit
+    HeadCallback     Exit,
+    HeadCallback     Free
 )
 {
 	if (Setup)      head->Setup      = Setup;
@@ -154,52 +206,47 @@ Head_setCallbacksConditional(
 	if (Render)     head->Render     = Render;
 	if (PostRender) head->PostRender = PostRender;
 	if (Exit)       head->Exit       = Exit;
+	if (Free)       head->Free       = Free;
 }
 
 
 void
 Head_Setup(Head *Self, Engine *engine)
 {
-	if (!Self->Setup) return;
-	Self->Setup(Self, engine);
+	if (Self->Setup) Self->Setup(Self, engine);
 }
 
 
 void
 Head_Update(Head *Self, Engine *engine, float delta)
 {
-	if (!Self->Update) return;
-	Self->Update(Self, engine);
+	if (Self->Update) Self->Update(Self, engine);
 }
 
 
 void
 Head_PreRender(Head *Self, Engine *engine)
 {
-	if (!Self->PreRender() return;
-	Self->PreRender(Self, engine);
+	if (Self->PreRender) Self->PreRender(Self, engine);
 }
 
 
 void
 Head_Render(Head *Self, Engine *engine)
 {
-	if (!Self->Render() return;
-	Self->Render(Sself, engine);
+	if (Self->Render) Self->Render(Sself, engine);
 }
 
 
 void
 Head_PostRender(Head *Self, Engine *engine)
 {
-	if (!Self->PostRender() return;
-	Self->PostRender(Self, engine);
+	if (Self->PostRender) Self->PostRender(Self, engine);
 }
 
 
 void
 Head_Exit(Head *Self, Engine *engine)
 {
-	if (!Self->Exit() return;
-	Self->Exit(Self, engine);
+	if (Self->Exit) Self->Exit(Self, engine);
 }

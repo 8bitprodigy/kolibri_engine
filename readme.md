@@ -2,7 +2,7 @@
 
 ---
 
-**Rationale:** Create a simple, minimalist 3D game engine in C using raylib for both education, hacking, modification, and legitimate game development in mind.
+**Rationale:** Create a simple, minimalist 3D game engine in C using raylib for education, hacking, modification, and legitimate game development.
 
 ---
 

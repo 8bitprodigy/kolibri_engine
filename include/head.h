@@ -5,14 +5,11 @@
 #include "common.h"
 
 
-typedef struct Head Head;
-typedef struct Engine Engine;
-
-
+/* Callback Types */
 typedef void (*HeadCallback)(   Head *head, Engine *engine);
 typedef void (*HeadCallback_1f)(Head *head, Engine *engine, float delta);
 
-
+/* Constructor */
 Head *Head_new(  
 	int              Controller_ID,
     HeadCallback     Setup,
@@ -21,10 +18,14 @@ Head *Head_new(
     HeadCallback     render,
     HeadCallback     postrender,
     HeadCallback     Exit,
+    HeadCallback     Free,
     Engine          *engine,
 );
+/* Destructor */
 void Head_free(        Head *head);
 
+
+/* Setters/Getters */
 Camera        *Head_getCamera(  Head *head);
 Engine        *Head_getEngine(  Head *head);
 RenderTexture *Head_getViewport(Head *head);
@@ -32,6 +33,7 @@ void           Head_setViewport(Head *head, int   width,     int                
 void          *Head_getUserData(Head *head);
 void           Head_setUserData(Head *head, void *user_data, FreeUserDataCallback callback);
 
+/* Methods */
 void Head_setCallbacks(
     Head            *head,
     HeadCallback     Setup,
@@ -39,7 +41,8 @@ void Head_setCallbacks(
     HeadCallback     prerender,
     HeadCallback     render,
     HeadCallback     postrender,
-    HeadCallback     Exit
+    HeadCallback     Exit,
+    HeadCallback     Free
 );
 void Head_setCallbacksConditional(
     Head            *head,
@@ -48,14 +51,23 @@ void Head_setCallbacksConditional(
     HeadCallback     prerender,
     HeadCallback     render,
     HeadCallback     postrender,
-    HeadCallback     Exit
+    HeadCallback     Exit,
+    HeadCallback     Free
 );
-#define Head_setSetupCallback(  head, callback) Head_setCallbacksConditional( (head), (callback), NULL, NULL, NULL, NULL, NULL)
-#define Head_UpdateCallback(    head, callback) Head_setCallbacksConditional( (head), NULL, (callback), NULL, NULL, NULL, NULL)
-#define Head_PreRenderCallback( head, callback) Head_setCallbacksConditional( (head), NULL, NULL, (callback), NULL, NULL, NULL)
-#define Head_RenderCallback(    head, callback) Head_setCallbacksConditional( (head), NULL, NULL, NULL, (callback), NULL, NULL)
-#define Head_PostRenderCallback(head, callback) Head_setCallbacksConditional( (head), NULL, NULL, NULL, NULL, (callback), NULL)
-#define Head_ExitCallback(      head, callback) Head_setCallbacksConditional( (head), NULL, NULL, NULL, NULL, NULL, (callback))
+#define Head_setSetupCallback(  head, callback) \
+    Head_setCallbacksConditional( (head), (callback), NULL, NULL, NULL, NULL, NULL, NULL)
+#define Head_setUpdateCallback( head, callback) \
+    Head_setCallbacksConditional( (head), NULL, (callback), NULL, NULL, NULL, NULL, NULL)
+#define Head_setPreRenderCallback( head, callback) \
+    Head_setCallbacksConditional( (head), NULL, NULL, (callback), NULL, NULL, NULL, NULL)
+#define Head_setRenderCallback( head, callback) \
+    Head_setCallbacksConditional( (head), NULL, NULL, NULL, (callback), NULL, NULL, NULL)
+#define Head_setPostRenderCallback(head, callback) \
+    Head_setCallbacksConditional( (head), NULL, NULL, NULL, NULL, (callback), NULL, NULL)
+#define Head_setExitCallback(   head, callback) \
+    Head_setCallbacksConditional( (head), NULL, NULL, NULL, NULL, NULL, (callback), NULL)
+#define Head_setFreeCallback(   head, callback) \
+    Head_setCallbacksConditional( (head), NULL, NULL, NULL, NULL, NULL, NULL, (callback))
 
 void Head_Setup(     Head *head, Engine *engine);
 void Head_Update(    Head *head, Engine *engine, float delta);

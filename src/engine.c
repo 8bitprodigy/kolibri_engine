@@ -6,9 +6,10 @@
 typedef struct
 Engine
 {
-	Head       *heads[MAX_NUM_HEADS];
-	EntityNode *entities;
-	Scene      *scene;
+	Head           *heads;
+	EntityNode     *entities;
+	Scene          *scene;
+	CollisionScene *collision_scene;
 	
 	uint64     frame_num;
 	uint       head_count;
@@ -173,17 +174,23 @@ Engine_requestExit(Engine *self)
 }
 
 
-/******************
-	PRIVATE API
-******************/
-
-void
-Engine__addHead(Engine *self, Head *head)
+/**********************
+	PRIVATE METHODS
+**********************/
+Head *
+Engine__getHeads(Engine *self)
 {
-	if (MAX_NUM_HEADS <= self->head_count) {
-		Head_free(head);
-		return;
-	}
-	/* Add head to array and then increment head_count */
-	self->heads[self->head_count++] = head;
+	return self->heads;
+}
+
+Entity *
+Engine__getEntities(Engine *self)
+{
+	return self->entities;
+}
+
+Scene *
+Engine__getScene(Engine *self)
+{
+	return self->scene;
 }
