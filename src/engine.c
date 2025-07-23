@@ -52,14 +52,7 @@ Engine;
 	CONSTRUCTOR
 ******************/
 Engine *
-Engine_new(
-	EngineCallback    Setup_Callback, 
-	EngineCallback    Run_Callback, 
-	EngineCallback_1f Update_Callback, 
-	EngineCallback    Render_Callback, 
-	EngineCallback    Exit_Callback,
-	EngineCallback    Free_Callback
-)
+Engine_new(EngineVTable *vtable)
 {
 	Engine *engine = malloc(sizeof(Engine));
 
@@ -81,12 +74,7 @@ Engine_new(
 	engine->request_exit     = false;
 	engine->dirty_entityList = true;
 
-	engine->Setup            = Setup_Callback
-	engine->Run              = Run_Callback
-	engine->Update           = Update_Callback;
-	engine->Render           = Render_Callback;
-	engine->Exit             = Exit_Callback;
-	engine->Free             = Free_Callback;
+	engine->vtable           = vtable;
 
 	if (engine->Setup) engine->Setup(engine);
 }
@@ -116,58 +104,44 @@ Engine_getEntityList(Engine *engine)
 
 
 void 
-Engine_setCallbacks(
-    Engine            *engine,
-    EngineCallback     Setup,
-    EngineCallback     Run,
-    EngineCallback_1f  Update,
-    EngineCallback     Render,
-    EngineCallback     Exit,
-    EngineCallback     Free
-)
+Engine_setVTable(Engine *engine, EngineVTable *vtable)
 {
-	engine->Setup  = Setup;
-	engine->Run    = Run;
-	engine->Update = Update;
-	engine->Render = Render;
-	engine->Exit   = Exit;
-	engine->Free   = Free;
+	engine->vtable = vtable;
 }
 
 
-void 
-Engine_setCallbacksConditional(
-    Engine            *engine,
-    EngineCallback     Setup,
-    EngineCallback     Run,
-    EngineCallback_1f  Update,
-    EngineCallback     Render,
-    EngineCallback     Exit,
-    EngineCallback     Free
-)
+EngineVTable *
+Engine_getVTable(Engine *engine)
 {
-	if (Setup)  engine->Setup  = Setup;
-	if (Run)    engine->Run    = Run;
-	if (Update) engine->Update = Update;
-	if (Render) engine->Render = Render;
-	if (Exit)   engine->Exit   = Exit;
-	if (Free)   engine->Free   = Free;
+	return engine->vtable;
 }
 
 
 void
 Engine_run(Engine *self)
 {
-	if (self->Run) self->Run(self);
-	while(!self->request_exit) {
-		self->request_exit = WindowShouldClose();
+	const EngineVTable *vtable = self-vtable;
+	
+	if (vtable && vtable->Run) vtable->Run(self);
+	if (self->head_count) {
+		while(!self->request_exit) {
+			self->request_exit = WindowShouldClose();
 
-		Engine_update(self);
-		Engine_render(self);
+			Engine_update(self);
+			Engine_render(self);
 
-		self->frame_num++;
+			self->frame_num++;
+		}
+	else { /* For uses such as game servers */
+		while(!self->request_exit) {
+			self->request_exit = WindowShouldClose();
+
+			Engine_update(self);
+
+			self->frame_num++;
+		}
 	}
-	if (self->Exit) self->Exit(self);
+	if (vtable && vtable->Exit) vtable->Exit(self);
 }
 
 
@@ -178,6 +152,8 @@ Engine_update(Engine *self)
 	EntityNode 
 		*entity_nodes = self->entities,
 		*node;
+
+	const EntityVTable *vtable = self->vtable;
 	
 	float delta = GetFrameTime();
 	self->delta = delta;
@@ -196,7 +172,7 @@ Engine_update(Engine *self)
 		node = node->next;
 		i++;
 	} while (node != entity_nodes);
-	if (engine->Update) engine->Update(self, delta);
+	if (vtable && vtable->Update) vtable->Update(self, delta);
 	self->frame_num++;
 }
 
@@ -204,6 +180,7 @@ Engine_update(Engine *self)
 void
 Engine_render(Engine *self)
 {
+	const EntityVTable *vtable = self->vtable;
 	/* Loop through Heads */
 	/* Render to Head stage */
 	for (int i = 0; i < self->head_count; i++) {
@@ -221,7 +198,8 @@ Engine_render(Engine *self)
 	/* End loop through Heads */
 	/* Composition stage */
 	BeginDrawing()
-		if (self->Render) self->Render(self);
+		/* This is how the final frame is composited together */
+		if (vtable && vtable->Render) vtable->Render(self);
 	EndDrawing()
 }
 
@@ -256,7 +234,14 @@ Engine__getHeads(Engine *self)
 	return self->heads;
 }
 
-Entity *
+void
+Engine__addEntity(Engine *self, EntityNode *node)
+{
+	EntityNode__insert(node, self->entities);
+	self->entity_count++;
+}
+
+EntityNode *
 Engine__getEntities(Engine *self)
 {
 	return self->entities;

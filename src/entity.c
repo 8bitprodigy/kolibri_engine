@@ -34,7 +34,7 @@ Entity_new(const Entity *entity, Engine *engine)
 
 	node->unique_ID = latest_ID++;
 	
-	insertEntityNode(node, Engine__getEntities(engine));
+	Engine__addEntity(engine, node);
 
 	if (base->Setup) base->Setup(base);
 }
@@ -59,15 +59,15 @@ EntityNode__free(EntityNode *self)
 
 
 void
-insertEntityNode(EntityNode *node, EntityNode *to)
+EntityNode__insert(EntityNode *node, EntityNode *to)
 {
 	if (!node || !to) {
-		ERR_OUT("insertEntity() received a NULL pointer as argument");
+		ERR_OUT("EntityNode__insert() received a NULL pointer in arguments");
 		return;
 	}
 
 	if (!to->prev || !to->next) {
-		ERR_OUT("insertEntity() received improperly initialized EntityNode `to`.");
+		ERR_OUT("EntityNode__insert() received improperly initialized EntityNode `to`.");
 		return;
 	}
 
@@ -82,7 +82,7 @@ insertEntityNode(EntityNode *node, EntityNode *to)
 
 
 void
-removeEntityNode(EntityNode *node)
+EntityNode__remove(EntityNode *node)
 {
 	EntityNode *node_1 = node->prev;
 	EntityNode *node_2 = node->next;

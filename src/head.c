@@ -18,13 +18,7 @@ Head
 		*prev,
 		*next;
 
-	HeadCallback          Setup;
-	HeadCallback_1f       Update;
-	HeadCallback          PreRender;
-	HeadCallback          Render;
-	HeadCallback          PostRender;
-	HeadCallback          Exit;
-	HeadCallback          Free;
+	HeadVTable *vtable;
 } 
 Head;
 
@@ -34,15 +28,9 @@ Head;
 */
 Head *
 Head_new(
-	int              Controller_ID,
-    HeadCallback     Setup,
-    HeadCallback_1f  Update,
-    HeadCallback     PreRender,
-    HeadCallback     Render,
-    HeadCallback     PostRender,
-    HeadCallback     Exit,
-    HeadCallback     Free,
-    Engine          *engine
+	int         Controller_ID,
+    HeadVTable *VTable,
+    Engine     *engine
 )
 {
 	Head *head = malloc(sizeof(Head));
@@ -57,16 +45,7 @@ Head_new(
 	head->controlled_entity = NULL;
 	head->user_data         = NULL;
 
-	Head_setCallbacks(
-		head,
-		Setup,
-		Update,
-		PreRender,
-		Render,
-		PostRender,
-		Exit,
-		Free
-	)
+	head->vtable            = VTable
 
 	insertHead(head, Engine__getHead(engine));
 }
@@ -167,46 +146,15 @@ Head_setUserData(Head *Self, void *User_Data, FreeUserDataCallback callback)
 
 
 void 
-Head_setCallbacks(
-    Head            *head,
-    HeadCallback     Setup,
-    HeadCallback_1f  update,
-    HeadCallback     prerender,
-    HeadCallback     render,
-    HeadCallback     postrender,
-    HeadCallback     Exit,
-    HeadCallback     Free
-)
+Head_setVTable(Head *head, HeadVTable *VTable)
 {
-	head->Setup      = Setup;
-	head->Update     = Update;
-	head->PreRender  = PreRender;
-	head->Render     = Render;
-	head->PostRender = PostRender;
-	head->Exit       = Exit;
-	head->Free       = Free;
+	head->vtable = VTable;
 }
 
-
-void 
-Head_setCallbacksConditional(
-    Head            *head,
-    HeadCallback     Setup,
-    HeadCallback_1f  update,
-    HeadCallback     prerender,
-    HeadCallback     render,
-    HeadCallback     postrender,
-    HeadCallback     Exit,
-    HeadCallback     Free
-)
+HeadVTable *
+Head_getVTable(Head *head)
 {
-	if (Setup)      head->Setup      = Setup;
-	if (Update)     head->Update     = Update;
-	if (PreRender)  head->PreRender  = PreRender;
-	if (Render)     head->Render     = Render;
-	if (PostRender) head->PostRender = PostRender;
-	if (Exit)       head->Exit       = Exit;
-	if (Free)       head->Free       = Free;
+	return head->vtable;
 }
 
 

@@ -24,9 +24,9 @@ Scene;
 */
 Scene *
 Scene_new(
-    const MapType *map_type, 
-    void          *data, 
-    Engine        *engine)
+    const SceneVTable *map_type, 
+    void              *data, 
+    Engine            *engine)
 {
     Scene *scene = malloc(sizeof(Scene));
     if (!scene) {

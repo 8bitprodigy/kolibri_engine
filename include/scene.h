@@ -5,7 +5,6 @@
 #include "common.h"
 
 
-// Map loading callback type
 typedef void       (*SceneCallback)(         Scene *scene);
 typedef void       (*SceneDataCallback)(     Scene *scene, void    *map_data);
 typedef void       (*SceneUpdateCallback)(   Scene *scene, float   *delta);
@@ -16,10 +15,8 @@ typedef VisibleSet (*SceneRenderCallback)(   Scene *scene, Head    *head);
 
 typedef struct Scene Scene;
 typedef struct
-MapType
+SceneVTable
 {
-    char                   *name;
-    
     SceneDataCallback       Setup;
     SceneCallback           Enter;
     SceneUpdateCallback     Update;
@@ -31,14 +28,14 @@ MapType
     SceneCallback           Exit;
     SceneDataCallback       Free;
 }
-MapType;
+SceneVTable;
 
 /* Constructor */
-Scene          *Scene_new(const MapType *scene_type, void *data, Engine *engine);
+Scene          *Scene_new(const SceneVTable *scene_type, void *data, Engine *engine);
 /* Destructor */
 void            Scene_free(     Scene   *scene);
 
-/* Methods */
+/* Public Methods */
 void            Scene_enter(         Scene *scene);
 void            Scene_update(        Scene *scene, float    delta);
 CollisionResult Scene_checkCollision(Scene *scene, Entity  *entity, Vector3 to);

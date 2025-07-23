@@ -21,5 +21,6 @@ EntityNode
 }
 EntityNode;
 
-
-void EntityNode__free(EntityNode *entity_node);
+void EntityNode__insert(EntityNode *entity_node, EntityNode *to);
+void EntityNode__remove(EntityNode *entity_node);
+void EntityNode__free(  EntityNode *entity_node);

@@ -26,13 +26,7 @@ HeadVTable;
 /* Constructor */
 Head *Head_new(  
 	int              Controller_ID,
-    HeadCallback     Setup,
-    HeadCallback_1f  update,
-    HeadCallback     prerender,
-    HeadCallback     render,
-    HeadCallback     postrender,
-    HeadCallback     Exit,
-    HeadCallback     Free,
+    HeadVTable      *vtable;
     Engine          *engine,
 );
 /* Destructor */
@@ -46,41 +40,8 @@ RenderTexture *Head_getViewport(Head *head);
 void           Head_setViewport(Head *head, int   width,     int                  height);
 void          *Head_getUserData(Head *head);
 void           Head_setUserData(Head *head, void *user_data, FreeUserDataCallback callback);
-
-void Head_setCallbacks(
-    Head            *head,
-    HeadCallback     Setup,
-    HeadCallback_1f  update,
-    HeadCallback     prerender,
-    HeadCallback     render,
-    HeadCallback     postrender,
-    HeadCallback     Exit,
-    HeadCallback     Free
-);
-void Head_setCallbacksConditional(
-    Head            *head,
-    HeadCallback     Setup,
-    HeadCallback_1f  update,
-    HeadCallback     prerender,
-    HeadCallback     render,
-    HeadCallback     postrender,
-    HeadCallback     Exit,
-    HeadCallback     Free
-);
-#define Head_setSetupCallback(  head, callback) \
-    Head_setCallbacksConditional((head), (callback), NULL, NULL, NULL, NULL, NULL, NULL)
-#define Head_setUpdateCallback( head, callback) \
-    Head_setCallbacksConditional((head), NULL, (callback), NULL, NULL, NULL, NULL, NULL)
-#define Head_setPreRenderCallback( head, callback) \
-    Head_setCallbacksConditional((head), NULL, NULL, (callback), NULL, NULL, NULL, NULL)
-#define Head_setRenderCallback( head, callback) \
-    Head_setCallbacksConditional((head), NULL, NULL, NULL, (callback), NULL, NULL, NULL)
-#define Head_setPostRenderCallback(head, callback) \
-    Head_setCallbacksConditional((head), NULL, NULL, NULL, NULL, (callback), NULL, NULL)
-#define Head_setExitCallback(   head, callback) \
-    Head_setCallbacksConditional((head), NULL, NULL, NULL, NULL, NULL, (callback), NULL)
-#define Head_setFreeCallback(   head, callback) \
-    Head_setCallbacksConditional((head), NULL, NULL, NULL, NULL, NULL, NULL, (callback))
+void           Head_setVTable(  Head *head, HeadVTable *vtable);
+HeadVTable    *Head_getVTable(  Head *head);
 
 /* Methods */
 void Head_Setup(     Head *head, Engine *engine);
