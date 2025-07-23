@@ -13,6 +13,9 @@ EntityNode
 		*next;
 
 	uint64 unique_ID;
+	int    current_lod;
+    float  last_lod_distance; /* Cache to avoid recalculating every frame */
+    bool   visible_last_frame; /* For frustum culling optimizations */
 	
 	Entity base;
 }

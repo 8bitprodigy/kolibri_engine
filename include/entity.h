@@ -13,7 +13,9 @@ typedef struct
 Entity 
 {
     
-    Model          *model;
+    Renderable      renderables[MAX_LOD_LEVELS];
+    float           lod_distances[MAX_LOD_LEVELS];
+    uint8           lod_count
     Engine         *engine;
     void           *user_data; /* This is a void *, but could be replaced with a hashmap, perhaps */
 

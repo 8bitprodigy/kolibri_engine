@@ -6,12 +6,13 @@
 
 
 // Map loading callback type
-typedef void (*SceneCallback)(         Scene *scene);
-typedef void (*SceneDataCallback)(    Scene *scene, void    *map_data);
-typedef void (*SceneUpdateCallback)(   Scene *scene, float   *delta);
-typedef void (*SceneCollisionCallback)(Scene *scene, Entity  *entity, Vector3 to);
-typedef void (*SceneRaycastCallback)(  Scene *scene, Vector3  from,   Vector3 to);
-typedef void (*SceneRenderCallback)(   Scene *scene, Head    *head);
+typedef void       (*SceneCallback)(         Scene *scene);
+typedef void       (*SceneDataCallback)(     Scene *scene, void    *map_data);
+typedef void       (*SceneUpdateCallback)(   Scene *scene, float   *delta);
+typedef void       (*SceneEntityCallback)(   Scene *scene, Entity  *entity);
+typedef void       (*SceneCollisionCallback)(Scene *scene, Entity  *entity, Vector3 to);
+typedef void       (*SceneRaycastCallback)(  Scene *scene, Vector3  from,   Vector3 to);
+typedef VisibleSet (*SceneRenderCallback)(   Scene *scene, Head    *head);
 
 typedef struct Scene Scene;
 typedef struct
@@ -22,6 +23,8 @@ MapType
     SceneDataCallback       Setup;
     SceneCallback           Enter;
     SceneUpdateCallback     Update;
+    SceneEntityCallback     EntityEnter;
+    SceneEntityCallback     EntityLeave;
     SceneCollisionCallback  CheckCollision; 
     SceneRaycastCallback    Raycast; 
     SceneRenderCallback     Render;
