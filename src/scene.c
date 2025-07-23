@@ -7,18 +7,6 @@ void insertScene(Scene *scene, Scene *to);
 void removeScene(Scene *scene);
 
 
-typedef struct 
-Scene
-{
-    struct Scene
-        *prev,
-        *next;
-    void      *map_data;
-    SceneType *vtable;
-} 
-Scene;
-
-
 /*
     CONSTRUCTOR
 */
@@ -36,10 +24,12 @@ Scene_new(
 
     scene->prev     = scene;
     scene->next     = scene;
+    
+    scene->engine   = engine;
     scene->map_data = data;
     scene->vtable   = map_type;
 
-    insertScene(scene, Engine__getScene(engine));
+    Engine__insertScene(engine, scene);
 
     if (map_type->Setup) map_type->Setup(scene, data);
 }
@@ -47,48 +37,15 @@ Scene_new(
     DESTRUCTOR
 */
 void
-Scene_free(Scene *scene)
+Scene_free(Scene *scene, Engine *engine)
 {
-    removeScene(scene);
-    if (scene->vtable->Free) scene->vtable->Free(scene);
+    SceneVTable *vtable = scene->vtable;
+    
+    if (vtable && vtable->Free) vtable->Free(scene);
+    
+    Engine__removeScene(scene->engine, scene);
+    
     free(scene);
-}
-
-
-/*
-    PRIVATE METHODS
-*/
-void
-insertScene(Scene *scene, Scene *to)
-{
-	if (!scene || !to) {
-		ERR_OUT("insertEntity() received a NULL pointer as argument");
-		return;
-	}
-    
-	if (!to->prev || !to->next) {
-		ERR_OUT("insertEntity() received improperly initialized EntityNode `to`.");
-		return;
-	}
-    
-	Scene *last = to->prev;
-    
-	last->next = scene;
-	to->prev   = scene;
-	
-	scene->next = to;
-	scene->prev = last;
-}
-
-
-void
-removeScene(Scene *scene)
-{
-	EntityNode *scene_1 = scene->prev;
-	EntityNode *nscene_2 = scene->next;
-
-	scene_1->next = scene_2;
-	scene_2->prev = scene_1;
 }
 
 
@@ -98,35 +55,55 @@ removeScene(Scene *scene)
 void
 Scene_enter(Scene *self)
 {
-    if (self->vtable->Enter) self->vtable->Enter(self);
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->Enter) vtable->Enter(self);
 }
 
 void
 Scene_update(Scene *self, float delta)
 {
-    if (self->vtable->Enter) self->vtable->Update(self, delta);
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->Enter) vtable->Update(self, delta);
+}
+
+void 
+Scene_entityEnter(Scene *scene, Entity *entity)
+{
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->EntityEnter) vtable->EntityEnter(self, entity);
+}
+
+void 
+Scene_entityExit(Scene *scene, Entity *entity)
+{
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->EntityExit) vtable->EntityExit(self, entity);
 }
 
 void
 Scene_checkCollision(Scene *self, Entity *entity, Vector to)
 {
-    if (self->vtable->CheckCollision) self->vtable->CheckCollision(self, entity, to);
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->CheckCollision) vtable->CheckCollision(self, entity, to);
 }
 
 void
 Scene_raycast(Scene *self, Vector from, Vector to)
 {
-    if (self->vtable->Raycast) self->vtable->Raycast(self, from, to);
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->Raycast) vtable->Raycast(self, from, to);
 }
 
 void
 Scene_update(Scene *self, Head *head)
 {
-    if (self->vtable->Render) self->vtable->Render(self, head);
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->Render) vtable->Render(self, head);
 }
 
 void
 Scene_exit(Scene *self)
 {
-    if (self->vtable->Exit) self->vtable->Exit(self);
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->Exit) vtable->Exit(self);
 }

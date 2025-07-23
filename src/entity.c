@@ -34,7 +34,7 @@ Entity_new(const Entity *entity, Engine *engine)
 
 	node->unique_ID = latest_ID++;
 	
-	Engine__addEntity(engine, node);
+	Engine__insertEntity(engine, node);
 
 	if (base->Setup) base->Setup(base);
 }
@@ -50,9 +50,12 @@ Entity_free(Entity *self)
 void
 EntityNode__free(EntityNode *self)
 {
-	Entity *entity = PRIVATE_TO_ENTITY(self);
-
-	entity->Free(entity);
+	Entity       *entity = PRIVATE_TO_ENTITY(self);
+	EntityVTable *vtable = entity->vtable;
+	
+	if (vtable && vtable->Free) vtable->Free(entity);
+	
+	Engine__removeEntity(self->engine, node);
 
 	free(self);
 }
@@ -84,6 +87,14 @@ EntityNode__insert(EntityNode *node, EntityNode *to)
 void
 EntityNode__remove(EntityNode *node)
 {
+	if (!node) {
+		ERR_OUT("EntityNode__remove() received a NULL pointer.");
+		return;
+	}
+	if (!node->prev || !node->next) {
+		ERR_OUT("EntityNode__remove() received an EntityNode with missing prev/next pointers.");
+		return;
+	}
 	EntityNode *node_1 = node->prev;
 	EntityNode *node_2 = node->next;
 

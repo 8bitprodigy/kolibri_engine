@@ -1,6 +1,7 @@
 #include <raylib.h>
 #include "_engine_.h"
 #include "_entity_.h"
+#include "_scene_.h"
 #include "head.h"
 
 
@@ -235,11 +236,42 @@ Engine__getHeads(Engine *self)
 }
 
 void
-Engine__addEntity(Engine *self, EntityNode *node)
+Engine__insertHead(Engine *self, Head *head)
 {
-	EntityNode__insert(node, self->entities);
-	self->entity_count++;
+	if (self->HEAD_COUNT_MAX <= self->head_count) return;
+	if (self->heads) {
+		self->heads = head;
+		self->head_count++;
+		return;
+	}
+	Head 
+		*to   = self->heads,
+		*last = to->prev;
+
+	last->next = head;
+	to->prev   = head;
+	
+	head->next = to;
+	head->prev = last;
+	
+	self->head_count++;
 }
+
+void
+Engine__removeHead(Engine *self, Head *head)
+{
+	if (!self->head_count) return;
+	Head *head_1 = head->prev;
+	Head *head_2 = head->next;
+
+	head_1->next = head_2;
+	head_2->prev = head_1;
+
+	if (self->heads == head) self->heads = head_2;
+	
+	self->head_count--;
+}
+
 
 EntityNode *
 Engine__getEntities(Engine *self)
@@ -247,8 +279,76 @@ Engine__getEntities(Engine *self)
 	return self->entities;
 }
 
+void
+Engine__insertEntity(Engine *self, EntityNode *node)
+{
+	if (self->ENTITY_COUNT_MAX <= self->entity_count) return;
+	if (self->entities) {
+		self->entities = node;
+		self->entity_count++;
+		return;
+	}
+	EntityNode 
+		*to   = self->entities,
+		*last = to->prev;
+
+	last->next = node;
+	to->prev   = node;
+	
+	node->next = to;
+	node->prev = last;
+	
+	self->entity_count++;
+}
+
+void
+Engine__removeEntity(Engine *self, EntityNode *node)
+{
+	if (!self->entity_count) return;
+	EntityNode *node_1 = node->prev;
+	EntityNode *node_2 = node->next;
+
+	node_1->next = node_2;
+	node_2->prev = node_1;
+
+	if (self->entities == node) self->entities = node_2;
+	
+	self->entity_count--;
+}
+
 Scene *
 Engine__getScene(Engine *self)
 {
 	return self->scene;
+}
+
+void
+Engine__insertScene(Engine *self, Scene *scene)
+{
+	if (self->scene) {
+		self->scene = scene;
+		return;
+	}
+	Scene 
+		*to   = self->scene,
+		*last = to->prev;
+
+	last->next = scene;
+	to->prev   = scene;
+	
+	scene->next = to;
+	scene->prev = last;
+}
+
+void
+Engine__removeScene(Engine *self, Scene *scene)
+{
+	if (!self->scene) return;
+	Scene *scene_1 = scene->prev;
+	Scene *scene_2 = scene->next;
+
+	scene_1->next = scene_2;
+	scene_2->prev = scene_1;
+
+	if (self->scene == scene) self->scene = scene_2;
 }

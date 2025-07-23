@@ -1,3 +1,4 @@
+#include "_engine_.h"
 #include "_head_.h"
 
 
@@ -47,7 +48,9 @@ Head_new(
 
 	head->vtable            = VTable
 
-	insertHead(head, Engine__getHead(engine));
+	Engine__insertHead(engine, head);
+
+	Head_setup(head);
 }
 /*
 	DESTRUCTOR
@@ -55,46 +58,15 @@ Head_new(
 void
 Head_free(Head *Self)
 {
-	if(
-	UnloadRenderTexture(Self->viewport);
-	free(Self);
-}
-
-
-/*
-	PRIVATE METHODS
-*/
-void
-insertHead(Head *head, Scene *to)
-{
-	if (!head || !to) {
-		ERR_OUT("insertEntity() received a NULL pointer as argument");
-		return;
-	}
-    
-	if (!to->prev || !to->next) {
-		ERR_OUT("insertEntity() received improperly initialized EntityNode `to`.");
-		return;
-	}
-    
-	Scene *last = to->prev;
-    
-	last->next = head;
-	to->prev   = head;
+	HeadVTable *vtable = self->vtable;
 	
-	head->next = to;
-	head->prev = last;
-}
-
-
-void
-removeHead(Head *head)
-{
-	EntityNode *head_1 = head->prev;
-	EntityNode *head_2 = head->next;
-
-	head_1->next = head_2;
-	head_2->prev = head_1;
+	if (vtable && vtable->Free) vtable->Free(self);
+	
+	Engine__removeHead(self->engine, self)
+	
+	UnloadRenderTexture(Self->viewport);
+	
+	free(Self);
 }
 
 
@@ -159,42 +131,42 @@ Head_getVTable(Head *head)
 
 
 void
-Head_Setup(Head *Self, Engine *engine)
+Head_Setup(Head *Self)
 {
-	if (Self->Setup) Self->Setup(Self, engine);
+	if (Self->Setup) Self->Setup(Self);
 }
 
 
 void
-Head_Update(Head *Self, Engine *engine, float delta)
+Head_Update(Head *Self, float delta)
 {
-	if (Self->Update) Self->Update(Self, engine);
+	if (Self->Update) Self->Update(Self, delta);
 }
 
 
 void
-Head_PreRender(Head *Self, Engine *engine)
+Head_PreRender(Head *Self)
 {
-	if (Self->PreRender) Self->PreRender(Self, engine);
+	if (Self->PreRender) Self->PreRender(Self);
 }
 
 
 void
-Head_Render(Head *Self, Engine *engine)
+Head_Render(Head *Self)
 {
-	if (Self->Render) Self->Render(Sself, engine);
+	if (Self->Render) Self->Render(Self);
 }
 
 
 void
-Head_PostRender(Head *Self, Engine *engine)
+Head_PostRender(Head *Self)
 {
-	if (Self->PostRender) Self->PostRender(Self, engine);
+	if (Self->PostRender) Self->PostRender(Self);
 }
 
 
 void
-Head_Exit(Head *Self, Engine *engine)
+Head_Exit(Head *Self)
 {
-	if (Self->Exit) Self->Exit(Self, engine);
+	if (Self->Exit) Self->Exit(Self);
 }

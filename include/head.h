@@ -6,8 +6,8 @@
 
 
 /* Callback Types */
-typedef void (*HeadCallback)(   Head *head, Engine *engine);
-typedef void (*HeadCallback_1f)(Head *head, Engine *engine, float delta);
+typedef void (*HeadCallback)(   Head *head);
+typedef void (*HeadCallback_1f)(Head *head, float delta);
 
 typedef struct
 HeadVTable
@@ -30,7 +30,7 @@ Head *Head_new(
     Engine          *engine,
 );
 /* Destructor */
-void Head_free(        Head *head);
+void Head_free(Head *head);
 
 
 /* Setters/Getters */
@@ -44,12 +44,12 @@ void           Head_setVTable(  Head *head, HeadVTable *vtable);
 HeadVTable    *Head_getVTable(  Head *head);
 
 /* Methods */
-void Head_Setup(     Head *head, Engine *engine);
-void Head_Update(    Head *head, Engine *engine, float delta);
-void Head_PreRender( Head *head, Engine *engine);
-void Head_Render(    Head *head, Engine *engine);
-void Head_PostRender(Head *head, Engine *engine);
-void Head_Exit(      Head *head, Engine *engine);
+void Head_Setup(     Head *head);
+void Head_Update(    Head *head, float delta);
+void Head_PreRender( Head *head);
+void Head_Render(    Head *head);
+void Head_PostRender(Head *head);
+void Head_Exit(      Head *head);
 
 
 #endif /* HEAD_H */

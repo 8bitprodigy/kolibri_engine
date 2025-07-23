@@ -69,6 +69,7 @@ typedef int64_t      int64;
 typedef int16_t      int16;
 typedef int8_t       int8;
 typedef unsigned int uint;
+typedef size_t       word;
 
 /* Structs */
 typedef struct 

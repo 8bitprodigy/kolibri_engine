@@ -21,7 +21,7 @@ SceneVTable
     SceneCallback           Enter;
     SceneUpdateCallback     Update;
     SceneEntityCallback     EntityEnter;
-    SceneEntityCallback     EntityLeave;
+    SceneEntityCallback     EntityExit;
     SceneCollisionCallback  CheckCollision; 
     SceneRaycastCallback    Raycast; 
     SceneRenderCallback     Render;
@@ -33,11 +33,13 @@ SceneVTable;
 /* Constructor */
 Scene          *Scene_new(const SceneVTable *scene_type, void *data, Engine *engine);
 /* Destructor */
-void            Scene_free(     Scene   *scene);
+void            Scene_free(     Scene       *scene);
 
 /* Public Methods */
 void            Scene_enter(         Scene *scene);
 void            Scene_update(        Scene *scene, float    delta);
+void            Scene_entityEnter(   Scene *scene, Entity  *entity);
+void            Scene_entityExit(    Scene *scene, Entity  *entity);
 CollisionResult Scene_checkCollision(Scene *scene, Entity  *entity, Vector3 to);
 CollisionResult Scene_raycast(       Scene *scene, Vector3  from,   Vector3 to);
 void            Scene_render(        Scene *scene, Head    *head);
