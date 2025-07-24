@@ -189,9 +189,51 @@ insertEntity(CollisionScene *scene, Entity *entity)
 	}
 }
 
+/* 
+	Constructor
+*/
+void
+CollisionScene__new(Engine *engine)
+{
+	CollisionScene *scene = malloc(sizeof(CollisionScene));
+	if (!scene) {
+		ERR_OUT("Failed to allocate CollisionScene.");
+		return NULL;
+	}
+
+	initSpatialHash(&scene->spatial_hash);
+
+	scene->entities_ref = Engine__getEntities(engine);
+	
+	Engine__setCollisionScene(engine, scene);
+}
+
+/*
+	Destructor
+*/
+void
+CollisionScene__free(CollisionScene *scene)
+{
+	if (!scene) return;
+
+	clearHash(&scene->spatial_hash);
+	free(scene->spatial_hash.entry_pool);
+	free(scene);
+}
+
+
+/*
+	Protected Methods
+*/
+void
+CollisionScene__markRebuild(CollisionScene *scene)
+{
+	scene->needs_rebuild = true;
+}
+
 /* Query entities in a region */
 static Entity **
-queryRegion(
+CollisionScene__queryRegion(
 	CollisionScene *scene,
 	Vector3         Min,
 	Vector3         Max,
@@ -247,46 +289,9 @@ queryRegion(
 	return query_results;
 }
 
-
-/* 
-	Constructor
-*/
-void
-CollisionScene__new(Engine *engine)
-{
-	CollisionScene *scene = malloc(sizeof(CollisionScene));
-	if (!scene) {
-		ERR_OUT("Failed to allocate CollisionScene.");
-		return NULL;
-	}
-
-	initSpatialHash(&scene->spatial_hash);
-
-	scene->entities_ref = Engine__getEntities(engine);
-	
-	Engine__setCollisionScene(engine, scene);
-}
-
-void
-CollisionScene__free(CollisionScene *scene)
-{
-	if (!scene) return;
-
-	clearHash(&scene->spatial_hash);
-	free(scene->spatial_hash.entry_pool);
-	free(scene);
-}
-
-/* Add entity to scene */
-void
-CollisionScene__markRebuild(CollisionScene *scene)
-{
-	scene->needs_rebuild = true;
-}
-
 /* AABB Collision */
 CollisionResult
-CollisionScene__checkAABB(Entity *a, Entity *b);
+Collision__checkAABB(Entity *a, Entity *b);
 {
 	CollisionResult result = {0};
 	result.hit = false;
@@ -353,7 +358,7 @@ CollisionScene__checkAABB(Entity *a, Entity *b);
 
 /* Check collision for entity moving to new position */
 CollisionResult
-Collision__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to)
+CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to)
 {
 	CollisionResult result = {0};
 	result.hit             = false;
@@ -390,16 +395,9 @@ Collision__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to)
 		if (other == entity) continue; /* Skip self */
 		if (!other->physical) continue;
 
-		if (CollisionScene__checkAABB(&temp_entity, other)) {
-			result.hit      = true;
-			result.entity   = other;
-			result.position = to;
-
-			/* Calculate simple collision normal (toward entity center) */
-			Vector3 direcction = Vector3Subtract(entity->positon, other->position);
-			result.normal      = Vector3Normalize(direction);
-			result.distance    = Vector3Distance(entity->position, to);
-
+		CollisionResult test_result = CollisionScene__checkAABB(&temp_entity, other)
+		if (test_result.hit) {
+			result = test_result;
 			break; /* Return first collision found */
 		}
 	}
@@ -407,12 +405,112 @@ Collision__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to)
 	return result;
 }
 
+
+CollisionResult
+Collision__checkRayAABB(Vector3 from, Vector3 to, Entity *entity)
+{
+	CollisionResult result = {0};
+	result.hit = false;
+
+	Vector3
+		min_bounds = {
+			entity->position.x - entity->bounds.x * 0.5f,
+			entity->position.y,
+			Entity->position.z - entity->bounds.z * 0.5f
+		},
+		max_bounds = {
+			entity->position.x + entity->bounds.x * 0.5f,
+			entity->position.y + entity->bounds.y,
+			entity->position.z + entity->bounds.z * 0.5f
+		};
+
+	/* Ray direction & length */
+	Vector3 ray_dir = Vector3Subtract(to, from);
+	float   ray_len = Vector3Length(ray_dir);
+
+	if (ray_len < 0.0001f) return result; /* Zero-length ray */
+
+	ray_dir = Vector3Normalize(ray_dir);
+
+	float
+		t_min = 0.0f,
+		t_max = ray_len;
+
+	for (int axis = 0; axis < 3; axis++) {
+		float
+			ray_origin    = (axis==0) ? from.x       : (axis==1) ? from.y       : from.z;
+			ray_direction = (axis==0) ? ray_dir.x    : (axis==1) ? ray_dir.y    : ray_dir.z;
+			box_min       = (axis==0) ? min_bounds.x : (axis==1) ? min_bounds.y : min_bounds.z;
+			box_max       = (axis==0) ? max_bounds.x : (axis==1) ? max_bounds.y : max_bounds.z;
+
+		if (fabsf(ray_direction) < 0.0001f) {
+			/* Ray is parallel to this axis */
+			if (ray_origin < box_min || box_max < ray_origin) {
+				return result; /* Ray misses box */
+			}
+		}
+		else {
+			float
+				t1 = (box_min - ray_origin) / ray_direction,
+				t2 = (box_max - ray_origin) / ray_direction;
+
+			/* Ensure t1 <= t2 */
+			if (t2 < t1) {
+				float temp = t1;
+				t1 = t2;
+				t2 = temp;
+			}
+
+			t_min = fmaxf(t_min, t1);
+			t_max = fminf(t_max, t2);
+
+			if (t_max < t_min) return result; /* No intersection */
+		}
+	}
+
+	/* Intersection found */
+	if (0.0f <= 0.0f && t_min <= ray_length) {
+		result.hit      = true;
+		result.distance = t_min;
+		result.position = Vector3Add(from, Vector3Scale(ray_dir, t_min));
+		result.entity   = entity;
+
+		/* Calculate surface normal of the face hit */
+		Vector3 
+			hit_point = result.position;
+			center    = {
+				entity->position.x,
+				entity->position.y + entity->bounds.y * 0.5f,
+				entity->position,z
+			},
+			to_center = Vector3Subtract(hit_point, center);
+
+		/* Find dominant axis for normal */
+		float
+			abs_x = fabsf(to_center.x),
+			abs_y = fabsf(to_center.y),
+			abs_z = fabsf(to_center.z);
+
+		if (abs_y < abs_x && abs_z < abs_x) {
+			result.normal = (Vector3){(0 < to_center.x) ? 1.0f : -1.0f, 0.0f, 0.0f};
+		} else if (abs_z < abs_y) {
+			result.normal = (Vector3){0.0f, (0 < to_center.y) ? 1.0f : -1.0f, 0.0f};
+		} else {
+			result.normal = (Vector3){0.0f, 0.0f, (0 < to_center.z) ? 1.0f : -1.0f};
+		}
+	}
+
+	return result;
+}
+
+
 /* Simple raycast */
 CollisionResult
 Collision__raycast(CollisionScene *scene, Vector3 from, Vector3 to)
 {
-	CollisionResult result = {0};
-	result.hit             = false;
+	CollisionResult closest_result = {0};
+	closest_result.hit      = false;
+	closest_result.distance = INFINITY;
 
 	/* Get bounds along ray path */
 	Vector3
@@ -435,41 +533,21 @@ Collision__raycast(CollisionScene *scene, Vector3 from, Vector3 to)
 		max_bounds,
 		candidate_count
 	);
-
-	float closest_distance = INFINITY;
-
+	
 	for (int i = 0; i < candidate_count; i++) {
 		Entity *entity = candidates[i];
+
+		/* Skip non-physical entities */
 		if (!entity->physical) continue;
 
-		/* Simple ray-AABB intersection test */
-		Vector3
-			entity_min = {
-				entity->position.x - entity->bounds.x * 0.5f,
-				entity->position.y,
-				entity->position.z - entity->bounds.z * 0.5f
-			},
-			entity_max = {
-				entity->position.x + entity->bounds.x * 0.5f,
-				entity->position.y + entity->bounds.y,
-				entity->position.z + entity->bounds.z * 0.5f
-			};
+		CollisionResult result = Collision__checkRayAABB(from, to, entity);
 
-		/*
-			TODO: Implement proper ray-AABB intersection
-			for now, just check if ray endpoints are near entity
-		*/
-		float distance = Vector3Distance(from, entity->position);
-		if (distance < closest_distance) {
-			result.hit       = true;
-			result.entity    = entity;
-			result.positon   = entity->position;
-			result.distance  = distance;
-			closest_distance = distance;
+		if (result.hit && result.distance < closest_result.distance) {
+			closest_result = result;
 		}
 	}
 
-	return result;
+	return closest_result;
 }
 
 /* System update - called each frame */

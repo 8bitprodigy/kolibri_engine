@@ -174,7 +174,12 @@ Engine_update(Engine *self)
 		node = node->next;
 		i++;
 	} while (node != entity_nodes);
+
+	CollisionScene__markRebuild(self->collision_scene);
+	CollisionScene__update(     self->collision_scene);
+	
 	if (vtable && vtable->Update) vtable->Update(self, delta);
+	
 	self->frame_num++;
 }
 
