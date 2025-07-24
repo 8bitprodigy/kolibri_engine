@@ -14,6 +14,9 @@
     #define ERR_OUT( Error_Text )
 #endif
 
+/****************
+	CONSTANTS
+****************/
 #ifdef PLATFORM_PSP
     #define SCREEN_WIDTH  480
     #define SCREEN_HEIGHT 272
@@ -29,14 +32,32 @@
 	#endif
 #endif
 
+/* Engine-related constants */
 #ifndef MAX_NUM_HEADS
 	#define MAX_NUM_HEADS 4
 #endif
+/* Renderable-related constants */
 #ifndef MAX_LOD_LEVELS
 	#define MAX_LOD_LEVELS 4
 #endif
 #ifndef MAX_RENDERABLES_PER_ENTITY  
 	#define MAX_RENDERABLES_PER_ENTITY 4
+#endif
+/* Collision system-related constants */
+#ifndef SPATIAL_HASH_SIZE
+	#define SPATIAL_HASH_SIZE 1024
+#endif
+#ifndef CELL_SIZE
+	#define CELL_SIZE 4.0f
+#endif
+#ifndef INITIAL_ENTITY_CAPACITY
+	#define INITIAL_ENTITY_CAPACITY 256
+#endif
+#ifndef ENTRY_POOL_SIZE
+	#define ENTRY_POOL_SIZE 2048
+#endif
+#ifndef QUERY_SIZE
+	#define QUERY_SIZE 512
 #endif
 
 #define V3_ZERO ((Vector3){0.0f, 0.0f, 0.0f})
@@ -50,7 +71,7 @@ enum {
     ROTATION,
     SCALE,
     SKEW,
-}
+};
 
 
 typedef struct Engine Engine;

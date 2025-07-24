@@ -1,8 +1,9 @@
 #include <raylib.h>
+#include "_collision_.h"
 #include "_engine_.h"
 #include "_entity_.h"
+#include "_head_.h"
 #include "_scene_.h"
-#include "head.h"
 
 
 /*
@@ -26,7 +27,7 @@ Engine
 	EntityList entity_list;
 	
 	union {
-		uint8 bit_flags;
+		uint8 flags;
 		struct {
 			bool paused          :1;
 			bool request_exit    :1;
@@ -84,7 +85,7 @@ Engine_new(EngineVTable *vtable)
 void
 Engine_free(Engine *engine)
 {
-	/* Free everything else, first! */
+	/* Free everything else first! */
 	free(engine);
 }
 
@@ -340,7 +341,7 @@ Engine__insertScene(Engine *self, Scene *scene)
 	scene->prev = last;
 }
 
-void
+void 
 Engine__removeScene(Engine *self, Scene *scene)
 {
 	if (!self->scene) return;
@@ -351,4 +352,10 @@ Engine__removeScene(Engine *self, Scene *scene)
 	scene_2->prev = scene_1;
 
 	if (self->scene == scene) self->scene = scene_2;
+}
+
+void
+Engine__setCollisionScene(Engine *self, CollisionScene *scene)
+{
+	self->collision_scene   = scene;
 }

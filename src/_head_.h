@@ -1,7 +1,6 @@
 #include "head.h"
 
 
-
 typedef struct 
 Head
 {

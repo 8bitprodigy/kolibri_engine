@@ -37,7 +37,7 @@ void Head_free(Head *head);
 Camera        *Head_getCamera(  Head *head);
 Engine        *Head_getEngine(  Head *head);
 RenderTexture *Head_getViewport(Head *head);
-void           Head_setViewport(Head *head, int   width,     int                  height);
+void           Head_setViewport(Head *head, uint  width,     uint                 height);
 void          *Head_getUserData(Head *head);
 void           Head_setUserData(Head *head, void *user_data, FreeUserDataCallback callback);
 void           Head_setVTable(  Head *head, HeadVTable *vtable);

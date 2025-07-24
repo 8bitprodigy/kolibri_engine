@@ -51,8 +51,8 @@ void
 EntityNode__free(EntityNode *self)
 {
 	Entity       *entity = PRIVATE_TO_ENTITY(self);
-	EntityVTable *vtable = entity->vtable;
 	
+	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Free) vtable->Free(entity);
 	
 	Engine__removeEntity(self->engine, node);

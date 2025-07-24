@@ -48,18 +48,50 @@ Entity
     };
     Vector3        bounds;
     
+    struct {
+        union {
+            uint8 layers;
+            struct {
+                bool
+                    layer_0:1,
+                    layer_1:1,
+                    layer_2:1,
+                    layer_3:1,
+                    layer_4:1,
+                    layer_5:1,
+                    layer_6:1,
+                    layer_7:1;
+            };
+        };
+        union {
+            uint8 masks;
+            struct {
+                bool
+                    mask_0:1,
+                    mask_1:1,
+                    mask_2:1,
+                    mask_3:1,
+                    mask_4:1,
+                    mask_5:1,
+                    mask_6:1,
+                    mask_7:1;
+            };
+        };
+    }
+    collision;
+    
     union {
         uint8 flags;
         struct {
             bool
-                visible:1,
-                active :1,
-                flag_2 :1,
-                flag_3 :1,
-                flag_4 :1,
-                flag_5 :1,
-                flag_6 :1,
-                flag_7 :1;
+                visible :1,
+                active  :1,
+                physical:1,
+                flag_3  :1,
+                flag_4  :1,
+                flag_5  :1,
+                flag_6  :1,
+                flag_7  :1;
         };
     };
 } 
