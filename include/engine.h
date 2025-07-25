@@ -31,6 +31,7 @@ void    Engine_free(Engine       *engine);
 /*
 	SETTERS/GETTERS
 */
+float       Engine_getDeltaTime( Engine *engine);
 EntityList *Engine_getEntityList(Engine *engine);
 Head       *Engine_getHeads(     Engine *engine);
 

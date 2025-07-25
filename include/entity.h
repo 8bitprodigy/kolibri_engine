@@ -6,19 +6,19 @@
 
 
 typedef void (*EntityCallback)(   Entity *entity);
-typedef void (*EntityCallback_1e)(Entity *entity, CollisionResult *collision);
-typedef void (*EntityCallback_1f)(Entity *entity, float   delta);
+typedef void (*EntityCollisionCallback)(Entity *entity, CollisionResult *collision);
+typedef void (*EntityUpdateCallback)(Entity *entity, float   delta);
 
 typedef struct
 EntityVTable
 {
-    EntityCallback    Setup;
-    EntityCallback    Enter;
-    EntityCallback_1f Update;
-    EntityCallback    Render;
-    EntityCallback_1e OnCollision;
-    EntityCallback    Exit;
-    EntityCallback    Free;
+    EntityCallback          Setup;
+    EntityCallback          Enter;
+    EntityUpdateCallback    Update;
+    EntityCallback          Render;
+    EntityCollisionCallback OnCollision;
+    EntityCallback          Exit;
+    EntityCallback          Free;
 }
 EntityVTable;
 
@@ -106,6 +106,12 @@ void     Entity_addToScene(     Scene  *scene,           Entity *entity);
 void     Entity_removeFromScene(Scene  *scene,           Entity *entity);
 void     Entity_updateAll(      float   dt);
 */
+/*
+    Setters/Getters
+*/
+Entity  *Entity_getNext(        Entity *entity);
+Entity  *Entity_getPrev(        Entity *entity);
+
 void     Entity_render(         Entity *entity, Head *head);
 uint64   Entity_getUniqueID(    Entity *entity);
 

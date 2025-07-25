@@ -44,10 +44,24 @@ Entity_free(Entity *self)
 }
 
 
-void
+Entity *
+Entity_getNext(Entity *self)
+{
+	return ENTITY_TO_PRIVATE(self)->next->base;
+}
+
+
+Entity *
+Entity_getPrev(Entity *self)
+{
+	return ENTITY_TO_PRIVATE(self)->prev->base;
+}
+
+
+uint64
 Entity_getUniqueID(Entity *entity)
 {
-	return &ENTITY_TO_PRIVATE(entity)->unique_ID;
+	return ENTITY_TO_PRIVATE(entity)->unique_ID;
 }
 
 

@@ -308,7 +308,7 @@ isSphereInFrustum(
     RendererSettings *settings = head->settings;
 
     Vector3 
-		forward   = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+		forward   = Vector3Normalize(Vector3Subtract(camera->target, camera->position)),
 		to_sphere = Vector3Subtract(sphere_center, camera->position);
 
     float distance = Vector3Length(to_sphere);
@@ -321,19 +321,21 @@ isSphereInFrustum(
     Vector3 
 		up    = camera->up,
 		right = Vector3Normalize(Vector3CrossProduct(forward, up));
-    up = Vector3Normalize(Vector3CrossProduct(right, forward)); /* Re-orthogonalize */
+		up    = Vector3Normalize(Vector3CrossProduct(right, forward)); /* Re-orthogonalize */
 
+	RenderTexture *viewport = Head_getViewport(head);
     float 
 		horizontal  = Vector3DotProduct(to_sphere, right),
 		vertical    = Vector3DotProduct(to_sphere, up),
-		/* Get angles */
-		horiz_angle = atanf(horizontal / forward_dot),
-		vert_angle  = atanf(vertical / forward_dot),
+		/* Get angles from camera forward direction */
+		horiz_angle = atanf(horizontal / fmaxf(fabsf(forward_dot), 0.001f)),
+		vert_angle  = atanf(vertical / fmaxf(fabsf(forward_dot), 0.001f)),
 		/* Get actual FOV and aspect */
-		vfov_rad    = DEG2RAD * settings->fov_y;
-		hfov_rad    = 2.0f * atanf(tanf(vfov_rad * 0.5f) * settings->aspect_ratio);
-		horiz_limit = hfov_rad * 0.5f;
-		vert_limit  = vfov_rad * 0.5f;
+		vfov_rad    = DEG2RAD * camera->fovy,
+		aspect      = (float)viewport->texture.width / (float)viewport->texture.height,
+		hfov_rad    = 2.0f * atanf(tanf(vfov_rad * 0.5f) * aspect),
+		horiz_limit = hfov_rad * 0.5f,
+		vert_limit  = vfov_rad * 0.5f,
 		/* Account for sphere radius as a loose bound */
 		angle_pad   = asinf(CLAMP(sphere_radius / distance, 0.0f, 1.0f));
 
@@ -359,7 +361,7 @@ CollisionScene__queryFrustum(
 	Vector3 
 		/* Calculate frustum bounds for broad-phase culling */
 		camera_pos     = camera->position;
-		camera_tartet  = camera->target;
+		camera_target  = camera->target;
 		forward        = Vector3Normalize(Vector3Subtract(camera_target, camera_pos)),
 		/* Create rough bounding box around frustum for spatial hash query */
 		frustum_center = Vector3Add(camera_pos, Vector3Scale(forward, max_distance * 0.5f));
@@ -500,7 +502,7 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 
 	/* Query spatial hash for potential collisions */
 	int      candidate_count;
-	Entity **candidates = queryRegion(
+	Entity **candidates = Collision__queryRegion(
 		&scene->spatial_hash,
 		min_bounds,
 		max_bounds,
@@ -534,7 +536,7 @@ Collision__checkRayAABB(Vector3 from, Vector3 to, Entity *entity)
 		min_bounds = {
 			entity->position.x - entity->bounds.x * 0.5f,
 			entity->position.y,
-			Entity->position.z - entity->bounds.z * 0.5f
+			entity->position.z - entity->bounds.z * 0.5f
 		},
 		max_bounds = {
 			entity->position.x + entity->bounds.x * 0.5f,
@@ -587,7 +589,7 @@ Collision__checkRayAABB(Vector3 from, Vector3 to, Entity *entity)
 	}
 
 	/* Intersection found */
-	if (0.0f <= 0.0f && t_min <= ray_length) {
+	if (0.0f <= t_min && t_min <= ray_length) {
 		result.hit      = true;
 		result.distance = t_min;
 		result.position = Vector3Add(from, Vector3Scale(ray_dir, t_min));
@@ -645,7 +647,7 @@ Collision__raycast(CollisionScene *scene, Vector3 from, Vector3 to)
 
 	/* Query spatial hash */
 	int      candidate_count;
-	Entity **candidates = queryRegion(
+	Entity **candidates = Collision__queryRegion(
 		&scene->spatial_hash, 
 		min_bounds,
 		max_bounds,

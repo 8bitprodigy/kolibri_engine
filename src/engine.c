@@ -22,9 +22,7 @@ Engine
 	
 	uint64     frame_num;
 	uint       head_count;
-	const uint HEAD_COUNT_MAX;
 	uint       entity_count;
-	const uint ENTITY_COUNT_MAX;
 	float      delta;
 
 	EntityList entity_list;
@@ -64,7 +62,7 @@ Engine_new(EngineVTable *vtable)
 	engine->heads            = NULL;
 	engine->entities         = NULL;
 	engine->scene            = NULL;
-	engine->collision_scene  = CollisionScene__new(engine);
+	engine->collision_scene  = CollisionScene__new(engine->entities);
 	
 	engine->frame_num        = 0;
 	engine->head_count       = 0;
@@ -92,6 +90,13 @@ Engine_free(Engine *engine)
 /*
 	SETTERS/GETTERS
 */
+float
+Engine_getDeltaTime(Engine *self)
+{
+	return self->delta;
+}
+
+
 EntityList *
 Engine_getEntityList(Engine *self)
 {

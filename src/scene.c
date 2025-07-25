@@ -32,6 +32,8 @@ Scene_new(
     Engine__insertScene(engine, scene);
 
     if (map_type->Setup) map_type->Setup(scene, data);
+
+    return scene;
 }
 /*
     DESTRUCTOR
