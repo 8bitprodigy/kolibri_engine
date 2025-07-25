@@ -2,7 +2,26 @@
 
 ---
 
-**Rationale:** Create a simple, minimalist 3D game engine in C using raylib for education, hacking, modification, and legitimate game development.
+**Rationale:** Create a simple, minimalist 3D game engine in C using raylib for education, hacking, modification, and legitimate game development. With so many game engines focusing on how many features they have, this engine stands apart, stripped down to its bare essentials. 
+
+It doesn't do networking.
+
+It doesn't have a UI.
+
+It doesn't do asset management.
+
+It doesn't do memory management.
+
+It doesn't do audio or input.
+
+It doesn't have a particle system.
+
+it doesn't have billboards or a native 3D model format, or a native scene format.
+
+It doesn't even have a configuration file format. 
+
+Instead, all these features are left up to the game developer to support.
+It's so minimal, one could use it as a framework to build a more specific, more fully-featured engine atop it, making it *not just* a game engine, but a *game engine engine*.
 
 ---
 
