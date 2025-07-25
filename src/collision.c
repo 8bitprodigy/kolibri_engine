@@ -1,6 +1,7 @@
 #include <math.h>
 #include <raylib.h>
 #include <raymath.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include "_collision_.h"
@@ -159,9 +160,50 @@ clearHash(CollisionScene *scene)
 	}
 }
 
+
+/* 
+	Constructor
+*/
+void
+CollisionScene__new(EntityNode *node)
+{
+	CollisionScene *scene = malloc(sizeof(CollisionScene));
+	if (!scene) {
+		ERR_OUT("Failed to allocate memory for CollisionScene.");
+		return NULL;
+	}
+
+	initSpatialHash(&scene->spatial_hash);
+
+	scene->entities_ref = node;
+}
+
+/*
+	Destructor
+*/
+void
+CollisionScene__free(CollisionScene *scene)
+{
+	if (!scene) return;
+
+	clearHash(&scene->spatial_hash);
+	free(scene->spatial_hash.entry_pool);
+	free(scene);
+}
+
+
+/*
+	Protected Methods
+*/
+void
+CollisionScene__markRebuild(CollisionScene *scene)
+{
+	scene->needs_rebuild = true;
+}
+
 /* Insert entity into spatial hash */
 static void
-insertEntity(CollisionScene *scene, Entity *entity)
+CollisionScene__insertEntity(CollisionScene *scene, Entity *entity)
 {
 	if (!entity->physical) return;
 
@@ -189,46 +231,10 @@ insertEntity(CollisionScene *scene, Entity *entity)
 	}
 }
 
-/* 
-	Constructor
-*/
 void
-CollisionScene__new(Engine *engine)
+CollisionScene__clear(CollisionScene *scene)
 {
-	CollisionScene *scene = malloc(sizeof(CollisionScene));
-	if (!scene) {
-		ERR_OUT("Failed to allocate CollisionScene.");
-		return NULL;
-	}
-
-	initSpatialHash(&scene->spatial_hash);
-
-	scene->entities_ref = Engine__getEntities(engine);
-	
-	Engine__setCollisionScene(engine, scene);
-}
-
-/*
-	Destructor
-*/
-void
-CollisionScene__free(CollisionScene *scene)
-{
-	if (!scene) return;
-
-	clearHash(&scene->spatial_hash);
-	free(scene->spatial_hash.entry_pool);
-	free(scene);
-}
-
-
-/*
-	Protected Methods
-*/
-void
-CollisionScene__markRebuild(CollisionScene *scene)
-{
-	scene->needs_rebuild = true;
+	clearHash(scene);
 }
 
 /* Query entities in a region */
@@ -287,6 +293,118 @@ CollisionScene__queryRegion(
 	}
 
 	return query_results;
+}
+
+
+static bool
+isSphereInFrustum(
+	Vector3  sphere_center, 
+	float    sphere_radius, 
+	Head    *head,
+	float    max_distance
+)
+{
+	Camera3D         *camera = &head->camera;
+    RendererSettings *settings = head->settings;
+
+    Vector3 
+		forward   = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+		to_sphere = Vector3Subtract(sphere_center, camera->position);
+
+    float distance = Vector3Length(to_sphere);
+    if (distance > max_distance + sphere_radius) return false;
+	
+    float forward_dot = Vector3DotProduct(to_sphere, forward);
+    if (forward_dot < -sphere_radius) return false; /* Behind camera */
+
+    /* Build right and up vectors from forward */
+    Vector3 
+		up    = camera->up,
+		right = Vector3Normalize(Vector3CrossProduct(forward, up));
+    up = Vector3Normalize(Vector3CrossProduct(right, forward)); /* Re-orthogonalize */
+
+    float 
+		horizontal  = Vector3DotProduct(to_sphere, right),
+		vertical    = Vector3DotProduct(to_sphere, up),
+		/* Get angles */
+		horiz_angle = atanf(horizontal / forward_dot),
+		vert_angle  = atanf(vertical / forward_dot),
+		/* Get actual FOV and aspect */
+		vfov_rad    = DEG2RAD * settings->fov_y;
+		hfov_rad    = 2.0f * atanf(tanf(vfov_rad * 0.5f) * settings->aspect_ratio);
+		horiz_limit = hfov_rad * 0.5f;
+		vert_limit  = vfov_rad * 0.5f;
+		/* Account for sphere radius as a loose bound */
+		angle_pad   = asinf(CLAMP(sphere_radius / distance, 0.0f, 1.0f));
+
+    return fabsf(horiz_angle) <= (horiz_limit + angle_pad) &&
+           fabsf(vert_angle)  <= (vert_limit  + angle_pad);
+}
+
+/* Query for entities visible in camera frustum */
+Entity **
+CollisionScene__queryFrustum(
+	CollisionScene *scene,
+	Head           *head,
+	float           max_distance,
+	int            *visible_entity_count
+)
+{
+	static Entity *frustum_results[QUERY_SIZE];
+	*visible_entity_count = 0;
+
+	if (!head) return frustum_results;
+	
+	Camera3D *camera = head->camera;
+	Vector3 
+		/* Calculate frustum bounds for broad-phase culling */
+		camera_pos     = camera->position;
+		camera_tartet  = camera->target;
+		forward        = Vector3Normalize(Vector3Subtract(camera_target, camera_pos)),
+		/* Create rough bounding box around frustum for spatial hash query */
+		frustum_center = Vector3Add(camera_pos, Vector3Scale(forward, max_distance * 0.5f));
+	float query_radius = max_distance * 1.2f; /* add some padding */
+
+	Vector3
+		min_bounds = {
+			frustum_center.x - query_radius,
+			frustum_center.y - query_radius,
+			frustum_center.z - query_radius
+		},
+		max_bounds = {
+			frustum_center.x + query_radius,
+			frustum_center.y + query_radius,
+			frustum_center.z + query_radius
+		};
+
+	int candidate_count;
+	Entity **candidates = CollisionScene__queryRegion(
+		scene,
+		min_bounds,
+		max_bounds,
+		&candidate_count
+	);
+
+	/* Fine-grained frustum culling */
+	for (int i = 0; i < candidate_count && *visible_entity_count < QUERY_SIZE; i++) {
+		Entity *entity = candidates[i];
+
+		if (!entity->visible) continue;
+
+		if (
+			isSphereInFrustum(
+				entity->position,
+				entity->visibility_radius,
+				head,
+				max_distance
+			)
+		) {
+			frustum_results[*visible_entity_count] = entity;
+			(*visible_entity_count)++;
+		}
+	}
+
+	return frustum_results;
 }
 
 /* AABB Collision */

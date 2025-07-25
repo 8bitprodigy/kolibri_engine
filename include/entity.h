@@ -29,6 +29,7 @@ Entity
     
     Renderable      renderables[MAX_LOD_LEVELS];
     float           lod_distances[MAX_LOD_LEVELS];
+    float           visibility_radius;
     uint8           lod_count;
     Engine         *engine;
     void           *user_data;
@@ -105,6 +106,7 @@ void     Entity_addToScene(     Scene  *scene,           Entity *entity);
 void     Entity_removeFromScene(Scene  *scene,           Entity *entity);
 void     Entity_updateAll(      float   dt);
 */
+void     Entity_render(         Entity *entity, Head *head);
 uint64   Entity_getUniqueID(    Entity *entity);
 
 #endif /* ENTITY_H */

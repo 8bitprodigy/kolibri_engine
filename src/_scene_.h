@@ -1,3 +1,7 @@
+#ifndef SCENE_PRIVATE_H
+#define SCENE_PRIVATE_H
+
+
 #include "scene.h"
 
 
@@ -12,3 +16,9 @@ Scene
     SceneType *vtable;
 } 
 Scene;
+
+
+Scene__update(Scene *scene, float delta);
+
+
+#endif /* SCENE_PRIVATE_H */

@@ -1,3 +1,7 @@
+#ifndef HEAD_PRIVATE_H
+#define HEAD_PRIVATE_H
+
+
 #include "head.h"
 
 
@@ -11,6 +15,7 @@ Head
     Entity               *controlled_entity;
     void                 *user_data;
     FreeUserDataCallback *FreeUserData;
+	RendererSettings     *settings;
 
     struct Head
 		*prev,
@@ -20,3 +25,5 @@ Head
 } 
 Head;
 
+
+#endif /* HEAD_PRIVATE_H */

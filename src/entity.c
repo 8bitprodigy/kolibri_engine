@@ -1,13 +1,10 @@
 #include "_engine_.h"
 #include "_entity_.h"
+#include "_head_.h"
 #include "common.h"
 
 
 static uint64 latest_ID = 0;
-
-
-void insertEntityNode(EntityNode *node, EntityNode *to);
-void removeEntityNode(EntityNode *node);
 
 
 /******************
@@ -44,6 +41,41 @@ void
 Entity_free(Entity *self)
 {
 	EntityNode__free(ENTITY_TO_PRIVATE(self));
+}
+
+
+void
+Entity_getUniqueID(Entity *entity)
+{
+	return &ENTITY_TO_PRIVATE(entity)->unique_ID;
+}
+
+
+void
+Entity_render(Entity *entity, Head *head)
+{
+	if (!entity->visible) return;
+
+	Camera3D *camera   = head->camera;
+	float     distance = Vector3Distance(entity->position, camera->position);
+
+	int lod_level = -1;
+	for (int i = 0; i < entity->lod_count; i++) {
+		if (entity->lod_distances[i] < distance) continue;
+		lod_level = i;
+		break;
+	}
+	if (lod_level < 0) return; /* Distance is greater than max renderable LOD level, so don't render it. */
+
+	Renderable *renderable = &entity->renderables[lod_level];
+	if (renderable && renderable->Render) {
+		renderable->Render(
+			renderable, 
+			entity->position,
+			entity->rotation,
+			entity->scale
+		);
+	}
 }
 
 
@@ -104,7 +136,14 @@ EntityNode__remove(EntityNode *node)
 
 
 void
-Entity_getUniqueID(Entity *entity)
+EntityNode__updateAll(EntityNode *node)
 {
-	return &ENTITY_TO_PRIVATE(entity)->unique_ID;
+	EntityNode *starting_node = node;
+	
+	do {
+		Entity *entity = PRIVATE_TO_ENTITY(node)
+		if (entity->Update) entity->Update(entity, delta);
+
+		node = node->next;
+	} while (node != starting_node);
 }

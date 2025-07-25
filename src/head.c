@@ -54,7 +54,21 @@ Head_free(Head *Self)
 /*
 	PUBLIC METHODS
 */
-Camera *
+Head *
+Head_getNext(head *Self)
+{
+	return Self->next;
+}
+
+
+Head *
+Head_getPrev(head *Self)
+{
+	return Self->prev;
+}
+
+
+Camera3D *
 Head_getCamera(Head *Self)
 {
 	return &Self->camera;
@@ -99,55 +113,55 @@ Head_setUserData(Head *Self, void *User_Data, FreeUserDataCallback callback)
 
 
 void 
-Head_setVTable(Head *head, HeadVTable *VTable)
+Head_setVTable(Head *Self, HeadVTable *VTable)
 {
-	head->vtable = VTable;
+	Self->vtable = VTable;
 }
 
 HeadVTable *
-Head_getVTable(Head *head)
+Head_getVTable(Head *Self)
 {
-	return head->vtable;
+	return Self->vtable;
 }
 
 
 void
 Head_Setup(Head *Self)
 {
-	if (Self->Setup) Self->Setup(Self);
+	if (Self && Self->Setup) Self->Setup(Self);
 }
 
 
 void
 Head_Update(Head *Self, float delta)
 {
-	if (Self->Update) Self->Update(Self, delta);
+	if (Self && Self->Update) Self->Update(Self, delta);
 }
 
 
 void
 Head_PreRender(Head *Self)
 {
-	if (Self->PreRender) Self->PreRender(Self);
+	if (Self && Self->PreRender) Self->PreRender(Self);
 }
 
 
 void
 Head_Render(Head *Self)
 {
-	if (Self->Render) Self->Render(Self);
+	if (Self && Self->Render) Self->Render(Self);
 }
 
 
 void
 Head_PostRender(Head *Self)
 {
-	if (Self->PostRender) Self->PostRender(Self);
+	if (Self && Self->PostRender) Self->PostRender(Self);
 }
 
 
 void
 Head_Exit(Head *Self)
 {
-	if (Self->Exit) Self->Exit(Self);
+	if (Self && Self->Exit) Self->Exit(Self);
 }

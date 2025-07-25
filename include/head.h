@@ -6,21 +6,44 @@
 
 
 /* Callback Types */
-typedef void (*HeadCallback)(   Head *head);
-typedef void (*HeadCallback_1f)(Head *head, float delta);
+typedef void (*HeadCallback)(      Head *head);
+typedef void (*HeadUpdateCallback)(Head *head, float delta);
+typedef void (*HeadResizeCallback)(Head *head, uint  width,  uint height);
 
 typedef struct
 HeadVTable
 {
-    HeadCallback     Setup;
-    HeadCallback_1f  update;
-    HeadCallback     prerender;
-    HeadCallback     render;
-    HeadCallback     postrender;
-    HeadCallback     Exit;
-    HeadCallback     Free;
+    HeadCallback       Setup;
+    HeadUpdateCallback Update;
+    HeadCallback       PreRender;
+    HeadCallback       Render;
+    HeadCallback       PostRender;
+    HeadResizeCallback Resize;
+    HeadCallback       Exit;
+    HeadCallback       Free;
 }
 HeadVTable;
+
+typedef struct
+RendererSettings
+{
+	float max_render_distance;
+	int   max_entities_per_frame;
+	union {
+		uint8 flags;
+		struct {
+			bool frustum_culling          :1;
+			bool sort_transparent_entities:1;
+			bool level_of_detail          :1;
+			bool flag_3                   :1; /* 3-4 not yet defined */
+			bool flag_4                   :1;
+			bool draw_entity_origin       :1;
+			bool draw_bounding_boxes      :1;
+			bool show_lod_levels          :1;
+		};
+	};
+}
+RendererSettings;
 
 
 /* Constructor */
@@ -34,7 +57,9 @@ void Head_free(Head *head);
 
 
 /* Setters/Getters */
-Camera        *Head_getCamera(  Head *head);
+Head          *Head_getNext(    Head *head);
+Head          *Head_getPrev(    Head *head);
+Camera3D      *Head_getCamera(  Head *head);
 Engine        *Head_getEngine(  Head *head);
 RenderTexture *Head_getViewport(Head *head);
 void           Head_setViewport(Head *head, uint  width,     uint                 height);

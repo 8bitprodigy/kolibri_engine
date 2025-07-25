@@ -3,6 +3,7 @@
 #include "_engine_.h"
 #include "_entity_.h"
 #include "_head_.h"
+#include "_renderer_.h"
 #include "_scene_.h"
 
 
@@ -12,10 +13,12 @@
 typedef struct
 Engine
 {
+	EngineVTable   *vtable;
 	Head           *heads;
 	EntityNode     *entities;
 	Scene          *scene;
 	CollisionScene *collision_scene;
+	Renderer       *renderer;
 	
 	uint64     frame_num;
 	uint       head_count;
@@ -25,6 +28,7 @@ Engine
 	float      delta;
 
 	EntityList entity_list;
+	
 	
 	union {
 		uint8 flags;
@@ -40,12 +44,6 @@ Engine
 		};
 	};
 
-	EngineCallback    Setup;
-	EngineCallback    Run;
-	EngineCallback_1f Update;
-	EngineCallback    Render;
-	EngineCallback    Exit;
-	EngineCallback    Free;
 }
 Engine;
 
@@ -66,6 +64,7 @@ Engine_new(EngineVTable *vtable)
 	engine->heads            = NULL;
 	engine->entities         = NULL;
 	engine->scene            = NULL;
+	engine->collision_scene  = CollisionScene__new(engine);
 	
 	engine->frame_num        = 0;
 	engine->head_count       = 0;
@@ -94,21 +93,28 @@ Engine_free(Engine *engine)
 	SETTERS/GETTERS
 */
 EntityList *
-Engine_getEntityList(Engine *engine)
+Engine_getEntityList(Engine *self)
 {
-	if (engine->dirty_EntityList) {
+	if (self->dirty_EntityList) {
 		/* Generate new array of entities */
-		engine->dirty_EntityList = false;
+		self->dirty_EntityList = false;
 	}
 
-	return engine->entity_list;
+	return self->entity_list;
+}
+
+
+Head *
+Engine_getHeads(Engine *self)
+{
+	return self->heads;
 }
 
 
 void 
-Engine_setVTable(Engine *engine, EngineVTable *vtable)
+Engine_setVTable(Engine *self, EngineVTable *vtable)
 {
-	engine->vtable = vtable;
+	self->vtable = vtable;
 }
 
 
@@ -151,9 +157,6 @@ void
 Engine_update(Engine *self)
 {
 	int i = 0;
-	EntityNode 
-		*entity_nodes = self->entities,
-		*node;
 
 	const EntityVTable *vtable = self->vtable;
 	
@@ -166,14 +169,7 @@ Engine_update(Engine *self)
 
 	if (self->paused || self->request_exit) return;
 
-	node = entity_nodes;
-	do {
-		Entity *entity = PRIVATE_TO_ENTITY(node)
-		if (entity->Update) entity->Update(entity, delta);
-
-		node = node->next;
-		i++;
-	} while (node != entity_nodes);
+	EntityNode__updateAll(self->entities);
 
 	CollisionScene__markRebuild(self->collision_scene);
 	CollisionScene__update(     self->collision_scene);
@@ -212,6 +208,15 @@ Engine_render(Engine *self)
 
 
 void
+Engine_resize(Engine *self, uint width, uint height)
+{
+	const EngineVTable *vtable = self->vtable;
+
+	if(vtable && vtable->Resize) vtable->Resize(width, height);
+}
+
+
+void
 Engine_pause(Engine *self, bool paused)
 {
 	self->paused = paused;
@@ -235,11 +240,6 @@ Engine_requestExit(Engine *self)
 /**********************
 	PRIVATE METHODS
 **********************/
-Head *
-Engine__getHeads(Engine *self)
-{
-	return self->heads;
-}
 
 void
 Engine__insertHead(Engine *self, Head *head)
@@ -359,8 +359,3 @@ Engine__removeScene(Engine *self, Scene *scene)
 	if (self->scene == scene) self->scene = scene_2;
 }
 
-void
-Engine__setCollisionScene(Engine *self, CollisionScene *scene)
-{
-	self->collision_scene   = scene;
-}

@@ -116,6 +116,9 @@ EntityList
 EntityList;
 
 
+/*
+	Renderable
+*/
 typedef enum 
 {
     RENDERABLE_NONE,
@@ -129,39 +132,15 @@ RenderableType;
 typedef struct 
 Renderable
 {
-    RenderableType type;
-    Vector3        offset;
-    union {
-        struct {
-            Model *model;
-            Color  tint;
-        } 
-        model;
-        
-        struct {
-            Texture2D texture;
-            Color     tint;
-            bool      face_camera;
-        } 
-        billboard;
-        
-        struct {
-            Texture2D  texture;
-            Vector3   *positions;
-            Color     *colors;
-            int        count;
-            int        max_count;
-        } 
-        particles;
-        
-        struct {
-            void  *data;
-            void (*draw)(void* data, Vector3 position, Vector3 rotation, Vector3 scale);
-        } 
-        custom;
-    };
+    RenderableType      type;
+    Vector3             offset;
+    void               *data;
+    void (*RenderableCallback)(Renderable *renderable, Vector3 position, Vector3 rotation, Vector3 scale);
 } 
 Renderable;
+/*
+	/Renderable
+*/
 
 
 typedef struct
@@ -181,14 +160,6 @@ Vector2i
 }
 Vector2i;
 
-typedef struct 
-{
-    Entity **entities;
-    int 
-		count,
-		capacity;
-} 
-VisibleSet;
 
 typedef struct
 Xform
