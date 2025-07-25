@@ -49,7 +49,6 @@ void      Engine_resize(     Engine *engine, uint  width,  uint height);
 void      Engine_pause(      Engine *engine, bool  paused);
 bool      Engine_isPaused(   Engine *engine);
 void      Engine_requestExit(Engine *engine);
-/*void      Engine_exit(       Engine *engine);*/
 
 
 #endif /* ENGINE_H */

@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#ifdef __linux__
+#ifdef DEBUG
 	#define ERR_OUT( Error_Text ) perror( "[ERROR] " Error_Text "\n" )    
 #else
     #define ERR_OUT( Error_Text )
@@ -17,21 +17,6 @@
 /****************
 	CONSTANTS
 ****************/
-#ifdef PLATFORM_PSP
-    #define SCREEN_WIDTH  480
-    #define SCREEN_HEIGHT 272
-#elifdef __DREAMCAST__
-    #define SCREEN_WIDTH  640
-    #define SCREEN_HEIGHT 480
-#elifdef __linux__
-	#ifndef SCREEN_WIDTH
-		#define SCREEN_WIDTH  854
-	#endif
-    #ifndef SCREEN_HEIGHT
-		#define SCREEN_HEIGHT 480
-	#endif
-#endif
-
 /* Engine-related constants */
 #ifndef MAX_NUM_HEADS
 	#define MAX_NUM_HEADS 4
@@ -84,9 +69,11 @@ typedef struct Head   Head;
 
 /* Value Types */
 typedef uint64_t     uint64;
+typedef uint32_t     uint32;
 typedef uint16_t     uint16;
 typedef uint8_t      uint8;
 typedef int64_t      int64;
+typedef int32_t      int32;
 typedef int16_t      int16;
 typedef int8_t       int8;
 typedef unsigned int uint;
@@ -100,8 +87,8 @@ CollisionResult
     Vector3 normal;       /* Surface normal at hit point */
     float   distance;     /* Distance to collision */
     int     material_id;  /* For different surface types */
-    void*   user_data;    /* Scene-specific data (material, etc.) */
-    Entity* entity;       /* If hit an entity (NULL for terrain) */
+    void   *user_data;    /* Scene-specific data (material, etc.) */
+    Entity *entity;       /* If hit an entity (NULL for terrain) */
     bool    hit;
 }
 CollisionResult;
@@ -164,11 +151,16 @@ Vector2i;
 typedef struct
 Xform
 {
-	Vector3 
-		position, 
-		rotation,
-		scale,
-		skew;
+	union {
+		Vector3 xf[4];
+		struct {
+			Vector3 
+				position, 
+				rotation,
+				scale,
+				skew;
+		};
+	};
 }
 Xform;
 
