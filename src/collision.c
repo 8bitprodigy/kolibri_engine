@@ -7,6 +7,7 @@
 #include "_collision_.h"
 #include "_engine_.h"
 #include "_entity_.h"
+#include "_head_.h"
 #include "common.h"
 
 
@@ -164,7 +165,7 @@ clearHash(CollisionScene *scene)
 /* 
 	Constructor
 */
-void
+CollisionScene *
 CollisionScene__new(EntityNode *node)
 {
 	CollisionScene *scene = malloc(sizeof(CollisionScene));
@@ -176,6 +177,8 @@ CollisionScene__new(EntityNode *node)
 	initSpatialHash(&scene->spatial_hash);
 
 	scene->entities_ref = node;
+
+	return scene;
 }
 
 /*
@@ -186,7 +189,7 @@ CollisionScene__free(CollisionScene *scene)
 {
 	if (!scene) return;
 
-	clearHash(&scene->spatial_hash);
+	clearHash(scene);
 	free(scene->spatial_hash.entry_pool);
 	free(scene);
 }
@@ -202,14 +205,14 @@ CollisionScene__markRebuild(CollisionScene *scene)
 }
 
 /* Insert entity into spatial hash */
-static void
+void
 CollisionScene__insertEntity(CollisionScene *scene, Entity *entity)
 {
 	if (!entity->physical) return;
 
 	SpatialHash *hash = &scene->spatial_hash;
 	int min_x, max_x, min_y, max_y, min_z, max_z;
-	Collision__getEntityCells(
+	getEntityCells(
 		entity, 
 		&min_x, &max_x, 
 		&min_y, &max_y, 
@@ -238,7 +241,7 @@ CollisionScene__clear(CollisionScene *scene)
 }
 
 /* Query entities in a region */
-static Entity **
+Entity **
 CollisionScene__queryRegion(
 	CollisionScene *scene,
 	Vector3         Min,
@@ -251,12 +254,12 @@ CollisionScene__queryRegion(
 	*Count = 0;
 
 	SpatialHash *hash = &scene->spatial_hash;
-	int min_x = CELL_ALIGN(min.x);
-	int max_x = CELL_ALIGN(max.x);
-	int min_y = CELL_ALIGN(min.y);
-	int max_y = CELL_ALIGN(max.y);
-	int min_z = CELL_ALIGN(min.z);
-	int max_z = CELL_ALIGN(max.z);
+	int min_x = CELL_ALIGN(Min.x);
+	int max_x = CELL_ALIGN(Max.x);
+	int min_y = CELL_ALIGN(Min.y);
+	int max_y = CELL_ALIGN(Max.y);
+	int min_z = CELL_ALIGN(Min.z);
+	int max_z = CELL_ALIGN(Max.z);
 
 	/* Track entities we've already added to duplicates */
 	memset(added, 0, sizeof(added));
@@ -271,10 +274,10 @@ CollisionScene__queryRegion(
 				);
 
 				CollisionEntry *entry = hash->cells[hash_key];
-				while (entry && *count < QUERY_SIZE) {
+				while (entry && *Count < QUERY_SIZE) {
 					/* Simple dubplicate check using entity pointer as identifier */
 					bool is_duplicate = false;
-					for (int i = 0; i < *count; i++) {
+					for (int i = 0; i < *Count; i++) {
 						if (query_results[i] == entry->entity) {
 							is_duplicate = true;
 							break;
@@ -282,8 +285,8 @@ CollisionScene__queryRegion(
 					}
 
 					if (!is_duplicate) {
-						query_results[*count] = entry->entity;
-						(*count)++;
+						query_results[*Count] = entry->entity;
+						(*Count)++;
 					}
 
 					entry = entry->next;
@@ -296,7 +299,7 @@ CollisionScene__queryRegion(
 }
 
 
-static bool
+bool
 isSphereInFrustum(
 	Vector3  sphere_center, 
 	float    sphere_radius, 
@@ -304,7 +307,7 @@ isSphereInFrustum(
 	float    max_distance
 )
 {
-	Camera3D         *camera = &head->camera;
+	Camera3D         *camera   = &head->camera;
     RendererSettings *settings = head->settings;
 
     Vector3 
@@ -357,11 +360,11 @@ CollisionScene__queryFrustum(
 
 	if (!head) return frustum_results;
 	
-	Camera3D *camera = head->camera;
+	Camera3D *camera = &head->camera;
 	Vector3 
 		/* Calculate frustum bounds for broad-phase culling */
-		camera_pos     = camera->position;
-		camera_target  = camera->target;
+		camera_pos     = camera->position,
+		camera_target  = camera->target,
 		forward        = Vector3Normalize(Vector3Subtract(camera_target, camera_pos)),
 		/* Create rough bounding box around frustum for spatial hash query */
 		frustum_center = Vector3Add(camera_pos, Vector3Scale(forward, max_distance * 0.5f));
@@ -411,7 +414,7 @@ CollisionScene__queryFrustum(
 
 /* AABB Collision */
 CollisionResult
-Collision__checkAABB(Entity *a, Entity *b);
+Collision__checkAABB(Entity *a, Entity *b)
 {
 	CollisionResult result = {0};
 	result.hit = false;
@@ -473,6 +476,7 @@ Collision__checkAABB(Entity *a, Entity *b);
 		result.distance = Vector3Distance(center_a, center_b);
 	}
 
+	
 	return result;
 }
 
@@ -502,8 +506,8 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 
 	/* Query spatial hash for potential collisions */
 	int      candidate_count;
-	Entity **candidates = Collision__queryRegion(
-		&scene->spatial_hash,
+	Entity **candidates = CollisionScene__queryRegion(
+		scene,
 		min_bounds,
 		max_bounds,
 		&candidate_count
@@ -515,12 +519,15 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 		if (other == entity) continue; /* Skip self */
 		if (!other->physical) continue;
 
-		CollisionResult test_result = CollisionScene__checkAABB(&temp_entity, other)
+		CollisionResult test_result = Collision__checkAABB(&temp_entity, other);
 		if (test_result.hit) {
 			result = test_result;
 			break; /* Return first collision found */
 		}
 	}
+
+	EntityVTable *vtable = entity->vtable;
+	if (result.hit && vtable && vtable->OnCollision) vtable->OnCollision(entity, &result);
 	
 	return result;
 }
@@ -558,9 +565,9 @@ Collision__checkRayAABB(Vector3 from, Vector3 to, Entity *entity)
 
 	for (int axis = 0; axis < 3; axis++) {
 		float
-			ray_origin    = (axis==0) ? from.x       : (axis==1) ? from.y       : from.z;
-			ray_direction = (axis==0) ? ray_dir.x    : (axis==1) ? ray_dir.y    : ray_dir.z;
-			box_min       = (axis==0) ? min_bounds.x : (axis==1) ? min_bounds.y : min_bounds.z;
+			ray_origin    = (axis==0) ? from.x       : (axis==1) ? from.y       : from.z,
+			ray_direction = (axis==0) ? ray_dir.x    : (axis==1) ? ray_dir.y    : ray_dir.z,
+			box_min       = (axis==0) ? min_bounds.x : (axis==1) ? min_bounds.y : min_bounds.z,
 			box_max       = (axis==0) ? max_bounds.x : (axis==1) ? max_bounds.y : max_bounds.z;
 
 		if (fabsf(ray_direction) < 0.0001f) {
@@ -589,7 +596,7 @@ Collision__checkRayAABB(Vector3 from, Vector3 to, Entity *entity)
 	}
 
 	/* Intersection found */
-	if (0.0f <= t_min && t_min <= ray_length) {
+	if (0.0f <= t_min && t_min <= ray_len) {
 		result.hit      = true;
 		result.distance = t_min;
 		result.position = Vector3Add(from, Vector3Scale(ray_dir, t_min));
@@ -597,11 +604,11 @@ Collision__checkRayAABB(Vector3 from, Vector3 to, Entity *entity)
 
 		/* Calculate surface normal of the face hit */
 		Vector3 
-			hit_point = result.position;
+			hit_point = result.position,
 			center    = {
 				entity->position.x,
 				entity->position.y + entity->bounds.y * 0.5f,
-				entity->position,z
+				entity->position.z
 			},
 			to_center = Vector3Subtract(hit_point, center);
 
@@ -647,11 +654,11 @@ Collision__raycast(CollisionScene *scene, Vector3 from, Vector3 to)
 
 	/* Query spatial hash */
 	int      candidate_count;
-	Entity **candidates = Collision__queryRegion(
-		&scene->spatial_hash, 
+	Entity **candidates = CollisionScene__queryRegion(
+		scene, 
 		min_bounds,
 		max_bounds,
-		candidate_count
+		&candidate_count
 	);
 	
 	for (int i = 0; i < candidate_count; i++) {
@@ -672,7 +679,7 @@ Collision__raycast(CollisionScene *scene, Vector3 from, Vector3 to)
 
 /* System update - called each frame */
 void
-Collision__update(CollisionScene *scene)
+CollisionScene__update(CollisionScene *scene)
 {
 	if (!scene->needs_rebuild) return;
 
@@ -683,10 +690,10 @@ Collision__update(CollisionScene *scene)
 	EntityNode *current = scene->entities_ref;
 	if (current) {
 		do {
-			entity *entity = &current->base;
+			Entity *entity = &current->base;
 
 			if (entity->active && entity->physical) {
-				insertEntity(scene, entity);
+				CollisionScene__insertEntity(scene, entity);
 			}
 
 			current = current->next;

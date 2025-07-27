@@ -1,3 +1,4 @@
+#include "_collision_.h"
 #include "_engine_.h"
 #include "_scene_.h"
 #include "common.h"
@@ -12,7 +13,7 @@ void removeScene(Scene *scene);
 */
 Scene *
 Scene_new(
-    const SceneVTable *map_type, 
+    SceneVTable *map_type, 
     void              *data, 
     Engine            *engine)
 {
@@ -39,21 +40,51 @@ Scene_new(
     DESTRUCTOR
 */
 void
-Scene_free(Scene *scene, Engine *engine)
+Scene_free(Scene *scene)
 {
     SceneVTable *vtable = scene->vtable;
     
-    if (vtable && vtable->Free) vtable->Free(scene);
+    if (vtable && vtable->Free) vtable->Free(scene, scene->map_data);
     
     Engine__removeScene(scene->engine, scene);
     
     free(scene);
 }
 
+void
+Scene__freeAll(Scene *scene)
+{
+	Scene *next = scene->next;
+	if (next == scene) {
+		Scene_free(scene);
+		return;
+	}
+	
+	Scene_free(scene);
+	Scene__freeAll(next);
+}
+
+
+/*
+    SETTERS / GETTERS
+*/
+Engine *
+Scene_getEngine(Scene *self)
+{
+    return self->engine;
+}
+
+void *
+Scene_getMapData(Scene *self)
+{
+    return self->map_data;
+}
+
 
 /*
     PUBLIC METHODS
 */
+
 void
 Scene_enter(Scene *self)
 {
@@ -69,35 +100,58 @@ Scene_update(Scene *self, float delta)
 }
 
 void 
-Scene_entityEnter(Scene *scene, Entity *entity)
+Scene_entityEnter(Scene *self, Entity *entity)
 {
     SceneVTable *vtable = self->vtable;
     if (vtable && vtable->EntityEnter) vtable->EntityEnter(self, entity);
 }
 
 void 
-Scene_entityExit(Scene *scene, Entity *entity)
+Scene_entityExit(Scene *self, Entity *entity)
 {
     SceneVTable *vtable = self->vtable;
     if (vtable && vtable->EntityExit) vtable->EntityExit(self, entity);
 }
 
-void
-Scene_checkCollision(Scene *self, Entity *entity, Vector to)
+CollisionResult
+Scene_checkCollision(Scene *self, Entity *entity, Vector3 to)
 {
     SceneVTable *vtable = self->vtable;
-    if (vtable && vtable->CheckCollision) vtable->CheckCollision(self, entity, to);
+    CollisionResult 
+        scene_result  = {0},
+        entity_result = {0};
+        
+    if (vtable && vtable->CheckCollision) {
+        scene_result = vtable->CheckCollision(self, entity, to);
+    }
+    CollisionScene *collision_scene = Engine__getCollisionScene(self->engine);
+    if(collision_scene) {
+        entity_result = CollisionScene__checkCollision(collision_scene, entity, to);
+    }
+
+    if (scene_result.hit && entity_result.hit) {
+        return (scene_result.distance <= entity_result.distance) ? scene_result : entity_result;
+    }
+    else if (scene_result.hit) {
+        return scene_result;
+    }
+    else if (entity_result.hit) {
+        return entity_result;
+    }
+    
+    return NO_COLLISION;
+}
+
+CollisionResult
+Scene_raycast(Scene *self, Vector3 from, Vector3 to)
+{
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->Raycast) return vtable->Raycast(self, from, to);
+    return NO_COLLISION;
 }
 
 void
-Scene_raycast(Scene *self, Vector from, Vector to)
-{
-    SceneVTable *vtable = self->vtable;
-    if (vtable && vtable->Raycast) vtable->Raycast(self, from, to);
-}
-
-void
-Scene_update(Scene *self, Head *head)
+Scene_render(Scene *self, Head *head)
 {
     SceneVTable *vtable = self->vtable;
     if (vtable && vtable->Render) vtable->Render(self, head);

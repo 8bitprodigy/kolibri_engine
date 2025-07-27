@@ -1,31 +1,52 @@
 CC      = gcc
-CFLAGS  = -Wall -Wextra -Wpedantic
-CCFLAGS = -Iinclude -I/usr/local/include -L/usr/local/lib -lraylib -lGL -lm -g3 -O0
+CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0
+LIBS    = -lraylib -lGL -lm
+INCLUDE = -Iinclude -I/usr/local/include
+LIBDIR  = -L/usr/local/lib
 
-PROJECTNAME = kolibrigame
+PROJECTNAME = kolibritest
 
 SRCDIR     = src
 GAMESRCDIR = gamesrc
 OBJDIR     = obj
 
 TARGET       = $(PROJECTNAME)
-CSOURCES     = $(foreach dir,$(SRCDIR), $(notdir $(wildcard $(dir)/*.c)))
-GAMECSOURCES = $(foreach dir,$(GAMESRCDIR), $(notdir $(wildcard $(dir)/*.c)))
-OBJS         = $(GAMECSOURCES:%.c=$(OBJDIR)/%.o)
+
+ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
+GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
+
+ENGINE_OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
+GAME_OBJS   = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
+
+OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
+
+.PHONY: all clean rm-elf prepare
 
 all: rm-elf prepare $(TARGET)
 
-clean:
+clean: rm-elf
 	rm -rf $(OBJDIR)
 
 rm-elf:
 	rm -f $(TARGET)
 
-$(OBJDIR)/%.o: $(GAMESRCDIR)/%.c
-	$(CC) $(CFLAGS) $(CCFLAGS) -c -o $@ $<
-
-$(TARGET): $(OBJS)
-	$(CC) -o $(TARGET) $(OBJS) $(CFLAGS) $(CCFLAGS)
-
 prepare:
 	mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR)/engine
+	mkdir -p $(OBJDIR)/game
+
+$(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+
+$(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+
+$(TARGET): $(OBJS)
+	$(CC) -o $(TARGET) $(OBJS) $(LIBDIR) $(LIBS)
+
+debug:
+	@echo "ENGINE_SOURCES: $(ENGINE_SRC)"
+	@echo "GAME_SOURCES:   $(GAME_SRC)"
+	@echo "ENGINE_OBJS:    $(ENGINE_OBJS)"
+	@echo "GAME_OBJS:      $(GAME_OBJS)"
+	@echo "OBJS:           $(OBJS)"

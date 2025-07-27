@@ -8,20 +8,34 @@ It doesn't do networking.
 
 It doesn't have a UI.
 
-It doesn't do asset management.
+It doesn't manage assets.
 
-It doesn't do memory management.
+It doesn't manage memory.
 
-It doesn't do audio or input.
+It doesn't handle audio or input.
 
 It doesn't have a particle system.
 
-it doesn't have billboards or a native 3D model format, or a native scene format.
+it doesn't have billboards, a native 3D model format, or a native scene format.
 
 It doesn't even have a configuration file format. 
 
 Instead, all these features are left up to the game developer to support.
-It's so minimal, one could use it as a framework to build a more specific, more fully-featured engine atop it, making it *not just* a game engine, but a *game engine engine*.
+It's so minimal, one could use it as a framework to build a more specific, more fully-featured engine atop it, making it *not just* a game engine, but a *game engine engine*. All it does have is:
+
+- Main loop with management(pause, unpause, exit) and callbacks
+
+- "Heads" - couples a render surface with a camera and event callbacks
+
+- Basic entity system with callbacks to define behavior
+
+- Generic scene interface with callbacks to support different scene types through dependency injection
+
+- Simple collision system to handle entity-entity collisions(AABB using spatial hashing)
+
+- Simple renderer using sphere-frustum intersection to handle frustum culling
+
+This engine is so simple, it weighs in at only \~1600 lines of C.
 
 ---
 

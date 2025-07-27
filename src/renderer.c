@@ -1,6 +1,6 @@
 #include "_collision_.h"
+#include "_head_.h"
 #include "_renderer_.h"
-#include "_renderer_h"
 
 
 typedef struct
@@ -26,7 +26,9 @@ Renderer__new(Engine *engine, RendererSettings *settings)
 	}
 
 	renderer->engine                  = engine;
-	renderer->potentially_visible_set = CollisionScene_new(NULL);
+	renderer->potentially_visible_set = CollisionScene__new(NULL);
+
+	return renderer;
 }
 
 
@@ -46,7 +48,7 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 {
 	if (!entities || entities->count < 1) return;
 
-	RendererSettings *settings = &head->settings;
+	RendererSettings *settings = head->settings;
 	CollisionScene   *pvs      = renderer->potentially_visible_set;
 	
 	/* Clear and populate the Renderer's visible scene */
@@ -65,7 +67,7 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 
 	if (settings->frustum_culling) {
 		Camera3D *camera = Head_getCamera(head);
-		visible_entities = CollisionScene__queryFrustum(pvs, camera, settings->max_render_distance, &visible_count);
+		visible_entities = CollisionScene__queryFrustum(pvs, head, settings->max_render_distance, &visible_count);
 	}
 	else {
 		/* No culling -- render all entities */
@@ -74,6 +76,6 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 	}
 
 	for (int i = 0; i < visible_count; i++) {
-		entity_render(visible_entities[i], head);
+		Entity_render(visible_entities[i], head);
 	}
 }

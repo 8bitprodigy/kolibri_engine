@@ -4,9 +4,9 @@
 
 
 typedef struct
-HeightMap
+Heightmap
 {
-	float *heightmap;
+	float **heightmap;
 	Vector3 sun_angle;
 	uint size;
 	union {
@@ -18,7 +18,7 @@ HeightMap
 		colors[2];
 	};
 }
-HeightMap
+Heightmap
 
 
 Vector3

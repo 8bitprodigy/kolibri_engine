@@ -71,19 +71,24 @@ Engine_new(EngineVTable *vtable)
 
 	engine->paused           = false;
 	engine->request_exit     = false;
-	engine->dirty_entityList = true;
+	engine->dirty_EntityList = true;
 
 	engine->vtable           = vtable;
 
-	if (engine->Setup) engine->Setup(engine);
+	if (vtable && vtable->Setup) vtable->Setup(engine);
+
+	return engine;
 }
 
 
 void
-Engine_free(Engine *engine)
+Engine_free(Engine *self)
 {
-	/* Free everything else first! */
-	free(engine);
+	Head__freeAll(self->heads);
+	Scene__freeAll(self->scene);
+	EntityNode__freeAll(self->entities);
+	CollisionScene__free(self->collision_scene);
+	free(self);
 }
 
 
@@ -100,12 +105,44 @@ Engine_getDeltaTime(Engine *self)
 EntityList *
 Engine_getEntityList(Engine *self)
 {
-	if (self->dirty_EntityList) {
-		/* Generate new array of entities */
-		self->dirty_EntityList = false;
+	if (!self->dirty_EntityList) {
+		return &self->entity_list;
 	}
 
-	return self->entity_list;
+	if (!self->entities || self->entity_count == 0) {
+		self->entity_list.count    = 0;
+		self->dirty_EntityList     = false;
+		return &self->entity_list;
+	}
+
+	if (self->entity_list.capacity < self->entity_count) {
+		if (self->entity_list.entities) {
+			free(self->entity_list.entities);
+		}
+		
+		Entity **entities = malloc(sizeof(Entity*) * self->entity_count);
+		if (!entities) {
+			ERR_OUT("Failed to allocate EntityList array.");
+			self->entity_list.count    = 0;
+			self->entity_list.capacity = 0;
+			return &self->entity_list;
+		}
+
+		self->entity_list.entities = entities;
+		self->entity_list.capacity = self->entity_count;
+	}
+
+	EntityNode *current = self->entities;
+	int index = 0;
+
+	do {
+		self->entity_list.entities[index++] = PRIVATE_TO_ENTITY(current);
+		current = current->next;
+	} while (current != self->entities);
+	
+	self->entity_list.count    = self->entity_count;
+	self->dirty_EntityList = false;
+	return &self->entity_list;
 }
 
 
@@ -133,9 +170,10 @@ Engine_getVTable(Engine *engine)
 void
 Engine_run(Engine *self)
 {
-	const EngineVTable *vtable = self-vtable;
+	const EngineVTable *vtable = self->vtable;
 	
 	if (vtable && vtable->Run) vtable->Run(self);
+	
 	if (self->head_count) {
 		while(!self->request_exit) {
 			self->request_exit = WindowShouldClose();
@@ -145,6 +183,7 @@ Engine_run(Engine *self)
 
 			self->frame_num++;
 		}
+	}
 	else { /* For uses such as game servers */
 		while(!self->request_exit) {
 			self->request_exit = WindowShouldClose();
@@ -161,23 +200,21 @@ Engine_run(Engine *self)
 void
 Engine_update(Engine *self)
 {
-	int i = 0;
-
-	const EntityVTable *vtable = self->vtable;
+	const EngineVTable *vtable = self->vtable;
 	
 	float delta = GetFrameTime();
 	self->delta = delta;
 
-	for (int i = 0; i < self->head_count; i++) {
-		Head_Update(self->heads[i])
-	}
+	Head__updateAll(self->heads, delta);
 
 	if (self->paused || self->request_exit) return;
 
-	EntityNode__updateAll(self->entities);
+	EntityNode__updateAll(self->entities, delta);
 
 	CollisionScene__markRebuild(self->collision_scene);
 	CollisionScene__update(     self->collision_scene);
+
+	Scene_update(self->scene, delta);
 	
 	if (vtable && vtable->Update) vtable->Update(self, delta);
 	
@@ -188,27 +225,27 @@ Engine_update(Engine *self)
 void
 Engine_render(Engine *self)
 {
-	const EntityVTable *vtable = self->vtable;
+	const EngineVTable *vtable = self->vtable;
 	/* Loop through Heads */
 	/* Render to Head stage */
-	for (int i = 0; i < self->head_count; i++) {
-		Head *current_head = self->heads[i];
+	for (uint i = 0; i < self->head_count; i++) {
+		Head *current_head = &self->heads[i];
 		
-		BeginTextureMode(&Head_getViewport(current_head));
-			Head_PreRender(current_head) /* Skyboxes, perhaps */
-			BeginMode3D(&Head_getCamera(current_head));
+		BeginTextureMode(*Head_getViewport(current_head));
+			Head_preRender(current_head); /* Skyboxes, perhaps */
+			BeginMode3D(*Head_getCamera(current_head));
 				if (self->scene) Scene_render(self->scene, current_head);
-				Head_Render(current_head); /* Called on render */
+				Head_render(current_head); /* Called on render */
 			EndMode3D();
-			Head_PostRender(current_head); /* UI overlays, etc. */
+			Head_postRender(current_head); /* UI overlays, etc. */
 		EndTextureMode();	
 	}
 	/* End loop through Heads */
 	/* Composition stage */
-	BeginDrawing()
+	BeginDrawing();
 		/* This is how the final frame is composited together */
 		if (vtable && vtable->Render) vtable->Render(self);
-	EndDrawing()
+	EndDrawing();
 }
 
 
@@ -217,14 +254,22 @@ Engine_resize(Engine *self, uint width, uint height)
 {
 	const EngineVTable *vtable = self->vtable;
 
-	if(vtable && vtable->Resize) vtable->Resize(width, height);
+	if(vtable && vtable->Resize) vtable->Resize(self, width, height);
 }
 
 
 void
-Engine_pause(Engine *self, bool paused)
+Engine_pause(Engine *self, bool Paused)
 {
-	self->paused = paused;
+	if (self->paused != Paused) {
+		EngineVTable *vtable = self->vtable;
+		if (Paused) {
+			if (vtable && vtable->Pause) vtable->Pause(self);
+		} else {
+			if (vtable && vtable->Unpause) vtable->Unpause(self);
+		}
+	}
+	self->paused = Paused;
 }
 
 
@@ -249,8 +294,8 @@ Engine_requestExit(Engine *self)
 void
 Engine__insertHead(Engine *self, Head *head)
 {
-	if (self->HEAD_COUNT_MAX <= self->head_count) return;
-	if (self->heads) {
+	if (MAX_NUM_HEADS <= self->head_count) return;
+	if (!self->heads) {
 		self->heads = head;
 		self->head_count++;
 		return;
@@ -293,7 +338,7 @@ Engine__getEntities(Engine *self)
 void
 Engine__insertEntity(Engine *self, EntityNode *node)
 {
-	if (self->ENTITY_COUNT_MAX <= self->entity_count) return;
+	if (MAX_NUM_ENTITIES <= self->entity_count) return;
 	if (self->entities) {
 		self->entities = node;
 		self->entity_count++;
@@ -336,7 +381,7 @@ Engine__getScene(Engine *self)
 void
 Engine__insertScene(Engine *self, Scene *scene)
 {
-	if (self->scene) {
+	if (!self->scene) {
 		self->scene = scene;
 		return;
 	}
@@ -364,3 +409,14 @@ Engine__removeScene(Engine *self, Scene *scene)
 	if (self->scene == scene) self->scene = scene_2;
 }
 
+void
+Engine__setCollisionScene(Engine *self, CollisionScene *scene)
+{
+	self->collision_scene = scene;
+}
+
+CollisionScene *
+Engine__getCollisionScene(Engine *self)
+{
+	return self->collision_scene;
+}

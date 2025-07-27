@@ -31,7 +31,6 @@ Entity
     float           lod_distances[MAX_LOD_LEVELS];
     float           visibility_radius;
     uint8           lod_count;
-    Engine         *engine;
     void           *user_data;
 
     EntityVTable   *vtable;

@@ -5,15 +5,18 @@
 #include "common.h"
 
 
-typedef void       (*SceneCallback)(         Scene *scene);
-typedef void       (*SceneDataCallback)(     Scene *scene, void    *map_data);
-typedef void       (*SceneUpdateCallback)(   Scene *scene, float   *delta);
-typedef void       (*SceneEntityCallback)(   Scene *scene, Entity  *entity);
-typedef void       (*SceneCollisionCallback)(Scene *scene, Entity  *entity, Vector3 to);
-typedef void       (*SceneRaycastCallback)(  Scene *scene, Vector3  from,   Vector3 to);
-typedef VisibleSet (*SceneRenderCallback)(   Scene *scene, Head    *head);
-
 typedef struct Scene Scene;
+
+
+typedef void            (*SceneCallback)(         Scene *scene);
+typedef void            (*SceneDataCallback)(     Scene *scene, void    *map_data);
+typedef void            (*SceneUpdateCallback)(   Scene *scene, float    delta);
+typedef void            (*SceneEntityCallback)(   Scene *scene, Entity  *entity);
+typedef CollisionResult (*SceneCollisionCallback)(Scene *scene, Entity  *entity, Vector3 to);
+typedef CollisionResult (*SceneRaycastCallback)(  Scene *scene, Vector3  from,   Vector3 to);
+typedef EntityList      (*SceneRenderCallback)(   Scene *scene, Head    *head);
+
+
 typedef struct
 SceneVTable
 {
@@ -31,9 +34,13 @@ SceneVTable
 SceneVTable;
 
 /* Constructor */
-Scene          *Scene_new(const SceneVTable *scene_type, void *data, Engine *engine);
+Scene          *Scene_new(SceneVTable *scene_type, void *data, Engine *engine);
 /* Destructor */
 void            Scene_free(     Scene       *scene);
+
+/* Setters/Getters */
+Engine         *Scene_getEngine(     Scene *scene);
+void           *Scene_getMapData(    Scene *scene);
 
 /* Public Methods */
 void            Scene_enter(         Scene *scene);

@@ -16,6 +16,8 @@ EngineVTable
     EngineUpdateCallback Update;
     EngineCallback       Render;
     EngineResizeCallback Resize;
+    EngineCallback       Pause;
+    EngineCallback       Unpause;
     EngineCallback       Exit;
     EngineCallback       Free;
 }
@@ -43,7 +45,7 @@ EngineVTable *Engine_getVTable(Engine *engine);
 	METHODS
 */
 void      Engine_run(        Engine *engine);
-void      Engine_update(     Engine *engine, float dt);
+void      Engine_update(     Engine *engine);
 void      Engine_render(     Engine *engine);
 void      Engine_resize(     Engine *engine, uint  width,  uint height);
 void      Engine_pause(      Engine *engine, bool  paused);

@@ -2,6 +2,9 @@
 #define HEIGHTMAP_H
 
 
+#include "common.h"
+
+
 #ifndef TERRAIN_NUM_SQUARES
 	#define TERRAIN_NUM_SQUARES 128
 #endif
@@ -15,6 +18,14 @@
 #ifndef TERRAIN_HEIGHT_SCALE
 	#define TERRAIN_HEIGHT_SCALE 10.0f
 #endif
+
+
+typedef struct Heightmap Heightmap;
+
+
+Heightmap *Heightmap_new(             uint  size,      float cell_size, float height, float **data);
+Heightmap *Heightmap_newDiamondSquare(uint  size,      float cell_size, float height, uint seed);
+Heightmap *Heightmap_newXOR(          float cell_size, float height);
 
 
 #endif /* HEIGHTMAP_H */

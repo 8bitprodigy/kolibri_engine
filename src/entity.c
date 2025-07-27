@@ -4,7 +4,7 @@
 #include "common.h"
 
 
-static uint64 latest_ID = 0;
+static uint64 Latest_ID = 0;
 
 
 /******************
@@ -20,20 +20,22 @@ Entity_new(const Entity *entity, Engine *engine)
 		return NULL;
 	}
 
-	node->next = node;
-	node->prev = node;
+	node->next   = node;
+	node->prev   = node;
+	node->engine = engine;
 
 	Entity *base = PRIVATE_TO_ENTITY(node);
 	*base = *entity;
 
 	base->user_data = NULL;
-	base->engine    = engine;
-
-	node->unique_ID = latest_ID++;
+	node->unique_ID = Latest_ID++;
 	
 	Engine__insertEntity(engine, node);
 
-	if (base->Setup) base->Setup(base);
+	EntityVTable *vtable = base->vtable;
+	if (vtable && vtable->Setup) vtable->Setup(base);
+
+	return base;
 }
 
 
@@ -47,14 +49,14 @@ Entity_free(Entity *self)
 Entity *
 Entity_getNext(Entity *self)
 {
-	return ENTITY_TO_PRIVATE(self)->next->base;
+	return &ENTITY_TO_PRIVATE(self)->next->base;
 }
 
 
 Entity *
 Entity_getPrev(Entity *self)
 {
-	return ENTITY_TO_PRIVATE(self)->prev->base;
+	return &ENTITY_TO_PRIVATE(self)->prev->base;
 }
 
 
@@ -70,7 +72,7 @@ Entity_render(Entity *entity, Head *head)
 {
 	if (!entity->visible) return;
 
-	Camera3D *camera   = head->camera;
+	Camera3D *camera   = &head->camera;
 	float     distance = Vector3Distance(entity->position, camera->position);
 
 	int lod_level = -1;
@@ -82,8 +84,8 @@ Entity_render(Entity *entity, Head *head)
 	if (lod_level < 0) return; /* Distance is greater than max renderable LOD level, so don't render it. */
 
 	Renderable *renderable = &entity->renderables[lod_level];
-	if (renderable && renderable->Render) {
-		renderable->Render(
+	if (renderable && renderable->RenderableCallback) {
+		renderable->RenderableCallback(
 			renderable, 
 			entity->position,
 			entity->rotation,
@@ -101,12 +103,25 @@ EntityNode__free(EntityNode *self)
 	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Free) vtable->Free(entity);
 	
-	Engine__removeEntity(self->engine, node);
+	Engine__removeEntity(self->engine, self);
 
 	free(self);
 }
 
+void
+EntityNode__freeAll(EntityNode *self)
+{
+	EntityNode *next = self->next;
+	if (next == self) {
+		EntityNode__free(self);
+		return;
+	}
+	
+	EntityNode__free(self);
+	EntityNode__freeAll(next);
+}
 
+/*
 void
 EntityNode__insert(EntityNode *node, EntityNode *to)
 {
@@ -147,16 +162,18 @@ EntityNode__remove(EntityNode *node)
 	node_1->next = node_2;
 	node_2->prev = node_1;
 }
-
+*/
 
 void
-EntityNode__updateAll(EntityNode *node)
+EntityNode__updateAll(EntityNode *node, float delta)
 {
+	if (!node) return;
 	EntityNode *starting_node = node;
 	
 	do {
-		Entity *entity = PRIVATE_TO_ENTITY(node)
-		if (entity->Update) entity->Update(entity, delta);
+		Entity *entity = PRIVATE_TO_ENTITY(node);
+		EntityVTable *vtable = entity->vtable;
+		if (vtable && vtable->Update) vtable->Update(entity, delta);
 
 		node = node->next;
 	} while (node != starting_node);

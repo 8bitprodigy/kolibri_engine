@@ -11,14 +11,15 @@ Scene
     struct Scene
         *prev,
         *next;
-    Engine    *engine;
-    void      *map_data;
-    SceneType *vtable;
+    Engine      *engine;
+    void        *map_data;
+    SceneVTable *vtable;
 } 
 Scene;
 
 
-Scene__update(Scene *scene, float delta);
+void Scene__freeAll(Scene *scene);
+void Scene__update( Scene *scene, float delta);
 
 
 #endif /* SCENE_PRIVATE_H */
