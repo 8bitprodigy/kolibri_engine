@@ -6,8 +6,8 @@
 #include <raylib.h>
 
 
-#define SCREEN_WIDTH 1280
-#define SCREEN_HEIGHT 720
+#define SCREEN_WIDTH 854
+#define SCREEN_HEIGHT 480
 
 
 float
@@ -73,6 +73,13 @@ testHeadPostRender(Head *head)
 	DrawFPS(10, 10);
 }
 
+void
+testHeadUpdate(Head *head, float delta)
+{
+	UpdateCamera(Head_getCamera(head), CAMERA_FIRST_PERSON);
+}
+
+
 EngineVTable engine_Callbacks = {
 	NULL, 
 	NULL, 
@@ -87,7 +94,7 @@ EngineVTable engine_Callbacks = {
 
 HeadVTable head_Callbacks = {
 	NULL, 
-	NULL, 
+	testHeadUpdate, 
 	NULL, 
 	NULL, 
 	testHeadPostRender,
@@ -124,7 +131,6 @@ main(void)
 	cam->up       = V3_UP;
 	cam->position = (Vector3){0.0f, 1.75f, 0.0f};
 	cam->target   = (Vector3){10.0f, 0.0f, 10.0f};
-	UpdateCamera(cam, CAMERA_FIRST_PERSON);
 
 	Scene_new(&scene_Callbacks, NULL, engine);
 
