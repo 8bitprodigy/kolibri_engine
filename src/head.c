@@ -21,7 +21,7 @@ Head_new(
 		ERR_OUT("Failed to allocate memory for Head.");
 		return NULL;
 	}
-
+	
 	head->next              = head;
 	head->prev              = head;
 	
@@ -32,6 +32,8 @@ Head_new(
 	head->region            = (Rectangle){0.0f, 0.0f, 0.0f, 0.0f};
 
 	head->vtable            = VTable;
+
+	head->settings          = DEFAULT_RENDERERSETTINGS;
 
 	Engine__insertHead(engine, head);
 
@@ -175,7 +177,7 @@ Head_getVTable(Head *Self)
 RendererSettings *
 Head_getRendererSettings(Head *Self)
 {
-	return Self->settings;
+	return &Self->settings;
 }
 
 

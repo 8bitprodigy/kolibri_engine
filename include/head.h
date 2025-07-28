@@ -5,6 +5,9 @@
 #include "common.h"
 
 
+#define DEFAULT_RENDERERSETTINGS ((RendererSettings){ 128.0f, 1024, 7 })
+
+
 /* Callback Types */
 typedef void (*HeadCallback)(            Head *head);
 typedef void (*HeadUpdateCallback)(      Head *head, float delta);

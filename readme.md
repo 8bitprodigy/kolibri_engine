@@ -35,7 +35,7 @@ It's so minimal, one could use it as a framework to build a more specific, more 
 
 - Simple renderer using sphere-frustum intersection to handle frustum culling
 
-This engine is so simple, it weighs in at only \~1600 lines of C.
+This engine is so simple, it weighs in at only \~1800 lines of C.
 
 ---
 

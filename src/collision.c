@@ -8,6 +8,7 @@
 #include "_engine_.h"
 #include "_entity_.h"
 #include "_head_.h"
+#include "_spatial_hash_.h"
 #include "common.h"
 
 
@@ -15,151 +16,13 @@
 
 
 typedef struct
-CollisionEntry
-{
-	Entity                *entity;
-	struct CollisionEntry *next;
-}
-CollisionEntry;
-
-typedef struct 
-SpatialHash
-{
-	CollisionEntry *cells[SPATIAL_HASH_SIZE];
-	CollisionEntry *entry_pool; /* pre-allocated entries for performance */
-	CollisionEntry *free_entries; /* Free list for recycling */
-	int pool_size;
-	int pool_used;
-}
-SpatialHash;
-
-typedef struct
 CollisionScene
 {
-	SpatialHash  spatial_hash;
+	SpatialHash *spatial_hash;
 	EntityNode  *entities_ref; /* Points to engine's entity list */
 	bool         needs_rebuild; /* Flag to rebuild hash next frame */
 }
 CollisionScene;
-
-
-/* Hash function for spatial coordinates */
-static inline uint32
-hashPosition(float x, float y, float z)
-{
-	int 
-		cell_x = CELL_ALIGN(x),
-		cell_y = CELL_ALIGN(y),
-		cell_z = CELL_ALIGN(z);
-
-	uint32 hash = (
-		/* Magic numbers of large primes to help us hash coordinates for even hash distribution */
-		  (uint32)cell_x * 73856093u
-		^ (uint32)cell_y * 19349663u
-		^ (uint32)cell_z * 83492791u
-	);
-
-	return hash % SPATIAL_HASH_SIZE;
-}
-
-static inline void
-getEntityCells(
-	Entity *entity,
-	int *min_x, int *max_x,
-	int *min_y, int *max_y,
-	int *min_z, int *max_z
-)
-{
-	Vector3
-		min_bounds = {
-			entity->position.x - entity->bounds.x * 0.5f,
-			entity->position.y,
-			entity->position.z - entity->bounds.z * 0.5f
-		},
-		max_bounds = {
-			entity->position.x + entity->bounds.x * 0.5f,
-			entity->position.y + entity->bounds.y,
-			entity->position.z + entity->bounds.z * 0.5f
-		};
-
-	*min_x = CELL_ALIGN(min_bounds.x);
-	*max_x = CELL_ALIGN(max_bounds.x);
-	*min_y = CELL_ALIGN(min_bounds.y);
-	*max_y = CELL_ALIGN(max_bounds.y);
-	*min_z = CELL_ALIGN(min_bounds.z);
-	*max_z = CELL_ALIGN(max_bounds.z);
-}
-
-/* Initialize spatial hash */
-static void
-initSpatialHash(SpatialHash *hash)
-{
-	memset(hash->cells, 0, sizeof(hash->cells));
-
-	/* Pre-allocate entry pool for performance */
-	hash->entry_pool = malloc(sizeof(CollisionEntry) * ENTRY_POOL_SIZE);
-	hash->pool_size  = ENTRY_POOL_SIZE;
-	hash->pool_used  = 0;
-
-	/* Initialize free list */
-	hash->free_entries = hash->entry_pool;
-	for (int i = 0; i < ENTRY_POOL_SIZE - 1; i++) {
-		hash->entry_pool[i].next = &hash->entry_pool[i + 1];
-	}
-	hash->entry_pool[ENTRY_POOL_SIZE - 1].next = NULL;
-}
-
-/* Get a free entry from the pool */
-static CollisionEntry *
-allocEntry(SpatialHash *Hash)
-{
-	if (!Hash->free_entries) {
-		ERR_OUT("Collision entry pool exhausted, allocating dynamically!");
-		return malloc(sizeof(CollisionEntry));
-	}
-
-	CollisionEntry *entry = Hash->free_entries;
-	Hash->free_entries = entry->next;
-	Hash->pool_used++;
-	
-	return entry;
-}
-
-/* Return entry to free list */
-static void
-freeEntry(SpatialHash *Hash, CollisionEntry *Entry)
-{
-	/* Check if entry pointer is within our pre-allocated pool (an array) */
-	if (
-		!(Hash->entry_pool <= Entry
-		&& Entry < Hash->entry_pool + Hash->pool_size)
-	) {
-		free(Entry);
-		return;
-	}
-	
-	Entry->next = Hash->free_entries;
-	Hash->free_entries = Entry;
-	Hash->pool_used--;
-}
-
-/* Clear all entries from spatial hash */
-static void
-clearHash(CollisionScene *scene)
-{
-	SpatialHash *hash = &scene->spatial_hash;
-
-	for (int i = 0; i < SPATIAL_HASH_SIZE; i++) {
-		CollisionEntry *entry = hash->cells[i];
-		while (entry) {
-			CollisionEntry *next = entry->next;
-			freeEntry(hash, entry);
-			entry = next;
-		}
-		
-		hash->cells[i] = NULL;
-	}
-}
 
 
 /* 
@@ -174,9 +37,9 @@ CollisionScene__new(EntityNode *node)
 		return NULL;
 	}
 
-	initSpatialHash(&scene->spatial_hash);
-
-	scene->entities_ref = node;
+	scene->spatial_hash  = SpatialHash__new();
+	scene->entities_ref  = node;
+	scene->needs_rebuild = true;
 
 	return scene;
 }
@@ -189,8 +52,7 @@ CollisionScene__free(CollisionScene *scene)
 {
 	if (!scene) return;
 
-	clearHash(scene);
-	free(scene->spatial_hash.entry_pool);
+	SpatialHash__free(scene->spatial_hash);
 	free(scene);
 }
 
@@ -210,207 +72,28 @@ CollisionScene__insertEntity(CollisionScene *scene, Entity *entity)
 {
 	if (!entity->physical) return;
 
-	SpatialHash *hash = &scene->spatial_hash;
-	int min_x, max_x, min_y, max_y, min_z, max_z;
-	getEntityCells(
-		entity, 
-		&min_x, &max_x, 
-		&min_y, &max_y, 
-		&min_z, &max_z
-	);
-
-	/* Insert into all cells the entity overlaps */
-	for (int x = min_x; x <= max_x; x++) {
-		for (int y = min_y; y <= max_y; y++) {
-			for (int z = min_z; z <= max_z; z++) {
-				uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
-
-				CollisionEntry *entry = allocEntry(hash);
-				entry->entity         = entity;
-				entry->next           = hash->cells[hash_key];
-				hash->cells[hash_key] = entry;
-			}
-		}
-	}
+	SpatialHash__insert(scene->spatial_hash, entity, entity->position, entity->bounds);
+	scene->needs_rebuild = true;
 }
 
 void
 CollisionScene__clear(CollisionScene *scene)
 {
-	clearHash(scene);
+	SpatialHash__clear(scene);
 }
 
 /* Query entities in a region */
 Entity **
 CollisionScene__queryRegion(
-	CollisionScene *scene,
-	Vector3         Min,
-	Vector3         Max,
-	int            *Count
+	CollisionScene *scene, 
+	Vector3 min, 
+	Vector3 max, 
+	int *count
 )
 {
-	static Entity *query_results[QUERY_SIZE];
-	static bool    added[QUERY_SIZE];
-	*Count = 0;
-
-	SpatialHash *hash = &scene->spatial_hash;
-	int min_x = CELL_ALIGN(Min.x);
-	int max_x = CELL_ALIGN(Max.x);
-	int min_y = CELL_ALIGN(Min.y);
-	int max_y = CELL_ALIGN(Max.y);
-	int min_z = CELL_ALIGN(Min.z);
-	int max_z = CELL_ALIGN(Max.z);
-
-	/* Track entities we've already added to duplicates */
-	memset(added, 0, sizeof(added));
-
-	for (int x = min_x; x <= max_x; x++) {
-		for (int y = min_y; y <= max_y; y++) {
-			for (int z = min_z; z <= max_z; z++) {
-				uint32 hash_key = hashPosition(
-					x * CELL_SIZE, 
-					y * CELL_SIZE, 
-					z * CELL_SIZE
-				);
-
-				CollisionEntry *entry = hash->cells[hash_key];
-				while (entry && *Count < QUERY_SIZE) {
-					/* Simple dubplicate check using entity pointer as identifier */
-					bool is_duplicate = false;
-					for (int i = 0; i < *Count; i++) {
-						if (query_results[i] == entry->entity) {
-							is_duplicate = true;
-							break;
-						}
-					}
-
-					if (!is_duplicate) {
-						query_results[*Count] = entry->entity;
-						(*Count)++;
-					}
-
-					entry = entry->next;
-				}
-			}
-		}
-	}
-
-	return query_results;
+	return SpatialHash__queryRegion(scene->spatial_hash, min, max, count);;
 }
 
-
-bool
-isSphereInFrustum(
-	Vector3  sphere_center, 
-	float    sphere_radius, 
-	Head    *head,
-	float    max_distance
-)
-{
-	Camera3D         *camera   = &head->camera;
-    RendererSettings *settings = head->settings;
-
-    Vector3 
-		forward   = Vector3Normalize(Vector3Subtract(camera->target, camera->position)),
-		to_sphere = Vector3Subtract(sphere_center, camera->position);
-
-    float distance = Vector3Length(to_sphere);
-    if (distance > max_distance + sphere_radius) return false;
-	
-    float forward_dot = Vector3DotProduct(to_sphere, forward);
-    if (forward_dot < -sphere_radius) return false; /* Behind camera */
-
-    /* Build right and up vectors from forward */
-    Vector3 
-		up    = camera->up,
-		right = Vector3Normalize(Vector3CrossProduct(forward, up));
-		up    = Vector3Normalize(Vector3CrossProduct(right, forward)); /* Re-orthogonalize */
-
-	RenderTexture *viewport = Head_getViewport(head);
-    float 
-		horizontal  = Vector3DotProduct(to_sphere, right),
-		vertical    = Vector3DotProduct(to_sphere, up),
-		/* Get angles from camera forward direction */
-		horiz_angle = atanf(horizontal / fmaxf(fabsf(forward_dot), 0.001f)),
-		vert_angle  = atanf(vertical / fmaxf(fabsf(forward_dot), 0.001f)),
-		/* Get actual FOV and aspect */
-		vfov_rad    = DEG2RAD * camera->fovy,
-		aspect      = (float)viewport->texture.width / (float)viewport->texture.height,
-		hfov_rad    = 2.0f * atanf(tanf(vfov_rad * 0.5f) * aspect),
-		horiz_limit = hfov_rad * 0.5f,
-		vert_limit  = vfov_rad * 0.5f,
-		/* Account for sphere radius as a loose bound */
-		angle_pad   = asinf(CLAMP(sphere_radius / distance, 0.0f, 1.0f));
-
-    return fabsf(horiz_angle) <= (horiz_limit + angle_pad) &&
-           fabsf(vert_angle)  <= (vert_limit  + angle_pad);
-}
-
-/* Query for entities visible in camera frustum */
-Entity **
-CollisionScene__queryFrustum(
-	CollisionScene *scene,
-	Head           *head,
-	float           max_distance,
-	int            *visible_entity_count
-)
-{
-	static Entity *frustum_results[QUERY_SIZE];
-	*visible_entity_count = 0;
-
-	if (!head) return frustum_results;
-	
-	Camera3D *camera = &head->camera;
-	Vector3 
-		/* Calculate frustum bounds for broad-phase culling */
-		camera_pos     = camera->position,
-		camera_target  = camera->target,
-		forward        = Vector3Normalize(Vector3Subtract(camera_target, camera_pos)),
-		/* Create rough bounding box around frustum for spatial hash query */
-		frustum_center = Vector3Add(camera_pos, Vector3Scale(forward, max_distance * 0.5f));
-	float query_radius = max_distance * 1.2f; /* add some padding */
-
-	Vector3
-		min_bounds = {
-			frustum_center.x - query_radius,
-			frustum_center.y - query_radius,
-			frustum_center.z - query_radius
-		},
-		max_bounds = {
-			frustum_center.x + query_radius,
-			frustum_center.y + query_radius,
-			frustum_center.z + query_radius
-		};
-
-	int candidate_count;
-	Entity **candidates = CollisionScene__queryRegion(
-		scene,
-		min_bounds,
-		max_bounds,
-		&candidate_count
-	);
-
-	/* Fine-grained frustum culling */
-	for (int i = 0; i < candidate_count && *visible_entity_count < QUERY_SIZE; i++) {
-		Entity *entity = candidates[i];
-
-		if (!entity->visible) continue;
-
-		if (
-			isSphereInFrustum(
-				entity->position,
-				entity->visibility_radius,
-				head,
-				max_distance
-			)
-		) {
-			frustum_results[*visible_entity_count] = entity;
-			(*visible_entity_count)++;
-		}
-	}
-
-	return frustum_results;
-}
 
 /* AABB Collision */
 CollisionResult
@@ -506,7 +189,7 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 
 	/* Query spatial hash for potential collisions */
 	int      candidate_count;
-	Entity **candidates = CollisionScene__queryRegion(
+	Entity **candidates = SpatialHash__queryRegion(
 		scene,
 		min_bounds,
 		max_bounds,
@@ -683,7 +366,7 @@ CollisionScene__update(CollisionScene *scene)
 {
 	if (!scene->needs_rebuild) return;
 
-	clearHash(scene);
+	SpatialHash__clear(scene->spatial_hash);
 
 	if (!scene->entities_ref) return;
 

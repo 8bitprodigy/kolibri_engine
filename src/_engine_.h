@@ -1,8 +1,13 @@
 #ifndef ENGINE_PRIVATE_H
 #define ENGINE_PRIVATE_H
 
+
 #include "_collision_.h"
+#include "_entity_.h"
+#include "_head_.h"
 #include "_scene_.h"
+#include "_renderer_.h"
+
 #include "common.h"
 #include "engine.h"
 
@@ -18,6 +23,7 @@ void            Engine__insertScene(      Engine *engine, Scene          *scene)
 void            Engine__removeScene(      Engine *engine, Scene          *scene);
 void            Engine__setCollisionScene(Engine *engine, CollisionScene *scene);
 CollisionScene *Engine__getCollisionScene(Engine *engine);
+Renderer       *Engine__getRenderer(      Engine *engine);
 
 
 #endif /* ENGINE_PRIVATE_H */

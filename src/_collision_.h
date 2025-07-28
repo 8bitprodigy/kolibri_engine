@@ -23,7 +23,6 @@ CollisionResult   Collision__checkAABB(          Entity         *a,     Entity  
 CollisionResult   Collision__checkRayAABB(       Vector3         from,  Vector3  to,     Entity  *entity);
 
 Entity          **CollisionScene__queryRegion(   CollisionScene *scene, Vector3  min,    Vector3  max,          int *count);
-Entity          **CollisionScene__queryFrustum(  CollisionScene *scene, Head    *head, float    max_distance, int *visible_entity_count);
 CollisionResult   CollisionScene__checkCollision(CollisionScene *scene, Entity  *a,      Vector3  to);
 CollisionResult   CollisionScene__raycast(       CollisionScene *scene, Vector3  from,   Vector3  to);
 

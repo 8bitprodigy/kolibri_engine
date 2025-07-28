@@ -12,11 +12,11 @@ Head
     RenderTexture             viewport;
     Rectangle                 region;
     int                       controller_id;
+	RendererSettings          settings;
     Engine                   *engine;
     Entity                   *controlled_entity;
     void                     *user_data;
     HeadFreeUserDataCallback  FreeUserData;
-	RendererSettings         *settings;
 
     struct Head
 		*prev,

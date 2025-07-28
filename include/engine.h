@@ -44,7 +44,7 @@ EngineVTable *Engine_getVTable(Engine *engine);
 /*
 	METHODS
 */
-void      Engine_run(        Engine *engine);
+void      Engine_run(        Engine *engine, uint target_fps);
 void      Engine_update(     Engine *engine);
 void      Engine_render(     Engine *engine);
 void      Engine_resize(     Engine *engine, uint  width,  uint height);

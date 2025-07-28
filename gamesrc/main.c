@@ -6,8 +6,20 @@
 #include <raylib.h>
 
 
-#define SCREEN_WIDTH 854
-#define SCREEN_HEIGHT 480
+#ifndef SCREEN_WIDTH
+	#define SCREEN_WIDTH 1280
+#endif
+#ifndef SCREEN_HEIGHT
+	#define SCREEN_HEIGHT 720
+#endif
+
+
+typedef struct
+RenderableData
+{
+	Color color;
+}
+RenderableData;
 
 
 float
@@ -80,6 +92,23 @@ testHeadUpdate(Head *head, float delta)
 }
 
 
+void
+testRenderableCallback(
+	Renderable *renderable,
+	Entity     *entity
+)
+{
+	RenderableData *data = (RenderableData*)renderable->data;
+	if (!data) return;
+	DrawCubeV(
+		Vector3Add(entity->position, entity->renderable_offset),
+		entity->bounds,
+		data->color
+	);
+		
+}
+
+
 EngineVTable engine_Callbacks = {
 	NULL, 
 	NULL, 
@@ -117,15 +146,58 @@ SceneVTable scene_Callbacks = {
 };
 
 
+static RenderableData rd_1, rd_2, rd_3;
+static Renderable     r_1,  r_2,  r_3;
+static Entity         entityTemplate;
+
+
 int
 main(void)
 {
+
+	entityTemplate = (Entity){
+		.renderables       = {&r_1,  &r_2,  &r_3},
+		.lod_distances     = {8.0f, 16.0f, 32.0f},
+		.lod_count         = 3,
+		.renderable_offset = {0.0f, 0.5f, 0.0f},
+		.visibility_radius = 1.0f,
+		.bounds            = V3_ONE,
+		.user_data         = NULL,
+		.vtable            = NULL,
+		.position          = V3_ZERO,
+		.rotation          = V3_ZERO,
+		.scale             = V3_ONE,
+		.visible           = true,
+		.active            = true,
+		.physical          = true, 
+	};
+	
+	rd_1 = (RenderableData){.color = RED};
+	rd_2 = (RenderableData){.color = GREEN};
+	rd_3 = (RenderableData){.color = BLUE};
+
+	r_1 = (Renderable){
+		.data   = &rd_1,
+		.Render = testRenderableCallback
+	};
+	r_2 = (Renderable){
+		.data   = &rd_2,
+		.Render = testRenderableCallback
+	};
+	r_3 = (Renderable){
+		.data   = &rd_3,
+		.Render = testRenderableCallback
+	};
+
+	
 	Engine *engine = Engine_new(&engine_Callbacks);
 	Head   *head   = Head_new(0, &head_Callbacks, engine);
 
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 
 	Head_setViewport(head, SCREEN_WIDTH, SCREEN_HEIGHT);
+	RendererSettings *settings = Head_getRendererSettings(head);
+//	settings->frustum_culling = false;
 	Camera3D *cam = Head_getCamera(head);
 	cam->fovy     = 45.0f;
 	cam->up       = V3_UP;
@@ -133,8 +205,24 @@ main(void)
 	cam->target   = (Vector3){10.0f, 0.0f, 10.0f};
 
 	Scene_new(&scene_Callbacks, NULL, engine);
+	
+	Entity 
+		*ent_1 = Entity_new(&entityTemplate, engine),
+		*ent_2 = Entity_new(&entityTemplate, engine),
+		*ent_3 = Entity_new(&entityTemplate, engine),
+		*ent_4 = Entity_new(&entityTemplate, engine);
+	
+	ent_1->visible = true; ent_1->active = true;
+	ent_2->visible = true; ent_2->active = true;
+	ent_3->visible = true; ent_3->active = true;
+	ent_4->visible = true; ent_4->active = true;
 
-	Engine_run(engine);
+	ent_1->position = (Vector3){ 10.0f, 0.0f,  10.0f};
+	ent_2->position = (Vector3){-10.0f, 0.0f,  10.0f};
+	ent_3->position = (Vector3){ 10.0f, 0.0f, -10.0f};
+	ent_4->position = (Vector3){-10.0f, 0.0f, -10.0f};
+
+	Engine_run(engine, 0);
 
 	return 0;
 }

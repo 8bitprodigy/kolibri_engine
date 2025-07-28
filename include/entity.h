@@ -27,12 +27,14 @@ typedef struct
 Entity 
 {
     
-    Renderable      renderables[MAX_LOD_LEVELS];
+    Renderable     *renderables[MAX_LOD_LEVELS];
     float           lod_distances[MAX_LOD_LEVELS];
-    float           visibility_radius;
     uint8           lod_count;
+    float           visibility_radius;
+    Vector3         
+                    bounds,
+                    renderable_offset;
     void           *user_data;
-
     EntityVTable   *vtable;
     
     union {
@@ -46,7 +48,6 @@ Entity
                 skew;
         };
     };
-    Vector3        bounds;
     
     struct {
         union {

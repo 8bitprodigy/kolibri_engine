@@ -13,6 +13,8 @@ static uint64 Latest_ID = 0;
 Entity *
 Entity_new(const Entity *entity, Engine *engine)
 {
+	if (!engine) return NULL;
+	
 	EntityNode *node = malloc(sizeof(EntityNode));
 
 	if (!node) {
@@ -82,16 +84,32 @@ Entity_render(Entity *entity, Head *head)
 		break;
 	}
 	if (lod_level < 0) return; /* Distance is greater than max renderable LOD level, so don't render it. */
+	
+	//DBG_OUT("Rendering entity at position: (%.2f, %.2f, %.2f)", entity->position.x, entity->position.y, entity->position.z);
+	//DBG_OUT("LOD level: %d\n", lod_level);
+	
+	Renderable *renderable = entity->renderables[lod_level];
 
-	Renderable *renderable = &entity->renderables[lod_level];
-	if (renderable && renderable->RenderableCallback) {
-		renderable->RenderableCallback(
-			renderable, 
-			entity->position,
-			entity->rotation,
-			entity->scale
+	//DBG_OUT("Renderable pointer: %p", (void*)renderable);
+	//DBG_OUT("Renderable->Render function pointer: %p", (void*)renderable->Render);
+	//DBG_OUT("Entity->renderables[%d] address: %p", lod_level, (void*)entity->renderables[lod_level]);
+	
+	
+	if (renderable && renderable->Render) {
+		//DBG_OUT("About to call Render function...");
+		renderable->Render(
+			renderable,
+			entity
 		);
+		//DBG_OUT("Render function completed successfully");
 	}
+	/*
+	DBG_EXPR(
+		else {
+			DBG_OUT("ERROR: renderable or renderable->Render is NULL!");
+		}
+	);
+	*/
 }
 
 
@@ -120,49 +138,6 @@ EntityNode__freeAll(EntityNode *self)
 	EntityNode__free(self);
 	EntityNode__freeAll(next);
 }
-
-/*
-void
-EntityNode__insert(EntityNode *node, EntityNode *to)
-{
-	if (!node || !to) {
-		ERR_OUT("EntityNode__insert() received a NULL pointer in arguments");
-		return;
-	}
-
-	if (!to->prev || !to->next) {
-		ERR_OUT("EntityNode__insert() received improperly initialized EntityNode `to`.");
-		return;
-	}
-
-	EntityNode *last = to->prev;
-
-	last->next = node;
-	to->prev   = node;
-	
-	node->next = to;
-	node->prev = last;
-}
-
-
-void
-EntityNode__remove(EntityNode *node)
-{
-	if (!node) {
-		ERR_OUT("EntityNode__remove() received a NULL pointer.");
-		return;
-	}
-	if (!node->prev || !node->next) {
-		ERR_OUT("EntityNode__remove() received an EntityNode with missing prev/next pointers.");
-		return;
-	}
-	EntityNode *node_1 = node->prev;
-	EntityNode *node_2 = node->next;
-
-	node_1->next = node_2;
-	node_2->prev = node_1;
-}
-*/
 
 void
 EntityNode__updateAll(EntityNode *node, float delta)

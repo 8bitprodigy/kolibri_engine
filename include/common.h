@@ -59,7 +59,9 @@
 
 #define V2_ZERO      ((Vector2){0.0f, 0.0f})
 #define V3_ZERO      ((Vector3){0.0f, 0.0f, 0.0f})
+#define V3_ONE       ((Vector3){1.0f, 1.0f, 1.0f})
 #define V3_UP        ((Vector3){0.0f, 1.0f, 0.0f})
+#define XF_ZERO      ((Xform){V3_ZERO,V3_ZERO,V3_ZERO,V3_ZERO})
 #define NO_COLLISION ((CollisionResult){V3_ZERO,V3_ZERO,0.0f,0,NULL,NULL,false})
 
 /*
@@ -82,6 +84,9 @@ typedef struct Head   Head;
 */
 
 /* Value Types */
+#ifdef __DREAMCAST__
+	#include <arch/types.h>
+#else
 typedef uint64_t     uint64;
 typedef uint32_t     uint32;
 typedef uint16_t     uint16;
@@ -90,6 +95,7 @@ typedef int64_t      int64;
 typedef int32_t      int32;
 typedef int16_t      int16;
 typedef int8_t       int8;
+#endif
 typedef unsigned int uint;
 typedef size_t       word;
 
@@ -134,9 +140,8 @@ typedef struct
 Renderable
 {
     RenderableType      type;
-    Vector3             offset;
     void               *data;
-    void (*RenderableCallback)(struct Renderable *renderable, Vector3 position, Vector3 rotation, Vector3 scale);
+    void (*Render)(struct Renderable *renderable, Entity *entity);
 } 
 Renderable;
 /*

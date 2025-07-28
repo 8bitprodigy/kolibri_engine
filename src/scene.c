@@ -1,6 +1,7 @@
 #include "_collision_.h"
 #include "_engine_.h"
 #include "_scene_.h"
+#include "_renderer_.h"
 #include "common.h"
 
 
@@ -96,7 +97,7 @@ void
 Scene_update(Scene *self, float delta)
 {
     SceneVTable *vtable = self->vtable;
-    if (vtable && vtable->Enter) vtable->Update(self, delta);
+    if (vtable && vtable->Update) vtable->Update(self, delta);
 }
 
 void 
@@ -153,8 +154,16 @@ Scene_raycast(Scene *self, Vector3 from, Vector3 to)
 void
 Scene_render(Scene *self, Head *head)
 {
-    SceneVTable *vtable = self->vtable;
-    if (vtable && vtable->Render) vtable->Render(self, head);
+    SceneVTable *vtable    = self->vtable;
+    EntityList entity_list = {0};
+    if (vtable && vtable->Render) entity_list = vtable->Render(self, head);
+    else {
+        EntityList *all_entities = Engine_getEntityList(self->engine);
+        if (all_entities) {
+            entity_list = *all_entities;
+        }
+    }
+    Renderer__render(Engine__getRenderer(self->engine), &entity_list, head);
 }
 
 void

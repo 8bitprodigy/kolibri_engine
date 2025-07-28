@@ -1,10 +1,5 @@
 #include <raylib.h>
-#include "_collision_.h"
 #include "_engine_.h"
-#include "_entity_.h"
-#include "_head_.h"
-#include "_renderer_.h"
-#include "_scene_.h"
 
 
 /*
@@ -23,6 +18,8 @@ Engine
 	uint64     frame_num;
 	uint       head_count;
 	uint       entity_count;
+	uint       target_fps;
+	
 	float      delta;
 
 	EntityList entity_list;
@@ -63,6 +60,7 @@ Engine_new(EngineVTable *vtable)
 	engine->entities         = NULL;
 	engine->scene            = NULL;
 	engine->collision_scene  = CollisionScene__new(engine->entities);
+	engine->renderer         = Renderer__new(engine);
 	
 	engine->frame_num        = 0;
 	engine->head_count       = 0;
@@ -168,9 +166,11 @@ Engine_getVTable(Engine *engine)
 
 
 void
-Engine_run(Engine *self)
+Engine_run(Engine *self, uint Target_FPS)
 {
 	const EngineVTable *vtable = self->vtable;
+	
+	if (0 < Target_FPS) SetTargetFPS(Target_FPS);
 	
 	if (vtable && vtable->Run) vtable->Run(self);
 	
@@ -339,7 +339,7 @@ void
 Engine__insertEntity(Engine *self, EntityNode *node)
 {
 	if (MAX_NUM_ENTITIES <= self->entity_count) return;
-	if (self->entities) {
+	if (!self->entities) {
 		self->entities = node;
 		self->entity_count++;
 		return;
@@ -419,4 +419,10 @@ CollisionScene *
 Engine__getCollisionScene(Engine *self)
 {
 	return self->collision_scene;
+}
+
+Renderer *
+Engine__getRenderer(Engine *self)
+{
+	return self->renderer;
 }

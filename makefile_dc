@@ -1,0 +1,79 @@
+PROJECTNAME = kolibritest
+PLATFORM    = dc
+
+SRCDIR     = src
+GAMESRCDIR = gamesrc
+OBJDIR     = obj/$(PLATFORM)
+
+TARGET = $(PROJECTNAME).dc.elf
+CDI    = $(PROJECTNAME).cdi
+
+# Source files
+ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
+GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
+
+ENGINE_OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
+GAME_OBJS   = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
+
+OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
+
+# KOS-specific flags and libraries (matching your working makefile)
+KOSCCFLAGS += -Iinclude -lraylib -lGL -lkosutils -g3 -O3 -flto 
+KOSCCFLAGS += -DSCREEN_HEIGHT=480 -DSCREEN_WIDTH=640
+KOS_CFLAGS += -I${KOS_PORTS}/include/raylib
+
+# Include KOS build system
+include $(KOS_BASE)/Makefile.rules
+
+.PHONY: all clean rm-elf prepare cdi run clean-all
+
+all: rm-elf prepare $(TARGET)
+
+clean: rm-elf
+	rm -rf $(OBJDIR)
+
+# Clean all platforms
+clean-all:
+	rm -rf obj
+	rm -f $(TARGET) $(CDI)
+
+rm-elf:
+	rm -f $(TARGET)
+
+prepare:
+	mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR)/engine
+	mkdir -p $(OBJDIR)/game
+
+$(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
+	kos-cc $(KOSCCFLAGS) -c -o $@ $<
+
+$(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c
+	kos-cc $(KOSCCFLAGS) -c -o $@ $<
+
+$(TARGET): $(OBJS)
+	kos-cc -o $(TARGET) $(OBJS) $(KOSCCFLAGS)
+
+# Create CDI image for burning to CD or running in emulator
+cdi: prepare $(TARGET)
+	@echo "Building DreamCast disc...\n"
+	mkdcdisc -e $(TARGET) -o $(PROJECTNAME).cdi
+
+# Run using KOS loader
+run: $(TARGET)
+	$(KOS_LOADER) $(TARGET)
+
+# Distribution build (stripped)
+dist: $(TARGET)
+	-rm -f $(OBJS)
+	$(KOS_STRIP) $(TARGET)
+
+debug:
+	@echo "PLATFORM:       $(PLATFORM)"
+	@echo "ENGINE_SOURCES: $(ENGINE_SRC)"
+	@echo "GAME_SOURCES:   $(GAME_SRC)"
+	@echo "ENGINE_OBJS:    $(ENGINE_OBJS)"
+	@echo "GAME_OBJS:      $(GAME_OBJS)"
+	@echo "OBJS:           $(OBJS)"
+	@echo "KOS_BASE:       $(KOS_BASE)"
+	@echo "KOS_CC:         $(KOS_CC)"
