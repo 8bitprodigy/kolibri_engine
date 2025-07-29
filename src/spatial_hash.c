@@ -209,3 +209,45 @@ SpatialHash__queryRegion(SpatialHash *hash, Vector3 min, Vector3 max, int *count
 
     return query_results;
 }
+
+static bool entity_seen[MAX_NUM_ENTITIES]; // Global bitfield
+static int frame_counter = 0;
+
+Entity **SpatialHash__queryRegionFast(SpatialHash *hash, Vector3 min, Vector3 max, int *count) {
+    static Entity *query_results[QUERY_SIZE];
+    *count = 0;
+    
+    // Clear seen flags efficiently
+    static int last_clear_frame = -1;
+    if (last_clear_frame != frame_counter) {
+        memset(entity_seen, 0, sizeof(entity_seen));
+        last_clear_frame = frame_counter;
+    }
+    
+    int min_x = CELL_ALIGN(min.x), max_x = CELL_ALIGN(max.x);
+    int min_y = CELL_ALIGN(min.y), max_y = CELL_ALIGN(max.y);
+    int min_z = CELL_ALIGN(min.z), max_z = CELL_ALIGN(max.z);
+
+    for (int x = min_x; x <= max_x; x++) {
+        for (int y = min_y; y <= max_y; y++) {
+            for (int z = min_z; z <= max_z; z++) {
+                uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
+                
+                CollisionEntry *entry = hash->cells[hash_key];
+                while (entry && *count < QUERY_SIZE) {
+                    uint64 entity_id = Entity_getUniqueID(entry->entity);
+                    
+                    if (!entity_seen[entity_id % MAX_NUM_ENTITIES]) {  // O(1) lookup!
+                        entity_seen[entity_id % MAX_NUM_ENTITIES] = true;
+                        query_results[*count] = entry->entity;
+                        (*count)++;
+                    }
+                    
+                    entry = entry->next;
+                }
+            }
+        }
+    }
+    frame_counter++;
+    return query_results;
+}

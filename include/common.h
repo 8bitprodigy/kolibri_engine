@@ -122,6 +122,46 @@ EntityList
 }
 EntityList;
 
+typedef struct 
+Plane
+{
+	Vector3 normal;
+	float   distance;
+}
+Plane;
+
+typedef enum
+{
+	FRUSTUM_LEFT,
+	FRUSTUM_RIGHT,
+	FRUSTUM_TOP,
+	FRUSTUM_BOTTOM,
+	FRUSTUM_NEAR,
+	FRUSTUM_FAR
+}
+FrustumPlaneIndices;
+
+typedef struct 
+Frustum
+{
+	Plane planes[6];
+
+	Vector3
+		forward,
+		right,
+		up,
+		position;
+
+	float
+		hfov_rad,
+		vfov_rad,
+		horiz_limit,
+		vert_limit,
+		aspect_ratio;
+
+	bool dirty;
+}
+Frustum;
 
 /*
 	Renderable

@@ -65,6 +65,7 @@ Head             *Head_getNext(            Head *head);
 Head             *Head_getPrev(            Head *head);
 Camera3D         *Head_getCamera(          Head *head);
 Engine           *Head_getEngine(          Head *head);
+Frustum          *Head_getFrustum(         Head *head);
 RenderTexture    *Head_getViewport(        Head *head);
 void              Head_setViewport(        Head *head, int   width,     int                      height);
 Rectangle         Head_getRegion(          Head *head);

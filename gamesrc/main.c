@@ -157,7 +157,7 @@ main(void)
 
 	entityTemplate = (Entity){
 		.renderables       = {&r_1,  &r_2,  &r_3},
-		.lod_distances     = {8.0f, 16.0f, 32.0f},
+		.lod_distances     = {8.0f, 16.0f, 64.0f},
 		.lod_count         = 3,
 		.renderable_offset = {0.0f, 0.5f, 0.0f},
 		.visibility_radius = 1.0f,
@@ -197,7 +197,7 @@ main(void)
 
 	Head_setViewport(head, SCREEN_WIDTH, SCREEN_HEIGHT);
 	RendererSettings *settings = Head_getRendererSettings(head);
-//	settings->frustum_culling = false;
+	settings->frustum_culling = false;
 	Camera3D *cam = Head_getCamera(head);
 	cam->fovy     = 45.0f;
 	cam->up       = V3_UP;
@@ -206,12 +206,28 @@ main(void)
 
 	Scene_new(&scene_Callbacks, NULL, engine);
 	
-	Entity 
+	Entity *ents[21][21][21];
+/*
 		*ent_1 = Entity_new(&entityTemplate, engine),
 		*ent_2 = Entity_new(&entityTemplate, engine),
 		*ent_3 = Entity_new(&entityTemplate, engine),
 		*ent_4 = Entity_new(&entityTemplate, engine);
-	
+*/
+	for (int x = 0; x < 21; x++) {
+		for (int y = 0; y < 21; y++) {
+			for (int z = 0; z < 21; z++) {
+				ents[x][y][z] = Entity_new(&entityTemplate, engine);
+				ents[x][y][z]->visible = true;
+				ents[x][y][z]->active  = true;
+				ents[x][y][z]->position = (Vector3){
+					(x * 5.0f) - 50.0f,
+					(z * 5.0f) - 50.0f,
+					(y * 5.0f) - 50.0f
+				};
+			}
+		}
+	}
+/*
 	ent_1->visible = true; ent_1->active = true;
 	ent_2->visible = true; ent_2->active = true;
 	ent_3->visible = true; ent_3->active = true;
@@ -221,7 +237,7 @@ main(void)
 	ent_2->position = (Vector3){-10.0f, 0.0f,  10.0f};
 	ent_3->position = (Vector3){ 10.0f, 0.0f, -10.0f};
 	ent_4->position = (Vector3){-10.0f, 0.0f, -10.0f};
-
+*/
 	Engine_run(engine, 0);
 
 	return 0;

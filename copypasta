@@ -1,0 +1,1 @@
+I'd just like to interject for a moment. What you're refering to as Kolibri is in fact, raylib/Kolibri, or as I've recently taken to calling it, raylib plus Kolibri Engine. Kolibri is not an engine unto itself, but rather another free component of a fully functioning game engine made useful by the raylib corelibs and raylib extra libraries comprising a full game engine.

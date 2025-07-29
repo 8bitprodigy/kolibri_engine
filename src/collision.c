@@ -190,7 +190,7 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 	/* Query spatial hash for potential collisions */
 	int      candidate_count;
 	Entity **candidates = SpatialHash__queryRegion(
-		scene,
+		scene->spatial_hash,
 		min_bounds,
 		max_bounds,
 		&candidate_count
