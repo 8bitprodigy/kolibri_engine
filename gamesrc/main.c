@@ -7,10 +7,10 @@
 
 
 #ifndef SCREEN_WIDTH
-	#define SCREEN_WIDTH 1280
+	#define SCREEN_WIDTH 854
 #endif
 #ifndef SCREEN_HEIGHT
-	#define SCREEN_HEIGHT 720
+	#define SCREEN_HEIGHT 480
 #endif
 
 
@@ -206,7 +206,7 @@ main(void)
 
 	Scene_new(&scene_Callbacks, NULL, engine);
 	
-	Entity *ents[21][21][21];
+	Entity *ents[21][21];
 /*
 		*ent_1 = Entity_new(&entityTemplate, engine),
 		*ent_2 = Entity_new(&entityTemplate, engine),
@@ -215,16 +215,16 @@ main(void)
 */
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
-			for (int z = 0; z < 21; z++) {
-				ents[x][y][z] = Entity_new(&entityTemplate, engine);
-				ents[x][y][z]->visible = true;
-				ents[x][y][z]->active  = true;
-				ents[x][y][z]->position = (Vector3){
+//			for (int z = 0; z < 21; z++) {
+				ents[x][y]           = Entity_new(&entityTemplate, engine);
+				ents[x][y]->visible  = true;
+				ents[x][y]->active   = true;
+				ents[x][y]->position = (Vector3){
 					(x * 5.0f) - 50.0f,
-					(z * 5.0f) - 50.0f,
+					0.0f, //(z * 5.0f),
 					(y * 5.0f) - 50.0f
 				};
-			}
+//			}
 		}
 	}
 /*

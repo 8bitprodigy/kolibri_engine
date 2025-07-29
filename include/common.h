@@ -42,19 +42,19 @@
 #endif
 /* Collision system-related constants */
 #ifndef SPATIAL_HASH_SIZE
-	#define SPATIAL_HASH_SIZE 1024
+	#define SPATIAL_HASH_SIZE 2053
 #endif
 #ifndef CELL_SIZE
-	#define CELL_SIZE 4.0f
+	#define CELL_SIZE 20.0f
 #endif
 #ifndef INITIAL_ENTITY_CAPACITY
 	#define INITIAL_ENTITY_CAPACITY 256
 #endif
 #ifndef ENTRY_POOL_SIZE
-	#define ENTRY_POOL_SIZE 2048
+	#define ENTRY_POOL_SIZE 16384
 #endif
 #ifndef QUERY_SIZE
-	#define QUERY_SIZE 512
+	#define QUERY_SIZE 1024
 #endif
 
 #define V2_ZERO      ((Vector2){0.0f, 0.0f})

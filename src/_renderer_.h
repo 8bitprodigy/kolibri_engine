@@ -16,6 +16,7 @@ void      Renderer__free(Renderer *renderer);
 
 /* Protected Methods */
 void      Renderer__render(Renderer *renderer, EntityList *entities, Head *head);
+void      Renderer__renderBruteForceFrustum(Renderer *renderer, EntityList *entities, Head *head) ;
 Entity  **Renderer__queryFrustum(Renderer *renderer, Head *head, float max_distance, int *visible_count);
 
 
