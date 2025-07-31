@@ -12,6 +12,7 @@
 #ifndef SCREEN_HEIGHT
 	#define SCREEN_HEIGHT 480
 #endif
+#define ASPECT_RATIO ((float)SCREEN_WIDTH/(float)SCREEN_HEIGHT)
 
 
 typedef struct
@@ -92,8 +93,8 @@ testSceneComposite(Engine *engine)
 	TestHeadData *data = Head_getUserData(head);
 	
 	Vector2 pos = (Vector2){
-			(SCREEN_WIDTH/2.0f)  - (rt->texture.width/2.0f),
-			(SCREEN_HEIGHT/2.0f) - (rt->texture.height/2.0f),
+			(SCREEN_WIDTH/2)  - (rt->texture.width/2),
+			(SCREEN_HEIGHT/2) - (rt->texture.height/2),
 		};
 	ClearBackground(BLACK);
 	DrawTextureRec((*Head_getViewport(head)).texture, Head_getRegion(head), pos, WHITE);
@@ -183,20 +184,24 @@ testHeadUpdate(Head *head, float delta)
 	UpdateCamera(Head_getCamera(head), CAMERA_FIRST_PERSON);
 	
 	if      (IsKeyPressed(KEY_EQUAL)) {
-		if (1 < data->viewport_scale) data->viewport_scale--;
-		Head_setViewport(
-				head, 
-				SCREEN_WIDTH/data->viewport_scale, 
-				SCREEN_HEIGHT/data->viewport_scale
-			);
+		if (0 < data->viewport_scale) data->viewport_scale--;
+		else return;
+
+		int
+			width  = SCREEN_WIDTH - (48 * data->viewport_scale),
+			height = width / ASPECT_RATIO;
+			
+		Head_setViewport(head, width, height);
 	}
 	else if (IsKeyPressed(KEY_MINUS)) {
-		if (data->viewport_scale < 8) data->viewport_scale++;
-		Head_setViewport(
-				head, 
-				SCREEN_WIDTH/data->viewport_scale, 
-				SCREEN_HEIGHT/data->viewport_scale
-			);
+		if (data->viewport_scale < 16) data->viewport_scale++;
+		else return;
+
+		int
+			width  = SCREEN_WIDTH - (48 * data->viewport_scale),
+			height = width / ASPECT_RATIO;
+			
+		Head_setViewport(head, width, height);
 	}
 	
 }
@@ -298,9 +303,9 @@ main(void)
 		.Render = testRenderableCallback
 	};
 	
-	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
-	
 	Engine *engine = Engine_new(&engine_Callbacks);
+	
+	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 	Head   *head   = Head_new(0, &head_Callbacks, engine);
 
 	Head_setViewport(head, SCREEN_WIDTH, SCREEN_HEIGHT);
