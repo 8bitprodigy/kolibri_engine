@@ -11,11 +11,13 @@ typedef struct CollisionEntry CollisionEntry;
 typedef struct 
 SpatialHash
 {
-	CollisionEntry *cells[SPATIAL_HASH_SIZE];
 	CollisionEntry *entry_pool; /* pre-allocated entries for performance */
 	CollisionEntry *free_entries; /* Free list for recycling */
-	int pool_size;
-	int pool_used;
+	int             pool_size;
+	int             pool_used;
+    int             hash_size; /* Number of hash buckets */
+    float           cell_size; /* Size of each cell */
+	CollisionEntry *cells[SPATIAL_HASH_SIZE]; /* Variable length array - MUST BE LAST */
 }
 SpatialHash;
 

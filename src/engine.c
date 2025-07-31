@@ -135,11 +135,11 @@ Engine_getEntityList(Engine *self)
 
 	do {
 		self->entity_list.entities[index++] = PRIVATE_TO_ENTITY(current);
-		current = current->next;
+		current                             = current->next;
 	} while (current != self->entities);
 	
-	self->entity_list.count    = self->entity_count;
-	self->dirty_EntityList = false;
+	self->entity_list.count = self->entity_count;
+	self->dirty_EntityList  = false;
 	return &self->entity_list;
 }
 

@@ -163,6 +163,21 @@ Frustum
 }
 Frustum;
 
+typedef struct
+K_Ray
+{
+	union {
+		Ray ray;
+		struct {
+			Vector3
+				position,
+				direction;
+		};
+	};
+	float length;
+}
+K_Ray;
+
 /*
 	Renderable
 */
@@ -222,6 +237,29 @@ Xform
 	};
 }
 Xform;
+
+
+/*
+	Utility Functions
+*/
+static int 
+nextPrime(int n) {
+    if (n <= 1) return 2;
+    if (n <= 3) return n;
+    if (n % 2 == 0) n++;
+    
+    while (true) {
+        bool is_prime = true;
+        for (int i = 3; i * i <= n; i += 2) {
+            if (n % i == 0) {
+                is_prime = false;
+                break;
+            }
+        }
+        if (is_prime) return n;
+        n += 2;
+    }
+}
 
 
 #endif /* COMMON_H */

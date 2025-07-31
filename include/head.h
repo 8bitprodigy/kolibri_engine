@@ -9,10 +9,9 @@
 
 
 /* Callback Types */
-typedef void (*HeadCallback)(            Head *head);
-typedef void (*HeadUpdateCallback)(      Head *head, float delta);
-typedef void (*HeadResizeCallback)(      Head *head, uint  width,  uint height);
-typedef void (*HeadFreeUserDataCallback)(void *user_data);
+typedef void        (*HeadCallback)(            Head *head);
+typedef void        (*HeadUpdateCallback)(      Head *head, float delta);
+typedef void        (*HeadResizeCallback)(      Head *head, uint  width,  uint height);
 
 typedef struct
 HeadVTable
@@ -71,8 +70,7 @@ void              Head_setViewport(        Head *head, int   width,     int     
 Rectangle         Head_getRegion(          Head *head);
 void              Head_setRegion(          Head *head, int   x,         int                      y,        int width, int height);
 void             *Head_getUserData(        Head *head);
-void              Head_setUserData(        Head *head, void *user_data, HeadFreeUserDataCallback callback);
-void              Head_freeUserData(       Head *head);
+void              Head_setUserData(        Head *head, void *user_data);
 void              Head_setVTable(          Head *head, HeadVTable *vtable);
 HeadVTable       *Head_getVTable(          Head *head);
 RendererSettings *Head_getRendererSettings(Head *head);

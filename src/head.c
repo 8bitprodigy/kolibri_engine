@@ -117,7 +117,11 @@ Head_new(
 	
 	head->next              = head;
 	head->prev              = head;
-	
+
+	head->camera            = (Camera3D){0};
+	head->camera.up         = V3_UP;
+	head->camera.fovy       = 45.0f;
+	head->camera.projection = CAMERA_PERSPECTIVE;
 	head->controller_id     = Controller_ID;
 	head->engine            = engine;
 	head->controlled_entity = NULL;
@@ -244,21 +248,10 @@ Head_getUserData(Head *Self)
 
 
 void
-Head_setUserData(Head *Self, void *User_Data, HeadFreeUserDataCallback callback)
+Head_setUserData(Head *Self, void *User_Data)
 {
-	if (!callback) return;
-	Self->FreeUserData = callback;
-	Self->user_data    = User_Data;
+	Self->user_data = User_Data;
 }
-
-
-void
-Head_freeUserData(Head *Self)
-{
-	if (!Self->FreeUserData) return;
-	Self->FreeUserData(Self->user_data);
-}
-
 
 void 
 Head_setVTable(Head *Self, HeadVTable *VTable)

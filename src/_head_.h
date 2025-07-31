@@ -25,7 +25,6 @@ Head
     Engine                   *engine;
     Entity                   *controlled_entity;
     void                     *user_data;
-    HeadFreeUserDataCallback  FreeUserData;
 
     struct Head
 		*prev,
