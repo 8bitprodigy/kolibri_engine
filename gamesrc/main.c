@@ -7,10 +7,10 @@
 
 
 #ifndef SCREEN_WIDTH
-	#define SCREEN_WIDTH 854
+	#define SCREEN_WIDTH 1280
 #endif
 #ifndef SCREEN_HEIGHT
-	#define SCREEN_HEIGHT 480
+	#define SCREEN_HEIGHT 720
 #endif
 #define ASPECT_RATIO ((float)SCREEN_WIDTH/(float)SCREEN_HEIGHT)
 
@@ -188,20 +188,22 @@ testHeadUpdate(Head *head, float delta)
 		else return;
 
 		int
-			width  = SCREEN_WIDTH - (48 * data->viewport_scale),
-			height = width / ASPECT_RATIO;
-			
+			height = SCREEN_HEIGHT - (48 * data->viewport_scale),
+			width  = height * ASPECT_RATIO;
+		
 		Head_setViewport(head, width, height);
+		DBG_OUT("New Viewport dimensions: W-%d\tH-%d", width, height);
 	}
 	else if (IsKeyPressed(KEY_MINUS)) {
-		if (data->viewport_scale < 16) data->viewport_scale++;
+		if (data->viewport_scale < 12) data->viewport_scale++;
 		else return;
 
 		int
-			width  = SCREEN_WIDTH - (48 * data->viewport_scale),
-			height = width / ASPECT_RATIO;
+			height  = SCREEN_HEIGHT - (48 * data->viewport_scale),
+			width = height * ASPECT_RATIO;
 			
 		Head_setViewport(head, width, height);
+		DBG_OUT("New Viewport dimensions: W-%d\tH-%d", width, height);
 	}
 	
 }
@@ -271,7 +273,7 @@ main(void)
 {
 	entityTemplate = (Entity){
 		.renderables       = {&r_1,  &r_2,  &r_3},
-		.lod_distances     = {8.0f, 16.0f, 64.0f},
+		.lod_distances     = {8.0f, 16.0f, 48.0f},
 		.lod_count         = 3,
 		.renderable_offset = {0.0f, 0.5f, 0.0f},
 		.visibility_radius = 1.0f,
@@ -303,9 +305,9 @@ main(void)
 		.Render = testRenderableCallback
 	};
 	
-	Engine *engine = Engine_new(&engine_Callbacks);
-	
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
+	
+	Engine *engine = Engine_new(&engine_Callbacks);
 	Head   *head   = Head_new(0, &head_Callbacks, engine);
 
 	Head_setViewport(head, SCREEN_WIDTH, SCREEN_HEIGHT);

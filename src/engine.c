@@ -71,6 +71,10 @@ Engine_new(EngineVTable *vtable)
 	engine->request_exit     = false;
 	engine->dirty_EntityList = true;
 
+	engine->entity_list.entities = NULL;
+	engine->entity_list.capacity = 0;
+	engine->entity_list.count    = 0;
+
 	engine->vtable           = vtable;
 
 	if (vtable && vtable->Setup) vtable->Setup(engine);

@@ -16,14 +16,12 @@ Head
     float                     prev_fovy;
     int
         prev_width,
-        prev_height,
-        controller_id;
+        prev_height;
     RenderTexture             viewport;
     Rectangle                 region;
 	RendererSettings          settings;
     Frustum                   frustum;
     Engine                   *engine;
-    Entity                   *controlled_entity;
     void                     *user_data;
 
     struct Head

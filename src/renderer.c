@@ -188,7 +188,7 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 		visible_count    = entities->count;
 	}
 
-	DBG_OUT("Visible count after frustum culling: %d", visible_count);
+	//DBG_OUT("Visible count after frustum culling: %d", visible_count);
 	
 	for (int i = 0; i < visible_count; i++) {
 		Entity_render(visible_entities[i], head);
