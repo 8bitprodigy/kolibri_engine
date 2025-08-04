@@ -122,9 +122,7 @@ Head_new(
 	head->camera.up         = V3_UP;
 	head->camera.fovy       = 45.0f;
 	head->camera.projection = CAMERA_PERSPECTIVE;
-	head->controller_id     = Controller_ID;
 	head->engine            = engine;
-	head->controlled_entity = NULL;
 	head->user_data         = NULL;
 	head->region            = (Rectangle){0.0f, 0.0f, 0.0f, 0.0f};
 

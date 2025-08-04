@@ -85,14 +85,14 @@ Entity
         uint8 flags;
         struct {
             bool
-                visible :1,
-                active  :1,
-                physical:1,
-                flag_3  :1,
-                flag_4  :1,
-                flag_5  :1,
-                flag_6  :1,
-                flag_7  :1;
+                visible        :1,
+                active         :1,
+                physical       :1, /* Use physics */
+                collision_shape:1, /* 0 = Box; 1 = Cylinder */
+                solid          :1, /* Solid or area collision */
+                _flag_5        :1,
+                _flag_6        :1,
+                _flag_7        :1;
         };
     };
 } 

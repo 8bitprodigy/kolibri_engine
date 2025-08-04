@@ -108,7 +108,7 @@ CollisionResult
     float   distance;     /* Distance to collision */
     int     material_id;  /* For different surface types */
     void   *user_data;    /* Scene-specific data (material, etc.) */
-    Entity *entity;       /* If hit an entity (NULL for terrain) */
+    Entity *entity;       /* If hit an entity (NULL for Scene) */
     bool    hit;
 }
 CollisionResult;
