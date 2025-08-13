@@ -315,7 +315,7 @@ main(void)
 
 	Head_setViewport(head, SCREEN_WIDTH, SCREEN_HEIGHT);
 	RendererSettings *settings = Head_getRendererSettings(head);
-	settings->frustum_culling = false;
+//	settings->frustum_culling = false;
 	Camera3D *cam = Head_getCamera(head);
 	cam->fovy     = 45.0f;
 	cam->up       = V3_UP;

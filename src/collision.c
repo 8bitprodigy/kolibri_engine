@@ -95,7 +95,7 @@ CollisionScene__queryRegion(
 }
 
 /* Cylinder Collision */
-static CollisionResult
+CollisionResult
 Collision__checkCylinder(Entity *a, Entity *b)
 {
 	CollisionResult result = {0};
@@ -213,7 +213,7 @@ Collision__checkAABB(Entity *a, Entity *b)
 	return result;
 }
 
-static CollisionResult
+CollisionResult
 Collision__checkMixed(Entity *aabb_entity, Entity *cyl_entity, bool cyl_is_b)
 {
     CollisionResult result = {0};
@@ -336,30 +336,10 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 
 		CollisionResult test_result = Collision__checkDiscreet(&temp_entity, other);
 		if (test_result.hit) {
-			/* Handle area mode - don't block movement, but still trigger callbacks */
-			if (!other->solid) {
-				/* Trigger callback on moving entity */
-				EntityVTable *vtable = entity->vtable;
-				if (vtable && vtable->OnCollision) vtable->OnCollision(entity, &test_result);
-
-				/* Trigger callback on area entity too */
-				EntityVTable *area_vtable = other->vtable;
-				if (area_vtable && area_vtable->OnCollision) {
-					CollisionResult area_result = test_result;
-					area_result.entity          = entity;
-					area_result.normal          = Vector3Scale(test_result.normal, -1.0f);
-					area_vtable->OnCollision(other, &area_result);
-				}
-				continue;
-			}
-			
 			result = test_result;
 			break; /* Return first collision found */
 		}
 	}
-
-	EntityVTable *vtable = entity->vtable;
-	if (result.hit && vtable && vtable->OnCollision) vtable->OnCollision(entity, &result);
 	
 	return result;
 }
@@ -370,7 +350,7 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 *************************************/
 
 /* CCD: Cylinder-Cylinder */
-static CollisionResult
+CollisionResult
 Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 {
 	CollisionResult result = {0};
@@ -444,7 +424,7 @@ Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 }
 
 /* CCD: AABB - AABB */
-static CollisionResult
+CollisionResult
 Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
 {
 	CollisionResult result = {0};
@@ -545,7 +525,7 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
 }
 
 /* CCD: AABB - Cylinder (either can be moving) */
-static CollisionResult
+CollisionResult
 Collision__checkContinuousMixed(Entity *aabb, Entity *cylinder, Vector3 movement, bool aabb_is_moving)
 {
     CollisionResult result = {0};
@@ -729,30 +709,7 @@ CollisionScene__moveEntity(CollisionScene *scene, Entity *entity, Vector3 moveme
 
         CollisionResult test_result = Collision__checkContinuous(&temp_entity, other, movement);
         
-        if (test_result.hit && test_result.distance < result.distance) {
-            /* Handle area mode */
-            if (!other->solid) {
-                EntityVTable *vtable = entity->vtable;
-                if (vtable && vtable->OnCollision) vtable->OnCollision(entity, &test_result);
-                
-                EntityVTable *area_vtable = other->vtable;
-                if (area_vtable && area_vtable->OnCollision) {
-                    CollisionResult area_result = test_result;
-                    area_result.entity = entity;
-                    area_result.normal = Vector3Scale(test_result.normal, -1.0f);
-                    area_vtable->OnCollision(other, &area_result);
-                }
-                continue; /* Don't block movement */
-            }
-            
-            result = test_result;
-        }
-    }
-
-    /* Trigger collision callback for solid collision */
-    if (result.hit) {
-        EntityVTable *vtable = entity->vtable;
-        if (vtable && vtable->OnCollision) vtable->OnCollision(entity, &result);
+        if (test_result.hit && test_result.distance < result.distance) result = test_result;
     }
 
     return result;

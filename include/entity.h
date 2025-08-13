@@ -5,9 +5,9 @@
 #include "common.h"
 
 
-typedef void (*EntityCallback)(   Entity *entity);
+typedef void (*EntityCallback)(         Entity *entity);
 typedef void (*EntityCollisionCallback)(Entity *entity, CollisionResult *collision);
-typedef void (*EntityUpdateCallback)(Entity *entity, float   delta);
+typedef void (*EntityUpdateCallback)(   Entity *entity, float            delta);
 
 typedef struct
 EntityVTable
@@ -17,6 +17,7 @@ EntityVTable
     EntityUpdateCallback    Update;
     EntityCallback          Render;
     EntityCollisionCallback OnCollision;
+    EntityCollisionCallback OnCollided;
     EntityCallback          Exit;
     EntityCallback          Free;
 }
@@ -98,14 +99,12 @@ Entity
 } 
 Entity;
 
-
+/*
+    Constructor/Destructor
+*/
 Entity  *Entity_new(      const Entity *template_entity, Engine *engine);
 void     Entity_free(           Entity *entity);
-/*
-void     Entity_addToScene(     Scene  *scene,           Entity *entity);
-void     Entity_removeFromScene(Scene  *scene,           Entity *entity);
-void     Entity_updateAll(      float   dt);
-*/
+
 /*
     Setters/Getters
 */

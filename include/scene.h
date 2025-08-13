@@ -26,6 +26,7 @@ SceneVTable
     SceneEntityCallback     EntityEnter;
     SceneEntityCallback     EntityExit;
     SceneCollisionCallback  CheckCollision; 
+    SceneCollisionCallback  MoveEntity; 
     SceneRaycastCallback    Raycast; 
     SceneRenderCallback     Render;
     SceneCallback           Exit;
@@ -36,21 +37,23 @@ SceneVTable;
 /* Constructor */
 Scene          *Scene_new(SceneVTable *scene_type, void *data, Engine *engine);
 /* Destructor */
-void            Scene_free(     Scene       *scene);
+void            Scene_free(Scene      *scene);
 
 /* Setters/Getters */
 Engine         *Scene_getEngine(     Scene *scene);
 void           *Scene_getMapData(    Scene *scene);
 
 /* Public Methods */
-void            Scene_enter(         Scene *scene);
-void            Scene_update(        Scene *scene, float    delta);
-void            Scene_entityEnter(   Scene *scene, Entity  *entity);
-void            Scene_entityExit(    Scene *scene, Entity  *entity);
-CollisionResult Scene_checkCollision(Scene *scene, Entity  *entity, Vector3 to);
-CollisionResult Scene_raycast(       Scene *scene, Vector3  from,   Vector3 to);
-void            Scene_render(        Scene *scene, Head    *head);
-void            Scene_exit(          Scene *scene);
+void            Scene_enter(          Scene *scene);
+void            Scene_update(         Scene *scene, float    delta);
+void            Scene_entityEnter(    Scene *scene, Entity  *entity);
+void            Scene_entityExit(     Scene *scene, Entity  *entity);
+CollisionResult Scene_checkCollision( Scene *scene, Entity  *entity, Vector3 to);
+CollisionResult Scene_checkContinuous(Scene *scene, Entity  *entity, Vector3 movement);
+CollisionResult Scene_moveEntity(     Scene *scene, Entity  *entity, Vector3 movement);
+CollisionResult Scene_raycast(        Scene *scene, Vector3  from,   Vector3 to);
+void            Scene_render(         Scene *scene, Head    *head);
+void            Scene_exit(           Scene *scene);
 
 
 #endif /* SCENE_H */

@@ -3,6 +3,7 @@
 #include "_scene_.h"
 #include "_renderer_.h"
 #include "common.h"
+#include <raylib.h>
 
 
 void insertScene(Scene *scene, Scene *to);
@@ -141,6 +142,68 @@ Scene_checkCollision(Scene *self, Entity *entity, Vector3 to)
     }
     
     return NO_COLLISION;
+}
+
+CollisionResult
+Scene_checkContinuous(Scene *self, Entity *entity, Vector3 to)
+{
+    SceneVTable     *vtable = self->vtable;
+    CollisionResult 
+        scene_result  = {0},
+        entity_result = {0},
+        result;
+        
+    if (vtable && vtable->CheckCollision) {
+        scene_result = vtable->moveEntity(self, entity, to);
+    }
+    CollisionScene *collision_scene = Engine__getCollisionScene(self->engine);
+    if(collision_scene) {
+        entity_result = CollisionScene__moveEntity(collision_scene, entity, to);
+    }
+    
+    if (scene_result.hit && entity_result.hit) {
+        result = (scene_result.distance <= entity_result.distance) ? scene_result : entity_result;
+    }
+    else if (scene_result.hit) {
+        result = scene_result;
+    }
+    else if (entity_result.hit) {
+        result = entity_result;
+    }
+    else {
+        result = NO_COLLISION;
+    }
+    
+    return result;
+}
+
+CollisionResult
+Scene_moveEntity(Scene *scene, Entity *entity, Vector3 to)
+{
+    CollisionResult result;
+    Vector3
+        *position = &entity->position;
+    result = Scene_checkContinuous(scene, entity, to);
+
+    if (result.hit) {
+        EntityVTable *entity_vtable = entity->vtable;
+        *position = Vector3Add(*position, Vector3Scale(to, result.distance));
+        if (entity_vtable && entity_vtable->OnCollision) entity_vtable->OnCollision(entity, result);
+        if (result.entity) {
+            Entity *other                = result.entity;
+            EntityVTable *other_vtable   = other->vtable;
+            if (other_vtable && other_vtable->OnCollided) {
+                CollisionResult other_result = result;
+                other_result.entity          = entity;
+                other_vtable->OnCollided(other, other_result);
+            }
+        }
+    }
+    else {
+        *position = Vector3Add(*position, to);
+    }
+    
+    return result;
 }
 
 CollisionResult
