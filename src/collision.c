@@ -91,7 +91,7 @@ CollisionScene__queryRegion(
 	int *count
 )
 {
-	return SpatialHash__queryRegion(scene->spatial_hash, min, max, count);;
+	return (Entity**)SpatialHash__queryRegion(scene->spatial_hash, min, max, count);;
 }
 
 /* Cylinder Collision */
@@ -102,7 +102,7 @@ Collision__checkCylinder(Entity *a, Entity *b)
 	result.hit = false;
 
 	if (
-		   !(a->collision.masks & b->collision,layers) 
+		   !(a->collision.masks & b->collision.layers) 
 		&& !(b->collision.masks & a->collision.layers)
 	) {
 		return result;
@@ -147,7 +147,7 @@ Collision__checkCylinder(Entity *a, Entity *b)
 }
 
 /* AABB Collision */
-static CollisionResult
+CollisionResult
 Collision__checkAABB(Entity *a, Entity *b)
 {
 	CollisionResult result = {0};
@@ -279,7 +279,7 @@ Collision__checkDiscreet(Entity *a, Entity *b)
 		   !(a->collision.masks & b->collision.layers)
 		&& !(b->collision.masks & a->collision.layers)
 	) {
-		return result;
+		return NO_COLLISION;
 	}
 
 	if (a->collision_shape && b->collision_shape) {
@@ -289,11 +289,10 @@ Collision__checkDiscreet(Entity *a, Entity *b)
 		return Collision__checkMixed(a, b, true);
 	}
 	else if (!a->collision_shape && b->collision_shape) {
-		return collision__checkMixed(a, b, false);
+		return Collision__checkMixed(a, b, false);
 	}
-	else {
-		return Collision__checkAABB(a, b);
-	}
+	
+	return Collision__checkAABB(a, b);
 }
 
 /* Check collision for entity moving to new position */
@@ -338,7 +337,7 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 		CollisionResult test_result = Collision__checkDiscreet(&temp_entity, other);
 		if (test_result.hit) {
 			/* Handle area mode - don't block movement, but still trigger callbacks */
-			if (other->area_mode) {
+			if (!other->solid) {
 				/* Trigger callback on moving entity */
 				EntityVTable *vtable = entity->vtable;
 				if (vtable && vtable->OnCollision) vtable->OnCollision(entity, &test_result);
@@ -347,7 +346,7 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 				EntityVTable *area_vtable = other->vtable;
 				if (area_vtable && area_vtable->OnCollision) {
 					CollisionResult area_result = test_result;
-					area_result.entity          = test_result;
+					area_result.entity          = entity;
 					area_result.normal          = Vector3Scale(test_result.normal, -1.0f);
 					area_vtable->OnCollision(other, &area_result);
 				}
@@ -470,14 +469,14 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
 		*a_bounds = &a->bounds,
 		
 		b_min     = {
-			b_pos.x - b_bounds.x * 0.5f - a-bounds.x * 0.5f,
-			b_pos.y - a_bounds.y,
-			b_pos.z - b_bounds.z * 0.5f - a_bounds.z * 0.5f
+			b_pos->x - b_bounds->x * 0.5f - a_bounds->x * 0.5f,
+			b_pos->y - a_bounds->y,
+			b_pos->z - b_bounds->z * 0.5f - a_bounds->z * 0.5f
 		},
 		b_max     = {
-			b_pos.x + b_bounds.x * 0.5f + a_bounds.x * 0.5f,
-			b_pos.y,
-			b_pos.z + b_bounds.z * 0.5f + a_bounds.z * 0.5f
+			b_pos->x + b_bounds->x * 0.5f + a_bounds->x * 0.5f,
+			b_pos->y,
+			b_pos->z + b_bounds->z * 0.5f + a_bounds->z * 0.5f
 		},
 
 	/* Ray vs expanded AABB */
@@ -524,7 +523,7 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
 
 		/* Calculate normal */
 		Vector3
-			center_b   = {b_pos.x, b_pos.y + b_bounds.y * 0.5f, b_pos.z},
+			center_b   = {b_pos->x, b_pos->y + b_bounds->y * 0.5f, b_pos->z},
 			to_contact = Vector3Subtract(result.position, center_b);
 		float 
 			abs_x = fabsf(to_contact.x), 
@@ -673,19 +672,18 @@ Collision__checkContinuous(Entity *a, Entity *b, Vector3 movement)
         return NO_COLLISION;
     }
 
-    if (a->cylindrical && b->cylindrical) {
+    if (a->collision_shape && b->collision_shape) {
         return Collision__checkContinuousCylinder(a, b, movement);
     } 
-    else if (a->cylindrical && !b->cylindrical) {
+    else if (a->collision_shape && !b->collision_shape) {
         return Collision__checkContinuousMixed(b, a, movement, false); /* Cylinder moving */
     } 
-    else if (!a->cylindrical && b->cylindrical) {
+    else if (!a->collision_shape && b->collision_shape) {
         return Collision__checkContinuousMixed(a, b, movement, true); /* AABB moving */
     } 
-    else {
-        /* AABB vs AABB */
-        return CollisionScene__checkContinuousAABB(a, b, movement);
-    }
+    
+	/* AABB vs AABB */
+	return Collision__checkContinuousAABB(a, b, movement);
 }
 
 /* Primary method for moving entities with CCD */
@@ -729,11 +727,11 @@ CollisionScene__moveEntity(CollisionScene *scene, Entity *entity, Vector3 moveme
         /* Create temporary entity for CCD */
         Entity temp_entity = *entity;
 
-        CollisionResult test_result = Collision__checkContinuousShapes(&temp_entity, other, movement);
+        CollisionResult test_result = Collision__checkContinuous(&temp_entity, other, movement);
         
         if (test_result.hit && test_result.distance < result.distance) {
             /* Handle area mode */
-            if (other->area_mode) {
+            if (!other->solid) {
                 EntityVTable *vtable = entity->vtable;
                 if (vtable && vtable->OnCollision) vtable->OnCollision(entity, &test_result);
                 

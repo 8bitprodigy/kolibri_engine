@@ -1,5 +1,5 @@
 CC      = gcc
-CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0 -DDEBUG
+CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0 -DDEBUG -DUSE_MORTON_CURVE
 LIBS    = -lraylib -lGL -lm
 INCLUDE = -Iinclude -I/usr/local/include
 LIBDIR  = -L/usr/local/lib

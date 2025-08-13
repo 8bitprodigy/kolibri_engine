@@ -85,31 +85,9 @@ Entity_render(Entity *entity, Head *head)
 	}
 	if (lod_level < 0) return; /* Distance is greater than max renderable LOD level, so don't render it. */
 	
-	//DBG_OUT("Rendering entity at position: (%.2f, %.2f, %.2f)", entity->position.x, entity->position.y, entity->position.z);
-	//DBG_OUT("LOD level: %d\n", lod_level);
-	
 	Renderable *renderable = entity->renderables[lod_level];
 
-	//DBG_OUT("Renderable pointer: %p", (void*)renderable);
-	//DBG_OUT("Renderable->Render function pointer: %p", (void*)renderable->Render);
-	//DBG_OUT("Entity->renderables[%d] address: %p", lod_level, (void*)entity->renderables[lod_level]);
-	
-	
-	if (renderable && renderable->Render) {
-		//DBG_OUT("About to call Render function...");
-		renderable->Render(
-			renderable,
-			entity
-		);
-		//DBG_OUT("Render function completed successfully");
-	}
-	/*
-	DBG_EXPR(
-		else {
-			DBG_OUT("ERROR: renderable or renderable->Render is NULL!");
-		}
-	);
-	*/
+	if (renderable && renderable->Render) renderable->Render(renderable, (void*)entity);
 }
 
 

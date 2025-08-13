@@ -1,9 +1,11 @@
+#include <raylib.h>
+
 #include "common.h"
 #include "engine.h"
 #include "entity.h"
 #include "head.h"
+#include "readarg.h"
 #include "scene.h"
-#include <raylib.h>
 
 
 #ifndef SCREEN_WIDTH
@@ -16,11 +18,11 @@
 
 
 typedef struct
-RenderableData
+TestRenderableData
 {
-	Color color;
+	Color   color;
 }
-RenderableData;
+TestRenderableData;
 
 typedef struct
 TestHeadData
@@ -212,10 +214,11 @@ testHeadUpdate(Head *head, float delta)
 void
 testRenderableCallback(
 	Renderable *renderable,
-	Entity     *entity
+	void       *render_data
 )
 {
-	RenderableData *data = (RenderableData*)renderable->data;
+	Entity             *entity = render_data;
+	TestRenderableData *data   = (TestRenderableData*)renderable->data;
 	if (!data) return;
 	DrawCubeV(
 		Vector3Add(entity->position, entity->renderable_offset),
@@ -263,9 +266,9 @@ SceneVTable scene_Callbacks = {
 };
 
 
-static RenderableData rd_1, rd_2, rd_3;
-static Renderable     r_1,  r_2,  r_3;
-static Entity         entityTemplate;
+static TestRenderableData rd_1, rd_2, rd_3;
+static Renderable         r_1,  r_2,  r_3;
+static Entity             entityTemplate;
 
 
 int
@@ -276,7 +279,7 @@ main(void)
 		.lod_distances     = {8.0f, 16.0f, 48.0f},
 		.lod_count         = 3,
 		.renderable_offset = {0.0f, 0.5f, 0.0f},
-		.visibility_radius = 1.0f,
+		.visibility_radius = 1.5f,
 		.bounds            = V3_ONE,
 		.user_data         = NULL,
 		.vtable            = NULL,
@@ -288,9 +291,9 @@ main(void)
 		.physical          = true, 
 	};
 	
-	rd_1 = (RenderableData){.color = RED};
-	rd_2 = (RenderableData){.color = GREEN};
-	rd_3 = (RenderableData){.color = BLUE};
+	rd_1 = (TestRenderableData){.color = RED};
+	rd_2 = (TestRenderableData){.color = GREEN};
+	rd_3 = (TestRenderableData){.color = BLUE};
 
 	r_1 = (Renderable){
 		.data   = &rd_1,
@@ -312,7 +315,7 @@ main(void)
 
 	Head_setViewport(head, SCREEN_WIDTH, SCREEN_HEIGHT);
 	RendererSettings *settings = Head_getRendererSettings(head);
-//	settings->frustum_culling = false;
+	settings->frustum_culling = false;
 	Camera3D *cam = Head_getCamera(head);
 	cam->fovy     = 45.0f;
 	cam->up       = V3_UP;
@@ -321,17 +324,17 @@ main(void)
 
 	Scene_new(&scene_Callbacks, NULL, engine);
 	
-	Entity *ents[21][21];
-
+	Entity *ents[21][21][2];
+	int z = 0;
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
 //			for (int z = 0; z < 21; z++) {
-				ents[x][y]           = Entity_new(&entityTemplate, engine);
-				ents[x][y]->visible  = true;
-				ents[x][y]->active   = true;
-				ents[x][y]->position = (Vector3){
+				ents[x][y][z]           = Entity_new(&entityTemplate, engine);
+				ents[x][y][z]->visible  = true;
+				ents[x][y][z]->active   = true;
+				ents[x][y][z]->position = (Vector3){
 					(x * 5.0f) - 50.0f,
-					0.0f, //(z * 5.0f),
+					(z * 5.0f),
 					(y * 5.0f) - 50.0f
 				};
 //			}

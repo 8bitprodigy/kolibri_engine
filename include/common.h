@@ -181,22 +181,24 @@ K_Ray;
 /*
 	Renderable
 */
-typedef enum 
-{
-    RENDERABLE_NONE,
-    RENDERABLE_MODEL,
-    RENDERABLE_BILLBOARD,
-    RENDERABLE_PARTICLES,
-    RENDERABLE_CUSTOM    
-} 
-RenderableType;
-
 typedef struct 
 Renderable
 {
-    RenderableType      type;
-    void               *data;
-    void (*Render)(struct Renderable *renderable, Entity *entity);
+    void  *data;
+    void (*Render)(struct Renderable *renderable, void *data);
+	union {
+		uint8 flags;
+		struct {
+			bool transparent:1;
+			bool flag_1     :1;
+			bool flag_2     :1;
+			bool flag_3     :1;
+			bool flag_4     :1;
+			bool flag_5     :1;
+			bool flag_6     :1;
+			bool flag_7     :1;
+		};
+	};
 } 
 Renderable;
 /*

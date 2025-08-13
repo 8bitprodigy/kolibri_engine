@@ -10,13 +10,30 @@
 
 
 typedef struct
-CollisionEntry
+SpatialEntry
 {
-	Entity                *entity;
-	struct CollisionEntry *next;
+	struct SpatialEntry *next;
+	void                *data;
 }
-CollisionEntry;
+SpatialEntry;
 
+
+static inline uint32
+spread(uint32 x)
+{
+    x = (x | (x << 16)) & 0x030000FF;
+    x = (x | (x << 8))  & 0x0300F00F;
+    x = (x | (x << 4))  & 0x030C30C3;
+    x = (x | (x << 2))  & 0x09249249;
+    
+    return x;
+}
+
+static inline uint32
+morton3d(uint32 x, uint32 y, uint32 z)
+{
+    return (spread(x)) | (spread(y) << 1) | (spread(z) << 2);
+}
 
 /* Hash function for spatial coordinates */
 static inline uint32
@@ -26,15 +43,16 @@ hashPosition(float x, float y, float z)
         cell_x = CELL_ALIGN(x),
         cell_y = CELL_ALIGN(y),
         cell_z = CELL_ALIGN(z);
-
-    uint32 hash = (
-        (uint32)cell_x * 73856093u
-        ^ (uint32)cell_y * 19349663u
-        ^ (uint32)cell_z * 83492791u
-    );
     
-    return hash % SPATIAL_HASH_SIZE;
+    uint32
+        ux = ((uint32)cell_x) & 0x3FF,
+        uy = ((uint32)cell_y) & 0x3FF,
+        uz = ((uint32)cell_z) & 0x3FF;
+
+    return morton3d(ux, uy, uz) % SPATIAL_HASH_SIZE;
 }
+
+
 
 static inline void
 getEntityCells(
@@ -66,15 +84,15 @@ getEntityCells(
 }
 
 /* Get a free entry from the pool */
-static CollisionEntry *
+static SpatialEntry *
 allocEntry(SpatialHash *hash)
 {
     if (!hash->free_entries) {
         ERR_OUT("Spatial hash entry pool exhausted, allocating dynamically!");
-        return malloc(sizeof(CollisionEntry));
+        return malloc(sizeof(SpatialEntry));
     }
 
-    CollisionEntry *entry = hash->free_entries;
+    SpatialEntry *entry = hash->free_entries;
     hash->free_entries = entry->next;
     hash->pool_used++;
     
@@ -83,7 +101,7 @@ allocEntry(SpatialHash *hash)
 
 /* Return entry to free list */
 static void
-freeEntry(SpatialHash *hash, CollisionEntry *entry)
+freeEntry(SpatialHash *hash, SpatialEntry *entry)
 {
     if (!(hash->entry_pool <= entry && entry < hash->entry_pool + hash->pool_size)) {
         free(entry);
@@ -107,7 +125,7 @@ SpatialHash__new(void)
 
     memset(hash->cells, 0, sizeof(hash->cells));
 
-    hash->entry_pool = malloc(sizeof(CollisionEntry) * ENTRY_POOL_SIZE);
+    hash->entry_pool = malloc(sizeof(SpatialEntry) * ENTRY_POOL_SIZE);
     hash->pool_size  = ENTRY_POOL_SIZE;
     hash->pool_used  = 0;
 
@@ -136,9 +154,9 @@ void
 SpatialHash__clear(SpatialHash *hash)
 {
     for (int i = 0; i < SPATIAL_HASH_SIZE; i++) {
-        CollisionEntry *entry = hash->cells[i];
+        SpatialEntry *entry = hash->cells[i];
         while (entry) {
-            CollisionEntry *next = entry->next;
+            SpatialEntry *next = entry->next;
             freeEntry(hash, entry);
             entry = next;
         }
@@ -148,7 +166,7 @@ SpatialHash__clear(SpatialHash *hash)
 
 /* Insert entity */
 void
-SpatialHash__insert(SpatialHash *hash, Entity *entity, Vector3 center, Vector3 bounds)
+SpatialHash__insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bounds)
 {
     int min_x, max_x, min_y, max_y, min_z, max_z;
     getEntityCells(center, bounds, &min_x, &max_x, &min_y, &max_y, &min_z, &max_z);
@@ -158,8 +176,8 @@ SpatialHash__insert(SpatialHash *hash, Entity *entity, Vector3 center, Vector3 b
             for (int z = min_z; z <= max_z; z++) {
                 uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
 
-                CollisionEntry *entry = allocEntry(hash);
-                entry->entity         = entity;
+                SpatialEntry *entry   = allocEntry(hash);
+                entry->data           = data;
                 entry->next           = hash->cells[hash_key];
                 hash->cells[hash_key] = entry;
             }
@@ -168,7 +186,7 @@ SpatialHash__insert(SpatialHash *hash, Entity *entity, Vector3 center, Vector3 b
 }
 
 /* Query region */
-Entity **
+void **
 SpatialHash__queryRegion(SpatialHash *hash, Vector3 min, Vector3 max, int *count)
 {
     static Entity *query_results[QUERY_SIZE];
@@ -186,18 +204,18 @@ SpatialHash__queryRegion(SpatialHash *hash, Vector3 min, Vector3 max, int *count
             for (int z = min_z; z <= max_z; z++) {
                 uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
 
-                CollisionEntry *entry = hash->cells[hash_key];
+                SpatialEntry *entry = hash->cells[hash_key];
                 while (entry && *count < QUERY_SIZE) {
                     bool is_duplicate = false;
                     for (int i = 0; i < *count; i++) {
-                        if (query_results[i] == entry->entity) {
+                        if (query_results[i] == entry->data) {
                             is_duplicate = true;
                             break;
                         }
                     }
 
                     if (!is_duplicate) {
-                        query_results[*count] = entry->entity;
+                        query_results[*count] = entry->data;
                         (*count)++;
                     }
 
@@ -207,47 +225,5 @@ SpatialHash__queryRegion(SpatialHash *hash, Vector3 min, Vector3 max, int *count
         }
     }
 
-    return query_results;
-}
-
-static bool entity_seen[MAX_NUM_ENTITIES]; // Global bitfield
-static int frame_counter = 0;
-
-Entity **SpatialHash__queryRegionFast(SpatialHash *hash, Vector3 min, Vector3 max, int *count) {
-    static Entity *query_results[QUERY_SIZE];
-    *count = 0;
-    
-    // Clear seen flags efficiently
-    static int last_clear_frame = -1;
-    if (last_clear_frame != frame_counter) {
-        memset(entity_seen, 0, sizeof(entity_seen));
-        last_clear_frame = frame_counter;
-    }
-    
-    int min_x = CELL_ALIGN(min.x), max_x = CELL_ALIGN(max.x);
-    int min_y = CELL_ALIGN(min.y), max_y = CELL_ALIGN(max.y);
-    int min_z = CELL_ALIGN(min.z), max_z = CELL_ALIGN(max.z);
-
-    for (int x = min_x; x <= max_x; x++) {
-        for (int y = min_y; y <= max_y; y++) {
-            for (int z = min_z; z <= max_z; z++) {
-                uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
-                
-                CollisionEntry *entry = hash->cells[hash_key];
-                while (entry && *count < QUERY_SIZE) {
-                    uint64 entity_id = Entity_getUniqueID(entry->entity);
-                    
-                    if (!entity_seen[entity_id % MAX_NUM_ENTITIES]) {  // O(1) lookup!
-                        entity_seen[entity_id % MAX_NUM_ENTITIES] = true;
-                        query_results[*count] = entry->entity;
-                        (*count)++;
-                    }
-                    
-                    entry = entry->next;
-                }
-            }
-        }
-    }
-    frame_counter++;
     return query_results;
 }
