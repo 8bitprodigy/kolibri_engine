@@ -260,6 +260,7 @@ SceneVTable scene_Callbacks = {
 	NULL, 
 	testSceneCollision, 
 	NULL, 
+	NULL,
 	testSceneRender, 
 	NULL, 
 	NULL

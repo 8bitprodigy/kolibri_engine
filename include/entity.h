@@ -6,8 +6,8 @@
 
 
 typedef void (*EntityCallback)(         Entity *entity);
-typedef void (*EntityCollisionCallback)(Entity *entity, CollisionResult *collision);
-typedef void (*EntityUpdateCallback)(   Entity *entity, float            delta);
+typedef void (*EntityCollisionCallback)(Entity *entity, CollisionResult collision);
+typedef void (*EntityUpdateCallback)(   Entity *entity, float           delta);
 
 typedef struct
 EntityVTable

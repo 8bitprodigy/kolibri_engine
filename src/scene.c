@@ -154,7 +154,7 @@ Scene_checkContinuous(Scene *self, Entity *entity, Vector3 to)
         result;
         
     if (vtable && vtable->CheckCollision) {
-        scene_result = vtable->moveEntity(self, entity, to);
+        scene_result = vtable->MoveEntity(self, entity, to);
     }
     CollisionScene *collision_scene = Engine__getCollisionScene(self->engine);
     if(collision_scene) {
@@ -187,17 +187,27 @@ Scene_moveEntity(Scene *scene, Entity *entity, Vector3 to)
 
     if (result.hit) {
         EntityVTable *entity_vtable = entity->vtable;
-        *position = Vector3Add(*position, Vector3Scale(to, result.distance));
-        if (entity_vtable && entity_vtable->OnCollision) entity_vtable->OnCollision(entity, result);
-        if (result.entity) {
-            Entity *other                = result.entity;
+        Entity *other               = result.entity;
+        Vector3 new_position;
+        if (other) {
             EntityVTable *other_vtable   = other->vtable;
             if (other_vtable && other_vtable->OnCollided) {
                 CollisionResult other_result = result;
                 other_result.entity          = entity;
                 other_vtable->OnCollided(other, other_result);
             }
+            if (other->solid) {
+                new_position = Vector3Add(*position, Vector3Scale(to, result.distance));
+            }
+            else {
+                new_position = Vector3Add(*position, to);
+            }
         }
+        else {
+            new_position = Vector3Add(*position, Vector3Scale(to, result.distance));
+        }
+        *position = new_position;
+        if (entity_vtable && entity_vtable->OnCollision) entity_vtable->OnCollision(entity, result);
     }
     else {
         *position = Vector3Add(*position, to);
