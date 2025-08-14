@@ -85,13 +85,12 @@ CollisionScene__clear(CollisionScene *scene)
 /* Query entities in a region */
 Entity **
 CollisionScene__queryRegion(
-	CollisionScene *scene, 
-	Vector3 min, 
-	Vector3 max, 
+	CollisionScene *scene,
+	BoundingBox bbox,
 	int *count
 )
 {
-	return (Entity**)SpatialHash__queryRegion(scene->spatial_hash, min, max, count);;
+	return (Entity**)SpatialHash__queryRegion(scene->spatial_hash, bbox, count);;
 }
 
 /* Cylinder Collision */
@@ -323,8 +322,7 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 	int      candidate_count;
 	Entity **candidates = SpatialHash__queryRegion(
 		scene->spatial_hash,
-		min_bounds,
-		max_bounds,
+		(BoundingBox){min_bounds, max_bounds},
 		&candidate_count
 	);
 
@@ -450,12 +448,12 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
 		
 		b_min     = {
 			b_pos->x - b_bounds->x * 0.5f - a_bounds->x * 0.5f,
-			b_pos->y - a_bounds->y,
+			b_pos->y - b_bounds->y * 0.5f - a_bounds->y * 0.5f,
 			b_pos->z - b_bounds->z * 0.5f - a_bounds->z * 0.5f
 		},
 		b_max     = {
 			b_pos->x + b_bounds->x * 0.5f + a_bounds->x * 0.5f,
-			b_pos->y,
+			b_pos->y + b_bounds->y * 0.5f + a_bounds->y * 0.5f,
 			b_pos->z + b_bounds->z * 0.5f + a_bounds->z * 0.5f
 		},
 
@@ -688,17 +686,21 @@ CollisionScene__moveEntity(CollisionScene *scene, Entity *entity, Vector3 moveme
     Vector3 
         min_bounds = {
             fminf(from.x, to.x) - entity->bounds.x * 0.5f,
-            fminf(from.y, to.y),
+            fminf(from.y, to.y) - entity->bounds.y * 0.5f,
             fminf(from.z, to.z) - entity->bounds.z * 0.5f
         },
         max_bounds = {
             fmaxf(from.x, to.x) + entity->bounds.x * 0.5f,
-            fmaxf(from.y, to.y) + entity->bounds.y,
+            fmaxf(from.y, to.y) + entity->bounds.y * 0.5f,
             fmaxf(from.z, to.z) + entity->bounds.z * 0.5f
         };
 
     int candidate_count;
-    Entity **candidates = SpatialHash__queryRegion(scene->spatial_hash, min_bounds, max_bounds, &candidate_count);
+    Entity **candidates = SpatialHash__queryRegion(
+			scene->spatial_hash, 
+			(BoundingBox){min_bounds, max_bounds}, 
+			&candidate_count
+		);
 
     for (int i = 0; i < candidate_count; i++) {
         Entity *other = candidates[i];
@@ -724,12 +726,12 @@ Collision__checkRayAABB(Vector3 from, Vector3 to, Entity *entity)
 	Vector3
 		min_bounds = {
 			entity->position.x - entity->bounds.x * 0.5f,
-			entity->position.y,
+			entity->position.y - entity->bounds.y * 0.5f,
 			entity->position.z - entity->bounds.z * 0.5f
 		},
 		max_bounds = {
 			entity->position.x + entity->bounds.x * 0.5f,
-			entity->position.y + entity->bounds.y,
+			entity->position.y + entity->bounds.y * 0.5f,
 			entity->position.z + entity->bounds.z * 0.5f
 		};
 
@@ -820,26 +822,26 @@ Collision__raycast(CollisionScene *scene, Vector3 from, Vector3 to)
 	CollisionResult closest_result = {0};
 	closest_result.hit      = false;
 	closest_result.distance = INFINITY;
-
+	
 	/* Get bounds along ray path */
-	Vector3
-		min_bounds = {
-			fminf(from.x, to.x),
-			fminf(from.y, to.y),
-			fminf(from.z, to.z)
-		},
-		max_bounds = {
-			fmaxf(from.x, to.x),
-			fmaxf(from.y, to.y),
-			fmaxf(from.z, to.z)
+	BoundingBox bbox = {
+			{
+				fminf(from.x, to.x),
+				fminf(from.y, to.y),
+				fminf(from.z, to.z)
+			},
+			{
+				fmaxf(from.x, to.x),
+				fmaxf(from.y, to.y),
+				fmaxf(from.z, to.z)
+			}
 		};
-
+	
 	/* Query spatial hash */
 	int      candidate_count;
 	Entity **candidates = CollisionScene__queryRegion(
 		scene, 
-		min_bounds,
-		max_bounds,
+		bbox,
 		&candidate_count
 	);
 	

@@ -71,13 +71,13 @@ testSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 	}
 
 	return (CollisionResult){
+		true,
+		distance,
 		hit_floor_point,
 		V3_UP,
-		distance,
 		0,
 		NULL,
-		NULL,
-		true
+		NULL
 	};
 }
 

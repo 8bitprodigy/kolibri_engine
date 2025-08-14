@@ -1,4 +1,5 @@
 #include <math.h>
+#include <raylib.h>
 #include <string.h>
 #include <stdbool.h>
 
@@ -12,8 +13,10 @@
 typedef struct
 SpatialEntry
 {
-	struct SpatialEntry *next;
+    BoundingBox          bbox;
+    Vector3              position;
 	void                *data;
+	struct SpatialEntry *next;
 }
 SpatialEntry;
 
@@ -54,33 +57,21 @@ hashPosition(float x, float y, float z)
 
 
 
-static inline void
-getEntityCells(
-    Vector3 center,
-    Vector3 bounds,
-    int *min_x, int *max_x,
-    int *min_y, int *max_y,
-    int *min_z, int *max_z
-)
+static inline BoundingBox
+getCellSelection(BoundingBox bbox)
 {
-    Vector3
-        min_bounds = {
-            center.x - bounds.x * 0.5f,
-            center.y,
-            center.z - bounds.z * 0.5f
-        },
-        max_bounds = {
-            center.x + bounds.x * 0.5f,
-            center.y + bounds.y,
-            center.z + bounds.z * 0.5f
+    return (BoundingBox){
+            {
+                CELL_ALIGN(bbox.min.x),
+                CELL_ALIGN(bbox.min.y),
+                CELL_ALIGN(bbox.min.z)
+            },
+            {
+                CELL_ALIGN(bbox.max.x),
+                CELL_ALIGN(bbox.max.y),
+                CELL_ALIGN(bbox.max.z)
+            }
         };
-
-    *min_x = CELL_ALIGN(min_bounds.x);
-    *max_x = CELL_ALIGN(max_bounds.x);
-    *min_y = CELL_ALIGN(min_bounds.y);
-    *max_y = CELL_ALIGN(max_bounds.y);
-    *min_z = CELL_ALIGN(min_bounds.z);
-    *max_z = CELL_ALIGN(max_bounds.z);
 }
 
 /* Get a free entry from the pool */
@@ -168,17 +159,31 @@ SpatialHash__clear(SpatialHash *hash)
 void
 SpatialHash__insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bounds)
 {
-    int min_x, max_x, min_y, max_y, min_z, max_z;
-    getEntityCells(center, bounds, &min_x, &max_x, &min_y, &max_y, &min_z, &max_z);
+    BoundingBox 
+        bbox = {
+                {
+                    center.x - bounds.x * 0.5f,
+                    center.y - bounds.y * 0.5f,
+                    center.z - bounds.z * 0.5f
+                },
+                {
+                    center.x + bounds.x * 0.5f,
+                    center.y + bounds.y * 0.5f,
+                    center.z + bounds.z * 0.5f
+                }
+            },
+        selection = getCellSelection(bbox);
 
-    for (int x = min_x; x <= max_x; x++) {
-        for (int y = min_y; y <= max_y; y++) {
-            for (int z = min_z; z <= max_z; z++) {
+    for (int x = selection.min.x; x <= selection.max.x; x++) {
+        for (int y = selection.min.y; y <= selection.max.y; y++) {
+            for (int z = selection.min.z; z <= selection.max.z; z++) {
                 uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
 
                 SpatialEntry *entry   = allocEntry(hash);
                 entry->data           = data;
                 entry->next           = hash->cells[hash_key];
+                entry->position       = center;
+                entry->bbox           = bbox;
                 hash->cells[hash_key] = entry;
             }
         }
@@ -187,21 +192,16 @@ SpatialHash__insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bound
 
 /* Query region */
 void **
-SpatialHash__queryRegion(SpatialHash *hash, Vector3 min, Vector3 max, int *count)
+SpatialHash__queryRegion(SpatialHash *hash, BoundingBox region, int *count)
 {
     static Entity *query_results[QUERY_SIZE];
     *count = 0;
 
-    int min_x = CELL_ALIGN(min.x);
-    int max_x = CELL_ALIGN(max.x);
-    int min_y = CELL_ALIGN(min.y);
-    int max_y = CELL_ALIGN(max.y);
-    int min_z = CELL_ALIGN(min.z);
-    int max_z = CELL_ALIGN(max.z);
+    BoundingBox selection = getCellSelection(region);
 
-    for (int x = min_x; x <= max_x; x++) {
-        for (int y = min_y; y <= max_y; y++) {
-            for (int z = min_z; z <= max_z; z++) {
+    for (int x = selection.min.x; x <= selection.max.x; x++) {
+        for (int y = selection.min.y; y <= selection.max.y; y++) {
+            for (int z = selection.min.z; z <= selection.max.z; z++) {
                 uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
 
                 SpatialEntry *entry = hash->cells[hash_key];

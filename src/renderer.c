@@ -118,8 +118,7 @@ Renderer__queryFrustum(
     int candidate_count;
     Entity **candidates = SpatialHash__queryRegion(
         renderer->visibility_hash,
-        min_bounds,
-        max_bounds,
+        (BoundingBox){min_bounds, max_bounds},
         &candidate_count
     );
 

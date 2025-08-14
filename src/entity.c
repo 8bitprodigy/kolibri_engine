@@ -2,6 +2,8 @@
 #include "_entity_.h"
 #include "_head_.h"
 #include "common.h"
+#include <raylib.h>
+#include <raymath.h>
 
 
 static uint64 Latest_ID = 0;
@@ -66,6 +68,30 @@ uint64
 Entity_getUniqueID(Entity *entity)
 {
 	return ENTITY_TO_PRIVATE(entity)->unique_ID;
+}
+
+
+BoundingBox
+Entity_getBoundingBox(Entity *entity)
+{
+	Vector3 
+		bounds = entity->bounds,
+		scale  = entity->scale;
+	
+	if (entity->collision_shape) {
+		bounds.z = bounds.x;
+	}
+	bounds = Vector3Multiply(bounds, scale);
+	
+	Vector3 
+		bounds_offset = Vector3Multiply(entity->bounds_offset, scale),
+		half_bounds   = Vector3Scale(bounds, 0.5f),
+		position      = Vector3Add(entity->position, bounds_offset);
+
+	return (BoundingBox){
+			Vector3Subtract(position, half_bounds),
+			Vector3Add(     position, half_bounds)
+		};
 }
 
 

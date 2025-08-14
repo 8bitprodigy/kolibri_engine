@@ -62,7 +62,7 @@
 #define V3_ONE       ((Vector3){1.0f, 1.0f, 1.0f})
 #define V3_UP        ((Vector3){0.0f, 1.0f, 0.0f})
 #define XF_ZERO      ((Xform){V3_ZERO,V3_ZERO,V3_ZERO,V3_ZERO})
-#define NO_COLLISION ((CollisionResult){V3_ZERO,V3_ZERO,0.0f,0,NULL,NULL,false})
+#define NO_COLLISION ((CollisionResult){false,0.0f,V3_ZERO,V3_ZERO,0,NULL,NULL})
 
 /*
 	COMMON ENUMERATIONS
@@ -103,13 +103,18 @@ typedef size_t       word;
 typedef struct 
 CollisionResult 
 {
-    Vector3 position;     /* Where collision occurred */
-    Vector3 normal;       /* Surface normal at hit point */
-    float   distance;     /* Distance to collision */
+	union {
+		RayCollision ray_collision;
+		struct {
+			bool    hit;
+			float   distance;     /* Distance to collision */
+			Vector3 position;     /* Where collision occurred */
+			Vector3 normal;       /* Surface normal at hit point */
+		};
+	};
     int     material_id;  /* For different surface types */
     void   *user_data;    /* Scene-specific data (material, etc.) */
     Entity *entity;       /* If hit an entity (NULL for Scene) */
-    bool    hit;
 }
 CollisionResult;
 

@@ -34,6 +34,7 @@ Entity
     float           visibility_radius;
     Vector3         
                     bounds,
+                    bounds_offset,
                     renderable_offset;
     void           *user_data;
     EntityVTable   *vtable;
@@ -108,10 +109,11 @@ void     Entity_free(           Entity *entity);
 /*
     Setters/Getters
 */
-Entity  *Entity_getNext(        Entity *entity);
-Entity  *Entity_getPrev(        Entity *entity);
+Entity      *Entity_getNext(       Entity *entity);
+Entity      *Entity_getPrev(       Entity *entity);
+uint64       Entity_getUniqueID(   Entity *entity);
+BoundingBox  Entity_getBoundingBox(Entity *entity);
 
 void     Entity_render(         Entity *entity, Head *head);
-uint64   Entity_getUniqueID(    Entity *entity);
 
 #endif /* ENTITY_H */
