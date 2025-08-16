@@ -153,7 +153,7 @@ Scene_checkContinuous(Scene *self, Entity *entity, Vector3 to)
         entity_result = {0},
         result;
         
-    if (vtable && vtable->CheckCollision) {
+    if (vtable && vtable->MoveEntity) {
         scene_result = vtable->MoveEntity(self, entity, to);
     }
     CollisionScene *collision_scene = Engine__getCollisionScene(self->engine);

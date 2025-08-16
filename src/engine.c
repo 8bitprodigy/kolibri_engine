@@ -59,7 +59,7 @@ Engine_new(EngineVTable *vtable)
 	engine->heads            = NULL;
 	engine->entities         = NULL;
 	engine->scene            = NULL;
-	engine->collision_scene  = CollisionScene__new(engine->entities);
+	engine->collision_scene  = CollisionScene__new(engine);
 	engine->renderer         = Renderer__new(engine);
 	
 	engine->frame_num        = 0;
@@ -101,6 +101,13 @@ float
 Engine_getDeltaTime(Engine *self)
 {
 	return self->delta;
+}
+
+
+uint64
+Engine_getFrameNumber(Engine *self)
+{
+	return self->frame_num;
 }
 
 
@@ -152,6 +159,13 @@ Head *
 Engine_getHeads(Engine *self)
 {
 	return self->heads;
+}
+
+
+Scene *
+Engine_getScene(Engine *self)
+{
+	return self->scene;
 }
 
 
@@ -221,8 +235,6 @@ Engine_update(Engine *self)
 	Scene_update(self->scene, delta);
 	
 	if (vtable && vtable->Update) vtable->Update(self, delta);
-	
-	self->frame_num++;
 }
 
 

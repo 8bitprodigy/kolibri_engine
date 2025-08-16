@@ -70,6 +70,11 @@ Entity_getUniqueID(Entity *entity)
 	return ENTITY_TO_PRIVATE(entity)->unique_ID;
 }
 
+Engine *
+Entity_getEngine(Entity *entity)
+{
+	return ENTITY_TO_PRIVATE(entity)->engine;
+}
 
 BoundingBox
 Entity_getBoundingBox(Entity *entity)
@@ -95,6 +100,48 @@ Entity_getBoundingBox(Entity *entity)
 }
 
 
+CollisionResult
+Entity_move(Entity *self, Vector3 movement)
+{
+	if (Vector3Equals(movement, V3_ZERO)) return NO_COLLISION;
+    CollisionResult  result;
+    Scene           *scene = Engine_getScene(ENTITY_TO_PRIVATE(self)->engine);
+    Vector3
+        *position = &self->position;
+    result = Scene_checkContinuous(scene, self, movement);
+
+    if (result.hit) {
+        EntityVTable *entity_vtable = self->vtable;
+        Entity *other               = result.entity;
+        Vector3 new_position;
+        if (other) {
+            EntityVTable *other_vtable   = other->vtable;
+            if (other_vtable && other_vtable->OnCollided) {
+                CollisionResult other_result = result;
+                other_result.entity          = self;
+                other_vtable->OnCollided(other, other_result);
+            }
+            if (other->solid) {
+                new_position = Vector3Add(*position, Vector3Scale(movement, result.distance));
+            }
+            else {
+                new_position = Vector3Add(*position, movement);
+            }
+        }
+        else {
+            new_position = Vector3Add(*position, Vector3Scale(movement, result.distance));
+        }
+        *position = new_position;
+        if (entity_vtable && entity_vtable->OnCollision) entity_vtable->OnCollision(self, result);
+    }
+    else {
+        *position = Vector3Add(*position, movement);
+    }
+    
+    return result;
+}
+
+
 void
 Entity_render(Entity *entity, Head *head)
 {
@@ -117,6 +164,9 @@ Entity_render(Entity *entity, Head *head)
 }
 
 
+/*
+	Private Methods
+*/
 void
 EntityNode__free(EntityNode *self)
 {

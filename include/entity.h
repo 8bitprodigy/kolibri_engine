@@ -40,14 +40,11 @@ Entity
     EntityVTable   *vtable;
     
     union {
-        Vector3 transform[4];
-        Xform   xform;
+        Transform transform;
         struct {
-            Vector3 
-                position, 
-                rotation,
-                scale,
-                skew;
+            Vector3    position;
+            Quaternion rotation;
+            Vector3    scale;
         };
     };
     
@@ -87,10 +84,10 @@ Entity
         uint8 flags;
         struct {
             bool
-                visible        :1,
                 active         :1,
-                physical       :1, /* Use physics */
-                collision_shape:1, /* 0 = Box; 1 = Cylinder */
+                visible        :1;
+            CollisionShape collision_shape:2; /* 0 = None | 1 = AABB | 2 = Cylinder | 3 = Sphere */
+            bool
                 solid          :1, /* Solid or area collision */
                 _flag_5        :1,
                 _flag_6        :1,
@@ -109,11 +106,16 @@ void     Entity_free(           Entity *entity);
 /*
     Setters/Getters
 */
+BoundingBox  Entity_getBoundingBox(Entity *entity);
+Engine      *Entity_getEngine(     Entity *entity);
 Entity      *Entity_getNext(       Entity *entity);
 Entity      *Entity_getPrev(       Entity *entity);
 uint64       Entity_getUniqueID(   Entity *entity);
-BoundingBox  Entity_getBoundingBox(Entity *entity);
 
-void     Entity_render(         Entity *entity, Head *head);
+/*
+    Methods
+*/
+CollisionResult Entity_move(  Entity *entity, Vector3  movement);    
+void            Entity_render(Entity *entity, Head    *head);
 
 #endif /* ENTITY_H */

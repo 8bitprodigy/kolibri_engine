@@ -33,12 +33,14 @@ void    Engine_free(Engine       *engine);
 /*
 	SETTERS/GETTERS
 */
-float       Engine_getDeltaTime( Engine *engine);
-EntityList *Engine_getEntityList(Engine *engine);
-Head       *Engine_getHeads(     Engine *engine);
+float       Engine_getDeltaTime(  Engine *engine);
+uint64      Engine_getFrameNumber(Engine *engine);
+EntityList *Engine_getEntityList( Engine *engine);
+Head       *Engine_getHeads(      Engine *engine);
+Scene      *Engine_getScene(      Engine *engine);
 
-void          Engine_setVTable(Engine *engine, EngineVTable *vtable);
-EngineVTable *Engine_getVTable(Engine *engine);
+void          Engine_setVTable(   Engine *engine, EngineVTable *vtable);
+EngineVTable *Engine_getVTable(   Engine *engine);
 
 
 /*

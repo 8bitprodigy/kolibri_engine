@@ -13,13 +13,14 @@
 
 
 #define CELL_ALIGN( value ) ((int)floorf( (value) / CELL_SIZE))
+#define COLLIDERS(a, b)     (((a) << 4) + (b))
 
 
 typedef struct
 CollisionScene
 {
 	SpatialHash *spatial_hash;
-	EntityNode  *entities_ref; /* Points to engine's entity list */
+	Engine      *engine;
 	bool         needs_rebuild; /* Flag to rebuild hash next frame */
 }
 CollisionScene;
@@ -29,7 +30,7 @@ CollisionScene;
 	Constructor
 */
 CollisionScene *
-CollisionScene__new(EntityNode *node)
+CollisionScene__new(Engine *engine)
 {
 	CollisionScene *scene = malloc(sizeof(CollisionScene));
 	if (!scene) {
@@ -38,7 +39,7 @@ CollisionScene__new(EntityNode *node)
 	}
 
 	scene->spatial_hash  = SpatialHash__new();
-	scene->entities_ref  = node;
+	scene->engine        = engine;
 	scene->needs_rebuild = true;
 
 	return scene;
@@ -70,7 +71,7 @@ CollisionScene__markRebuild(CollisionScene *scene)
 void
 CollisionScene__insertEntity(CollisionScene *scene, Entity *entity)
 {
-	if (!entity->physical) return;
+	if (!entity->collision_shape) return;
 
 	SpatialHash__insert(scene->spatial_hash, entity, entity->position, entity->bounds);
 	scene->needs_rebuild = true;
@@ -213,6 +214,26 @@ Collision__checkAABB(Entity *a, Entity *b)
 }
 
 CollisionResult
+Collision__checkSphere(Entity *a, Entity *b)
+{
+	CollisionResult result = {0};
+	result.hit             = false;
+
+	Vector3
+		a_pos = a->position,
+		b_pos = b->position;
+
+	float distance = Vector3Distance(a_pos, b_pos);
+	if (distance < (a_pos.x + b_pos.x)) return result;
+
+	result.distance = distance;
+	result.normal   = Vector3Normalize(Vector3Subtract(a_pos, b_pos));
+	result.position = Vector3Add(b_pos, Vector3Scale(result.normal, b->bounds.x));
+	
+	return result;
+}
+
+CollisionResult
 Collision__checkMixed(Entity *aabb_entity, Entity *cyl_entity, bool cyl_is_b)
 {
     CollisionResult result = {0};
@@ -281,17 +302,34 @@ Collision__checkDiscreet(Entity *a, Entity *b)
 		return NO_COLLISION;
 	}
 
-	if (a->collision_shape && b->collision_shape) {
-		return Collision__checkCylinder(a, b);
-	}
-	else if (a->collision_shape && !b->collision_shape) {
+	uint8 colliders = COLLIDERS(a->collision_shape, b->collision_shape);
+
+	switch (colliders) {
+	case COLLIDERS(COLLISION_BOX,      COLLISION_BOX):
+		return Collision__checkAABB(a, b);
+		break;
+	case COLLIDERS(COLLISION_BOX,      COLLISION_CYLINDER):
 		return Collision__checkMixed(a, b, true);
-	}
-	else if (!a->collision_shape && b->collision_shape) {
+		break;
+	case COLLIDERS(COLLISION_BOX,      COLLISION_SPHERE):
+		break;
+	case COLLIDERS(COLLISION_CYLINDER, COLLISION_CYLINDER):
+		return Collision__checkCylinder(a, b);
+		break;
+	case COLLIDERS(COLLISION_CYLINDER, COLLISION_BOX):
 		return Collision__checkMixed(a, b, false);
+		break;
+	case COLLIDERS(COLLISION_CYLINDER, COLLISION_SPHERE):
+		break;
+	case COLLIDERS(COLLISION_SPHERE,   COLLISION_SPHERE):
+		return Collision__checkSphere(a, b);
+	case COLLIDERS(COLLISION_SPHERE,   COLLISION_BOX): /* FALLTHROUGH */
+	case COLLIDERS(COLLISION_SPHERE,   COLLISION_CYLINDER):
+	default:
+		break;
 	}
 	
-	return Collision__checkAABB(a, b);
+	return NO_COLLISION;
 }
 
 /* Check collision for entity moving to new position */
@@ -301,6 +339,7 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 	CollisionResult result = {0};
 	result.hit             = false;
 
+	if (!entity->collision_shape) return result;
 	/* Temporary entity with new position for bounds checking */
 	Entity temp_entity   = *entity;
 	temp_entity.position = to;
@@ -330,7 +369,7 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 	for (int i = 0; i < candidate_count; i++) {
 		Entity *other = candidates[i];
 		if (other == entity) continue; /* Skip self */
-		if (!other->physical) continue;
+		if (!other->collision_shape) continue;
 
 		CollisionResult test_result = Collision__checkDiscreet(&temp_entity, other);
 		if (test_result.hit) {
@@ -526,12 +565,14 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
 CollisionResult
 Collision__checkContinuousMixed(Entity *aabb, Entity *cylinder, Vector3 movement, bool aabb_is_moving)
 {
+	DBG_OUT("Entering Collision__checkContinuousMixed(). aabb_is_moving: %s", aabb_is_moving?"true":"false");
     CollisionResult result = {0};
     result.hit             = false;
     result.distance        = 1.0f;
 
     float move_length = Vector3Length(movement);
     if (move_length < 0.0001f) {
+    	DBG_OUT("\tUsing discreet collision");
         /* No movement, use discrete collision */
         if (aabb_is_moving) {
             Entity temp_aabb = *aabb;
@@ -638,7 +679,8 @@ Collision__checkContinuousMixed(Entity *aabb, Entity *cylinder, Vector3 movement
     /* Adjust normal direction based on which entity is moving */
     float normal_sign = aabb_is_moving ? 1.0f : -1.0f;
     result.normal     = (Vector3){normal_2d.x * normal_sign, 0.0f, normal_2d.y * normal_sign};
-
+	
+	DBG_OUT("\tresult.hit: %s", result.hit?"true":"false");
     return result;
 }
 
@@ -646,28 +688,56 @@ Collision__checkContinuousMixed(Entity *aabb, Entity *cylinder, Vector3 movement
 CollisionResult
 Collision__checkContinuous(Entity *a, Entity *b, Vector3 movement)
 {
-    if (!(a->collision.masks & b->collision.layers) && !(b->collision.masks & a->collision.layers)) {
+	DBG_OUT("Collision__checkContinuous() entered...");
+    if (
+    	   !(a->collision.masks & b->collision.layers) 
+    	&& !(b->collision.masks & a->collision.layers)
+    ) {
+    	DBG_OUT("NO COLLISION. Exiting early.");
         return NO_COLLISION;
     }
 
-    if (a->collision_shape && b->collision_shape) {
-        return Collision__checkContinuousCylinder(a, b, movement);
-    } 
-    else if (a->collision_shape && !b->collision_shape) {
-        return Collision__checkContinuousMixed(b, a, movement, false); /* Cylinder moving */
-    } 
-    else if (!a->collision_shape && b->collision_shape) {
+	uint8 colliders = COLLIDERS(a->collision_shape, b->collision_shape);
+
+	switch (colliders) {
+	case COLLIDERS(COLLISION_BOX,      COLLISION_BOX):
+		DBG_OUT("Box-Box");
+		return Collision__checkContinuousAABB(a, b, movement);
+		break;
+	case COLLIDERS(COLLISION_BOX,      COLLISION_CYLINDER):
+		DBG_OUT("Box-Cylinder");
         return Collision__checkContinuousMixed(a, b, movement, true); /* AABB moving */
-    } 
-    
-	/* AABB vs AABB */
-	return Collision__checkContinuousAABB(a, b, movement);
+		break;
+	case COLLIDERS(COLLISION_BOX,      COLLISION_SPHERE):
+		break;
+	case COLLIDERS(COLLISION_CYLINDER, COLLISION_CYLINDER):
+		DBG_OUT("Cylinder-Cylinder");
+        return Collision__checkContinuousCylinder(a, b, movement);
+		break;
+	case COLLIDERS(COLLISION_CYLINDER, COLLISION_BOX):
+		DBG_OUT("Cylinder-Box");
+		DBG_OUT("Well, it should show up here...");
+        return Collision__checkContinuousMixed(b, a, movement, false); /* Cylinder moving */
+		break;
+	case COLLIDERS(COLLISION_CYLINDER, COLLISION_SPHERE):
+		DBG_OUT("Cylinder-Sphere");
+		break;
+	case COLLIDERS(COLLISION_SPHERE,   COLLISION_SPHERE): /* FALLTHROUGH */
+	case COLLIDERS(COLLISION_SPHERE,   COLLISION_BOX):
+	case COLLIDERS(COLLISION_SPHERE,   COLLISION_CYLINDER):
+	default:
+		break;
+	}
+
+	DBG_OUT("NO COLLISION. At least we tried, this time...");
+	return NO_COLLISION;
 }
 
 /* Primary method for moving entities with CCD */
 CollisionResult
 CollisionScene__moveEntity(CollisionScene *scene, Entity *entity, Vector3 movement)
 {
+	DBG_OUT("Entered CollisionScene__moveEntity()...");
     CollisionResult result = {0};
     result.hit = false;
     result.distance = 1.0f;
@@ -679,32 +749,43 @@ CollisionScene__moveEntity(CollisionScene *scene, Entity *entity, Vector3 moveme
         return CollisionScene__checkCollision(scene, entity, to);
     }
 
-    Vector3 from = entity->position;
-    Vector3 to = Vector3Add(from, movement);
+    Vector3 
+		e_bounds = entity->bounds,
+		b_offset = entity->bounds_offset,
+		from     = entity->position,
+		to       = Vector3Add(from, movement);
+
 
     /* Expand query bounds to cover entire swept path */
-    Vector3 
-        min_bounds = {
-            fminf(from.x, to.x) - entity->bounds.x * 0.5f,
-            fminf(from.y, to.y) - entity->bounds.y * 0.5f,
-            fminf(from.z, to.z) - entity->bounds.z * 0.5f
-        },
-        max_bounds = {
-            fmaxf(from.x, to.x) + entity->bounds.x * 0.5f,
-            fmaxf(from.y, to.y) + entity->bounds.y * 0.5f,
-            fmaxf(from.z, to.z) + entity->bounds.z * 0.5f
+    BoundingBox bounds = { 
+			.min = {
+				fminf(from.x, to.x) - (e_bounds.x * 0.5f) + b_offset.x,
+				fminf(from.y, to.y) - (e_bounds.y * 0.5f) + b_offset.y,
+				fminf(from.z, to.z) - (e_bounds.z * 0.5f) + b_offset.z
+			},
+			.max = {
+				fmaxf(from.x, to.x) + (e_bounds.x * 0.5f) + b_offset.x,
+				fmaxf(from.y, to.y) + (e_bounds.y * 0.5f) + b_offset.y,
+				fmaxf(from.z, to.z) + (e_bounds.z * 0.5f) + b_offset.z
+			}
         };
 
+	DBG_OUT(
+			"Bounding box:\n\tmin - x: %.8f\ty: %.8f\tz: %.8f\n\tmax - x: %.8f\ty: %.8f\tz: %.8f",
+			bounds.min.x, bounds.min.y, bounds.min.z,    bounds.max.x, bounds.max.y, bounds.max.z
+		);
+	
     int candidate_count;
     Entity **candidates = SpatialHash__queryRegion(
 			scene->spatial_hash, 
-			(BoundingBox){min_bounds, max_bounds}, 
+			bounds, 
 			&candidate_count
 		);
-
+	
+	DBG_OUT("Num candidates: %d", candidate_count);
     for (int i = 0; i < candidate_count; i++) {
         Entity *other = candidates[i];
-        if (other == entity || !other->physical) continue;
+        if (other == entity || !other->collision_shape) continue;
 
         /* Create temporary entity for CCD */
         Entity temp_entity = *entity;
@@ -714,126 +795,226 @@ CollisionScene__moveEntity(CollisionScene *scene, Entity *entity, Vector3 moveme
         if (test_result.hit && test_result.distance < result.distance) result = test_result;
     }
 
+	DBG_OUT("Result: %d", result.hit);
     return result;
 }
 
-CollisionResult
-Collision__checkRayAABB(Vector3 from, Vector3 to, Entity *entity)
+
+/***************
+	RAYCASTS
+***************/
+static CollisionResult
+checkRayOrSphere(K_Ray ray, Entity *entity, bool AABB)
 {
-	CollisionResult result = {0};
-	result.hit = false;
-
-	Vector3
-		min_bounds = {
-			entity->position.x - entity->bounds.x * 0.5f,
-			entity->position.y - entity->bounds.y * 0.5f,
-			entity->position.z - entity->bounds.z * 0.5f
-		},
-		max_bounds = {
-			entity->position.x + entity->bounds.x * 0.5f,
-			entity->position.y + entity->bounds.y * 0.5f,
-			entity->position.z + entity->bounds.z * 0.5f
-		};
-
-	/* Ray direction & length */
-	Vector3 ray_dir = Vector3Subtract(to, from);
-	float   ray_len = Vector3Length(ray_dir);
-
-	if (ray_len < 0.0001f) return result; /* Zero-length ray */
-
-	ray_dir = Vector3Normalize(ray_dir);
-
-	float
-		t_min = 0.0f,
-		t_max = ray_len;
-
-	for (int axis = 0; axis < 3; axis++) {
-		float
-			ray_origin    = (axis==0) ? from.x       : (axis==1) ? from.y       : from.z,
-			ray_direction = (axis==0) ? ray_dir.x    : (axis==1) ? ray_dir.y    : ray_dir.z,
-			box_min       = (axis==0) ? min_bounds.x : (axis==1) ? min_bounds.y : min_bounds.z,
-			box_max       = (axis==0) ? max_bounds.x : (axis==1) ? max_bounds.y : max_bounds.z;
-
-		if (fabsf(ray_direction) < 0.0001f) {
-			/* Ray is parallel to this axis */
-			if (ray_origin < box_min || box_max < ray_origin) {
-				return result; /* Ray misses box */
-			}
-		}
-		else {
-			float
-				t1 = (box_min - ray_origin) / ray_direction,
-				t2 = (box_max - ray_origin) / ray_direction;
-
-			/* Ensure t1 <= t2 */
-			if (t2 < t1) {
-				float temp = t1;
-				t1 = t2;
-				t2 = temp;
-			}
-
-			t_min = fmaxf(t_min, t1);
-			t_max = fminf(t_max, t2);
-
-			if (t_max < t_min) return result; /* No intersection */
-		}
-	}
-
-	/* Intersection found */
-	if (0.0f <= t_min && t_min <= ray_len) {
-		result.hit      = true;
-		result.distance = t_min;
-		result.position = Vector3Add(from, Vector3Scale(ray_dir, t_min));
-		result.entity   = entity;
-
-		/* Calculate surface normal of the face hit */
-		Vector3 
-			hit_point = result.position,
-			center    = {
-				entity->position.x,
-				entity->position.y + entity->bounds.y * 0.5f,
-				entity->position.z
-			},
-			to_center = Vector3Subtract(hit_point, center);
-
-		/* Find dominant axis for normal */
-		float
-			abs_x = fabsf(to_center.x),
-			abs_y = fabsf(to_center.y),
-			abs_z = fabsf(to_center.z);
-
-		if (abs_y < abs_x && abs_z < abs_x) {
-			result.normal = (Vector3){(0 < to_center.x) ? 1.0f : -1.0f, 0.0f, 0.0f};
-		} else if (abs_z < abs_y) {
-			result.normal = (Vector3){0.0f, (0 < to_center.y) ? 1.0f : -1.0f, 0.0f};
-		} else {
-			result.normal = (Vector3){0.0f, 0.0f, (0 < to_center.z) ? 1.0f : -1.0f};
-		}
-	}
-
+	CollisionResult result;
+	
+	result.ray_collision = (AABB) 
+		? GetRayCollisionBox(ray.ray, Entity_getBoundingBox(entity))
+		: GetRayCollisionSphere(ray.ray, entity->position, entity->bounds.x);
+	
+	if (!result.hit || ray.length < result.distance) return NO_COLLISION;
+	
+	result.entity = entity;
+	
 	return result;
+}
+
+CollisionResult
+Collision__checkRayAABB(K_Ray ray, Entity *entity)
+{
+	return checkRayOrSphere(ray, entity, true);
+}
+
+CollisionResult
+Collision__checkRaySphere(K_Ray ray, Entity *entity)
+{
+	return checkRayOrSphere(ray, entity, false);
+}
+
+CollisionResult
+Collision__checkRayCylinder(K_Ray ray, Entity *entity)
+{
+    CollisionResult result = {0};
+    
+    Vector3 cylinder_center = entity->position;
+    float
+		radius = entity->bounds.x,  /* x field serves as radius */
+		height = entity->bounds.y,  /* y field is height */
+    
+    /* Cylinder extends from center.y to center.y + height (assuming bottom-centered) */
+		cylinder_bottom = cylinder_center.y,
+		cylinder_top    = cylinder_center.y + height;
+    
+    /* Ray components */
+    Vector3 
+		ray_start = ray.position,
+		ray_dir   = ray.direction,
+    
+		/* Project ray onto XZ plane (ignore Y component for cylinder side collision) */
+		ray_start_xz = {ray_start.x, ray_start.z},
+		ray_dir_xz = {ray_dir.x, ray_dir.z},
+		cylinder_center_xz = {cylinder_center.x, cylinder_center.z};
+    
+    /* Check if ray direction has any XZ component (not purely vertical) */
+    float 
+		xz_length_sq = ray_dir_xz.x * ray_dir_xz.x + ray_dir_xz.y * ray_dir_xz.y,
+    
+		t_cylinder   = INFINITY;
+		
+    Vector3 
+		hit_point  = {0},
+		hit_normal = {0};
+    
+    /* Check collision with cylinder sides (infinite cylinder in XZ plane) */
+    if (xz_length_sq > 0.0001f) { /* Not purely vertical ray */
+        /* Normalize XZ direction */
+        float xz_length = sqrtf(xz_length_sq);
+        Vector2 
+			ray_dir_xz_norm = {ray_dir_xz.x / xz_length, ray_dir_xz.y / xz_length},
+        
+			/* Vector from cylinder center to ray start in XZ plane */
+			to_ray = {ray_start_xz.x - cylinder_center_xz.x, 
+                          ray_start_xz.y - cylinder_center_xz.y};
+        
+        /* Quadratic equation coefficients for ray-circle intersection */
+        /* (ray_start + t * ray_dir - center)^2 = radius^2 */
+        float 
+			a = ray_dir_xz_norm.x * ray_dir_xz_norm.x + ray_dir_xz_norm.y * ray_dir_xz_norm.y,
+			b = 2.0f * (to_ray.x * ray_dir_xz_norm.x + to_ray.y * ray_dir_xz_norm.y),
+			c = to_ray.x * to_ray.x + to_ray.y * to_ray.y - radius * radius,
+        
+			discriminant = b * b - 4 * a * c;
+        
+        if (discriminant >= 0) {
+            float 
+				sqrt_disc = sqrtf(discriminant),
+				t1        = (-b - sqrt_disc) / (2 * a),
+				t2        = (-b + sqrt_disc) / (2 * a),
+            
+				/* We want the closest positive intersection */
+				t_side    = (t1 > 0) ? t1 : t2;
+            
+            if (t_side > 0) {
+                /* Convert back to 3D space */
+                t_cylinder = t_side / xz_length; /* Scale by actual 3D ray length */
+                
+                hit_point = Vector3Add(ray_start, Vector3Scale(ray_dir, t_cylinder));
+                
+                /* Check if hit point is within cylinder height bounds */
+                if (hit_point.y >= cylinder_bottom && hit_point.y <= cylinder_top) {
+                    /* Calculate normal (pointing outward from cylinder axis) */
+                    Vector2 
+						hit_xz    = {hit_point.x, hit_point.z},
+						normal_xz = {hit_xz.x - cylinder_center_xz.x, 
+                                        hit_xz.y - cylinder_center_xz.y};
+                    float normal_length = sqrtf(normal_xz.x * normal_xz.x + normal_xz.y * normal_xz.y);
+                    if (normal_length > 0) {
+                        hit_normal = (Vector3){normal_xz.x / normal_length, 0, normal_xz.y / normal_length};
+                    }
+                } else {
+                    t_cylinder = INFINITY; /* Hit outside height bounds */
+                }
+            }
+        }
+    }
+    
+    /* Check collision with top and bottom caps */
+    float t_caps = INFINITY;
+    
+    if (fabsf(ray_dir.y) > 0.0001f) { /* Ray has Y component */
+        /* Check bottom cap (y = cylinder_bottom) */
+        float t_bottom = (cylinder_bottom - ray_start.y) / ray_dir.y;
+        if (t_bottom > 0) {
+            Vector3 bottom_hit = Vector3Add(ray_start, Vector3Scale(ray_dir, t_bottom));
+            float dist_from_axis_sq = (bottom_hit.x - cylinder_center.x) * (bottom_hit.x - cylinder_center.x) +
+                                     (bottom_hit.z - cylinder_center.z) * (bottom_hit.z - cylinder_center.z);
+            if (dist_from_axis_sq <= radius * radius) {
+                if (t_bottom < t_caps) {
+                    t_caps = t_bottom;
+                    hit_point = bottom_hit;
+                    hit_normal = (Vector3){0, -1, 0}; /* Bottom cap normal points down */
+                }
+            }
+        }
+        
+        /* Check top cap (y = cylinder_top) */
+        float t_top = (cylinder_top - ray_start.y) / ray_dir.y;
+        if (t_top > 0) {
+            Vector3 top_hit = Vector3Add(ray_start, Vector3Scale(ray_dir, t_top));
+            float dist_from_axis_sq = (top_hit.x - cylinder_center.x) * (top_hit.x - cylinder_center.x) +
+                                     (top_hit.z - cylinder_center.z) * (top_hit.z - cylinder_center.z);
+            if (dist_from_axis_sq <= radius * radius) {
+                if (t_top < t_caps) {
+                    t_caps = t_top;
+                    hit_point = top_hit;
+                    hit_normal = (Vector3){0, 1, 0}; /* Top cap normal points up */
+                }
+            }
+        }
+    }
+    
+    /* Choose the closest valid intersection */
+    float final_t = fminf(t_cylinder, t_caps);
+    
+    if (final_t == INFINITY || final_t > ray.length || final_t <= 0) {
+        return (CollisionResult){0}; /* NO_COLLISION equivalent */
+    }
+    
+    /* Fill result */
+    result.hit = true;
+    result.distance = final_t;
+    result.position = Vector3Add(ray_start, Vector3Scale(ray_dir, final_t));
+    
+    /* Recalculate normal for the chosen intersection */
+    if (final_t == t_caps) {
+        /* Normal already set above for caps */
+        result.normal = hit_normal;
+    } else {
+        /* Side collision normal */
+        Vector2 
+			hit_xz    = {result.position.x, result.position.z},
+			center_xz = {cylinder_center.x, cylinder_center.z},
+			normal_xz = {hit_xz.x - center_xz.x, hit_xz.y - center_xz.y};
+        float normal_length = sqrtf(normal_xz.x * normal_xz.x + normal_xz.y * normal_xz.y);
+        if (normal_length > 0) {
+            result.normal = (Vector3){normal_xz.x / normal_length, 0, normal_xz.y / normal_length};
+        }
+    }
+    
+    result.entity = entity;
+    result.material_id = 0;
+    result.user_data = NULL;
+    
+    return result;
 }
 
 
 /* Simple raycast */
 CollisionResult
-Collision__raycast(CollisionScene *scene, Vector3 from, Vector3 to)
+Collision__raycast(CollisionScene *scene, K_Ray ray)
 {
 	CollisionResult closest_result = {0};
 	closest_result.hit      = false;
 	closest_result.distance = INFINITY;
-	
+
+	Vector3 to = Vector3Add(
+			ray.position, 
+			Vector3Scale(
+				Vector3Normalize(ray.direction), 
+				ray.length
+			)
+		);
 	/* Get bounds along ray path */
 	BoundingBox bbox = {
 			{
-				fminf(from.x, to.x),
-				fminf(from.y, to.y),
-				fminf(from.z, to.z)
+				fminf(ray.position.x, to.x),
+				fminf(ray.position.y, to.y),
+				fminf(ray.position.z, to.z)
 			},
 			{
-				fmaxf(from.x, to.x),
-				fmaxf(from.y, to.y),
-				fmaxf(from.z, to.z)
+				fmaxf(ray.position.x, to.x),
+				fmaxf(ray.position.y, to.y),
+				fmaxf(ray.position.z, to.z)
 			}
 		};
 	
@@ -848,11 +1029,22 @@ Collision__raycast(CollisionScene *scene, Vector3 from, Vector3 to)
 	for (int i = 0; i < candidate_count; i++) {
 		Entity *entity = candidates[i];
 
-		/* Skip non-physical entities */
-		if (!entity->physical) continue;
-
-		CollisionResult result = Collision__checkRayAABB(from, to, entity);
-
+		CollisionResult result;
+		switch (entity->collision_shape) {
+		case COLLISION_NONE:
+			continue;
+			break;
+		case COLLISION_BOX:
+			result = Collision__checkRayAABB(    ray, entity);
+			break;
+		case COLLISION_CYLINDER:
+			result = Collision__checkRayCylinder(ray, entity);
+			break;
+		case COLLISION_SPHERE:
+			result = Collision__checkRaySphere(  ray, entity);
+			break;
+		}
+		
 		if (result.hit && result.distance < closest_result.distance) {
 			closest_result = result;
 		}
@@ -866,22 +1058,23 @@ void
 CollisionScene__update(CollisionScene *scene)
 {
 	if (!scene->needs_rebuild) return;
-
+	
 	SpatialHash__clear(scene->spatial_hash);
 
-	if (!scene->entities_ref) return;
+	EntityNode *first_entity = Engine__getEntities(scene->engine);
+	if (!first_entity) return;
 
-	EntityNode *current = scene->entities_ref;
+	EntityNode *current = first_entity;
 	if (current) {
 		do {
 			Entity *entity = &current->base;
 
-			if (entity->active && entity->physical) {
+			if (entity->active && entity->collision_shape) {
 				CollisionScene__insertEntity(scene, entity);
 			}
 
 			current = current->next;
-		} while (current != scene->entities_ref);
+		} while (current != first_entity);
 	}
 
 	scene->needs_rebuild = false;

@@ -10,7 +10,7 @@ typedef struct CollisionScene CollisionScene;
 
 
 /* Constructor/Destructor */
-CollisionScene   *CollisionScene__new(           EntityNode     *node);
+CollisionScene   *CollisionScene__new(           Engine         *engine);
 void              CollisionScene__free(          CollisionScene *scene);
 
 /* Scene management */
@@ -20,7 +20,7 @@ void              CollisionScene__clear(         CollisionScene *scene);
 
 /* Collision detection functions */
 CollisionResult   Collision__checkAABB(          Entity         *a,     Entity  *b);
-CollisionResult   Collision__checkRayAABB(       Vector3         from,  Vector3  to,     Entity  *entity);
+CollisionResult   Collision__checkRayAABB(       K_Ray           ray,   Entity  *entity);
 CollisionResult   Collision__checkDiscreet(      Entity         *a,     Entity   *b);
 CollisionResult   Collision__checkContinuous(    Entity         *a,     Entity   *b,     Vector3  movement);
 

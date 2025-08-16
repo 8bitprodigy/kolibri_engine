@@ -11,14 +11,12 @@
 
 #ifdef DEBUG
     #define DBG_EXPR( expression ) expression
-    #define DBG_OUT( Text, ... ) do{printf( "[DEBUG] " Text "\n", ##__VA_ARGS__ ); fflush(stdout);} while(false)
-    #define DBG_LINE( vec2_1, vec2_2, height, color ) DrawLine3D(VECTOR2_TO_3( (vec2_1), (height) ), VECTOR2_TO_3( (vec2_2), (height) ), (color))
-	#define ERR_OUT( Error_Text ) perror( "[ERROR] " Error_Text "\n" )    
+    #define DBG_OUT(  Text, ... ) do{printf( "[DEBUG] " Text "\n", ##__VA_ARGS__ ); fflush(stdout);} while(false)
+    #define ERR_OUT(  Error_Text ) perror( "[ERROR] " Error_Text "\n" )    
 #else
     #define DBG_EXPR( expression ) 
-    #define DBG_OUT( Text, ... )
-    #define DBG_LINE( vec2_1, vec2_2, height, color )
-    #define ERR_OUT( Error_Text )
+    #define DBG_OUT(  Text, ... )
+    #define ERR_OUT(  Error_Text )
 #endif
 
 #define CLAMP(value, min, max) ((value) < (min) ? (min) : ((value) > (max) ? (max) : (value)))
@@ -51,37 +49,69 @@
 	#define INITIAL_ENTITY_CAPACITY 256
 #endif
 #ifndef ENTRY_POOL_SIZE
-	#define ENTRY_POOL_SIZE 16384
+	#define ENTRY_POOL_SIZE 2048
 #endif
 #ifndef QUERY_SIZE
-	#define QUERY_SIZE 1024
+	#define QUERY_SIZE 512
 #endif
 
 #define V2_ZERO      ((Vector2){0.0f, 0.0f})
 #define V3_ZERO      ((Vector3){0.0f, 0.0f, 0.0f})
+#define V4_ZERO      ((Vector4){0.0f, 0.0f, 0.0f, 0.0f})
 #define V3_ONE       ((Vector3){1.0f, 1.0f, 1.0f})
 #define V3_UP        ((Vector3){0.0f, 1.0f, 0.0f})
 #define XF_ZERO      ((Xform){V3_ZERO,V3_ZERO,V3_ZERO,V3_ZERO})
 #define NO_COLLISION ((CollisionResult){false,0.0f,V3_ZERO,V3_ZERO,0,NULL,NULL})
 
-/*
-	COMMON ENUMERATIONS
-*/
-enum {
-    POSITION,
-    ROTATION,
-    SCALE,
-    SKEW,
-};
 
+/**********************
+	MACRO FUNCTIONS
+**********************/
+/*** Common Input Operations ***/
 
-typedef struct Engine Engine;
-typedef struct Entity Entity;
-typedef struct Head   Head;
+#define GET_KEY_OR_BUTTON_PRESSED( Controller, Button, Key ) (int)(IsGamepadButtonPressed(Controller, Button) || IsKeyPressed(Key))
+
+#define GET_KEY_OR_BUTTON_DOWN( Controller, Button, Key ) (int)(IsGamepadButtonDown(Controller, Button) || IsKeyDown(Key))
+
+#define GET_KEY_OR_BUTTON_AXIS( Controller, Btn_Pos, Key_Pos, Btn_Neg, Key_Neg ) ( \
+        GET_KEY_OR_BUTTON_DOWN( (Controller), (Btn_Pos), (Key_Pos) ) - \
+        GET_KEY_OR_BUTTON_DOWN( (Controller), (Btn_Neg), (Key_Neg) )   \
+    )
+
+#define GET_KEY_OR_BUTTON_VECTOR( Controller, Btn_Pos_X, Key_Pos_X, Btn_Neg_X, Key_Neg_X, Btn_Pos_Y, Key_Pos_Y, Btn_Neg_Y, Key_Neg_Y ) \
+    (Vector2){ \
+        GET_KEY_OR_BUTTON_AXIS( (Controller), (Btn_Pos_X), (Key_Pos_X), (Btn_Neg_X), (Key_Neg_X) ), \
+        GET_KEY_OR_BUTTON_AXIS( (Controller), (Btn_Pos_Y), (Key_Pos_Y), (Btn_Neg_Y), (Key_Neg_Y) )  \
+    }
+
+#define GET_KEY_AXIS( Key_Pos, Key_Neg )  ((int)IsKeyDown((Key_Pos)) - (int)IsKeyDown((Key_Neg)))
+
+#define GET_KEY_VECTOR( Key_Pos_X, Key_Neg_X, Key_Pos_Y, Key_Neg_Y ) \
+    (Vector2){ \
+        GET_KEY_AXIS( (Key_Pos_X), (Key_Neg_X) ), \
+        GET_KEY_AXIS( (Key_Pos_Y), (Key_Neg_Y) )  \
+    }
+
+#define GET_BUTTON_AXIS( Controller, Btn_Pos, Btn_Neg ) ( \
+        (int)IsGamepadButtonDown((Controller), (Btn_Pos)) - \
+        (int)IsGamepadButtonDown((Controller), (Btn_Neg))   \
+    )
+
+#define GET_BUTTON_VECTOR( Controller, Btn_Pos_X, Btn_Neg_X, Btn_Pos_Y, Btn_Neg_Y ) \
+    (Vector2){ \
+        GET_BUTTON_AXIS( (Controller, (Btn_Pos_X), (Btn_Neg_X) ), \
+        GET_BUTTON_AXIS( (Controller, (Btn_Pos_Y), (Btn_Neg_Y) ), \
+    }
+
 
 /* 
 	COMMON TYPES
 */
+typedef struct Engine Engine;
+typedef struct Entity Entity;
+typedef struct Head   Head;
+typedef struct Scene  Scene;
+
 
 /* Value Types */
 #ifdef __DREAMCAST__
@@ -98,6 +128,16 @@ typedef int8_t       int8;
 #endif
 typedef unsigned int uint;
 typedef size_t       word;
+
+
+typedef enum
+{
+	COLLISION_NONE     = 0,
+	COLLISION_BOX      = 1,
+	COLLISION_CYLINDER = 2,
+	COLLISION_SPHERE   = 3,
+}
+CollisionShape;
 
 /* Structs */
 typedef struct 
@@ -266,6 +306,13 @@ nextPrime(int n) {
         if (is_prime) return n;
         n += 2;
     }
+}
+
+static float
+invLerp(float a, float b, float value)
+{
+	if (a==b) return 0.0f;
+	return (value - a) / (b - a);
 }
 
 

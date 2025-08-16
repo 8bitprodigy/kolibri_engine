@@ -8,6 +8,19 @@
 
 
 #define CELL_ALIGN( value ) ((int)floorf( (value) / CELL_SIZE))
+#define GET_CELL_SELECTION( bbox ) \
+    ((BoundingBox){ \
+            { \
+                CELL_ALIGN(bbox.min.x), \
+                CELL_ALIGN(bbox.min.y), \
+                CELL_ALIGN(bbox.min.z) \
+            }, \
+            { \
+                CELL_ALIGN(bbox.max.x), \
+                CELL_ALIGN(bbox.max.y), \
+                CELL_ALIGN(bbox.max.z) \
+            } \
+        }) 
 
 
 typedef struct
@@ -53,25 +66,6 @@ hashPosition(float x, float y, float z)
         uz = ((uint32)cell_z) & 0x3FF;
 
     return morton3d(ux, uy, uz) % SPATIAL_HASH_SIZE;
-}
-
-
-
-static inline BoundingBox
-getCellSelection(BoundingBox bbox)
-{
-    return (BoundingBox){
-            {
-                CELL_ALIGN(bbox.min.x),
-                CELL_ALIGN(bbox.min.y),
-                CELL_ALIGN(bbox.min.z)
-            },
-            {
-                CELL_ALIGN(bbox.max.x),
-                CELL_ALIGN(bbox.max.y),
-                CELL_ALIGN(bbox.max.z)
-            }
-        };
 }
 
 /* Get a free entry from the pool */
@@ -172,7 +166,7 @@ SpatialHash__insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bound
                     center.z + bounds.z * 0.5f
                 }
             },
-        selection = getCellSelection(bbox);
+        selection = GET_CELL_SELECTION(bbox);
 
     for (int x = selection.min.x; x <= selection.max.x; x++) {
         for (int y = selection.min.y; y <= selection.max.y; y++) {
@@ -197,7 +191,7 @@ SpatialHash__queryRegion(SpatialHash *hash, BoundingBox region, int *count)
     static Entity *query_results[QUERY_SIZE];
     *count = 0;
 
-    BoundingBox selection = getCellSelection(region);
+    BoundingBox selection = GET_CELL_SELECTION(region);
 
     for (int x = selection.min.x; x <= selection.max.x; x++) {
         for (int y = selection.min.y; y <= selection.max.y; y++) {
