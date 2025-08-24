@@ -87,7 +87,7 @@ Renderer__queryFrustum(
 	int      *visible_entity_count
 )
 {
-    static Entity *frustum_results[QUERY_SIZE];
+    static Entity *frustum_results[VIS_QUERY_SIZE];
     *visible_entity_count = 0;
 
     if (!head) return frustum_results;
@@ -115,15 +115,17 @@ Renderer__queryFrustum(
         frustum_center.z + query_radius
     };
 
-    int candidate_count;
-    Entity **candidates = SpatialHash__queryRegion(
+    int            candidate_count = VIS_QUERY_SIZE;
+    static Entity *candidates[VIS_QUERY_SIZE];
+    SpatialHash__queryRegion(
         renderer->visibility_hash,
         (BoundingBox){min_bounds, max_bounds},
+        &candidates,
         &candidate_count
     );
 
     // Optimized culling loop
-    for (int i = 0; i < candidate_count && *visible_entity_count < QUERY_SIZE; i++) {
+    for (int i = 0; i < candidate_count && *visible_entity_count < VIS_QUERY_SIZE; i++) {
         Entity *entity = candidates[i];
         
         if (!entity->visible) continue;
@@ -178,15 +180,15 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 	int      visible_count;
 	Entity **visible_entities;
 	
-	if (settings->frustum_culling) {
+//	if (settings->frustum_culling) {
 		visible_entities = Renderer__queryFrustum(renderer, head, settings->max_render_distance, &visible_count);
-	}
-	else {
+//	}
+//	else {
 		/* No culling -- render all entities */
-		visible_entities = entities->entities;
+/*		visible_entities = entities->entities;
 		visible_count    = entities->count;
 	}
-
+*/
 	//DBG_OUT("Visible count after frustum culling: %d", visible_count);
 	
 	for (int i = 0; i < visible_count; i++) {
@@ -206,7 +208,7 @@ Renderer__renderBruteForceFrustum(Renderer *renderer, EntityList *entities, Head
     int rendered = 0;
     
     // Direct frustum culling on all entities - no spatial hash at all
-    for (int i = 0; i < entities->count && rendered < QUERY_SIZE; i++) {
+    for (int i = 0; i < entities->count && rendered < VIS_QUERY_SIZE; i++) {
         Entity *entity = entities->entities[i];
         
         if (!entity->active || !entity->visible) continue;

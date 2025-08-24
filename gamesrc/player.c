@@ -14,7 +14,7 @@ TestRenderableData rd_player = (TestRenderableData){.color = MAGENTA};
 Renderable         
 	r_player = (Renderable){
 			.data   = &rd_player,
-			.Render = testRenderableWiresCallback
+			.Render = testRenderableBoxWiresCallback
 		};
 
 EntityVTable player_Callbacks = (EntityVTable){
@@ -32,7 +32,7 @@ Entity playerTemplate = (Entity){
 	.renderables       = {&r_player},
 	.lod_distances     = {48.0f},
 	.lod_count         = 1,
-	.visibility_radius = 2.5f,
+	.visibility_radius = 4.5f,
 	.bounds            = {1.0f, 2.0f, 1.0f},
 	.bounds_offset     = {0.0f, 1.0f, 0.0f},
 	.renderable_offset = {0.0f, 1.0f, 0.0f},
@@ -44,7 +44,7 @@ Entity playerTemplate = (Entity){
 	.collision         = {.layers = 1, .masks = 1},
 	.active            = true,
 	.visible           = true,
-	.collision_shape   = COLLISION_CYLINDER, 
+	.collision_shape   = COLLISION_BOX, 
 	.solid             = true
 };
 

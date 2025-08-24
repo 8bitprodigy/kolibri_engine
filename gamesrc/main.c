@@ -41,6 +41,7 @@ main(void)
 	}
 
 	player    = Entity_new(&playerTemplate, engine);
+	player->position = (Vector3){2.0f, 0.0f, 2.0f};
 	head_data = (TestHeadData*)Head_getUserData(head);
 
 	head_data->target     = player;

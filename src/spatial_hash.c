@@ -185,10 +185,15 @@ SpatialHash__insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bound
 }
 
 /* Query region */
-void **
-SpatialHash__queryRegion(SpatialHash *hash, BoundingBox region, int *count)
+void 
+SpatialHash__queryRegion(
+    SpatialHash  *hash, 
+    BoundingBox   region, 
+    void        **query_results, 
+    int          *count
+)
 {
-    static Entity *query_results[QUERY_SIZE];
+    int size = *count;
     *count = 0;
 
     BoundingBox selection = GET_CELL_SELECTION(region);
@@ -199,7 +204,7 @@ SpatialHash__queryRegion(SpatialHash *hash, BoundingBox region, int *count)
                 uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
 
                 SpatialEntry *entry = hash->cells[hash_key];
-                while (entry && *count < QUERY_SIZE) {
+                while (entry && *count < size) {
                     bool is_duplicate = false;
                     for (int i = 0; i < *count; i++) {
                         if (query_results[i] == entry->data) {

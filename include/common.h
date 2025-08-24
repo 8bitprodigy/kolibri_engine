@@ -51,8 +51,11 @@
 #ifndef ENTRY_POOL_SIZE
 	#define ENTRY_POOL_SIZE 2048
 #endif
-#ifndef QUERY_SIZE
-	#define QUERY_SIZE 512
+#ifndef VIS_QUERY_SIZE
+	#define VIS_QUERY_SIZE 512
+#endif
+#ifndef COL_QUERY_SIZE
+	#define COL_QUERY_SIZE 128
 #endif
 
 #define V2_ZERO      ((Vector2){0.0f, 0.0f})

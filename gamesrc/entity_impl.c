@@ -17,15 +17,15 @@ TestRenderableData
 Renderable         
 	r_1 = (Renderable){
 			.data   = &rd_1,
-			.Render = testRenderableCallback
+			.Render = testRenderableBoxCallback
 		},  
 	r_2 = (Renderable){
 			.data   = &rd_2,
-			.Render = testRenderableCallback
+			.Render = testRenderableBoxCallback
 		},  
 	r_3 = (Renderable){
 			.data   = &rd_3,
-			.Render = testRenderableCallback
+			.Render = testRenderableBoxCallback
 		};
 
 EntityVTable entity_Callbacks = (EntityVTable){

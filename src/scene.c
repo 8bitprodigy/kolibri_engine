@@ -176,7 +176,7 @@ Scene_checkContinuous(Scene *self, Entity *entity, Vector3 to)
     
     return result;
 }
-
+/*
 CollisionResult
 Scene_moveEntity(Scene *scene, Entity *entity, Vector3 to)
 {
@@ -215,7 +215,7 @@ Scene_moveEntity(Scene *scene, Entity *entity, Vector3 to)
     
     return result;
 }
-
+*/
 CollisionResult
 Scene_raycast(Scene *self, Vector3 from, Vector3 to)
 {

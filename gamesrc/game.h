@@ -9,10 +9,10 @@
 
 
 #ifndef SCREEN_WIDTH
-	#define SCREEN_WIDTH 1280
+	#define SCREEN_WIDTH 854
 #endif
 #ifndef SCREEN_HEIGHT
-	#define SCREEN_HEIGHT 720
+	#define SCREEN_HEIGHT 480
 #endif
 #define ASPECT_RATIO ((float)SCREEN_WIDTH/(float)SCREEN_HEIGHT)
 
@@ -71,7 +71,7 @@ CollisionResult testSceneCollision(Scene *scene, Entity *entity, Vector3 to);
 
 /* Renderable Callback */
 static void
-testRenderableCallback(
+testRenderableBoxCallback(
 	Renderable *renderable,
 	void       *render_data
 )
@@ -88,20 +88,40 @@ testRenderableCallback(
 }
 
 static void
-testRenderableWiresCallback(
+testRenderableBoxWiresCallback(
 	Renderable *renderable,
 	void       *render_data
 )
 {
 	Entity             *entity = render_data;
 	TestRenderableData *data   = (TestRenderableData*)renderable->data;
-	if (!data) return;
+	if (!data) return; 
 	DrawCubeWiresV(
 		Vector3Add(entity->position, entity->renderable_offset),
 		entity->bounds,
 		data->color
 	);
 		
+}
+
+static void
+testRenderableCylinderWiresCallback(
+	Renderable *renderable,
+	void       *render_data
+)
+{
+	Entity             *entity = render_data;
+	TestRenderableData *data   = (TestRenderableData*)renderable->data;
+	float               radius = entity->bounds.x;
+	if (!data) return;
+	DrawCylinderWires(
+		entity->position,
+		radius,
+		radius,
+		entity->bounds.y,
+		8,
+		data->color
+	);
 }
 
 

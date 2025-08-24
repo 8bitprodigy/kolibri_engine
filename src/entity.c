@@ -6,6 +6,10 @@
 #include <raymath.h>
 
 
+#define PUSH_OUT_DISTANCE  0.1f
+#define SEPARATION_EPSILON 0.01f
+
+
 static uint64 Latest_ID = 0;
 
 
@@ -99,48 +103,77 @@ Entity_getBoundingBox(Entity *entity)
 		};
 }
 
-
 CollisionResult
 Entity_move(Entity *self, Vector3 movement)
 {
-	if (Vector3Equals(movement, V3_ZERO)) return NO_COLLISION;
-    CollisionResult  result;
-    Scene           *scene = Engine_getScene(ENTITY_TO_PRIVATE(self)->engine);
-    Vector3
-        *position = &self->position;
-    result = Scene_checkContinuous(scene, self, movement);
-
-    if (result.hit) {
-        EntityVTable *entity_vtable = self->vtable;
-        Entity *other               = result.entity;
-        Vector3 new_position;
-        if (other) {
-            EntityVTable *other_vtable   = other->vtable;
-            if (other_vtable && other_vtable->OnCollided) {
-                CollisionResult other_result = result;
-                other_result.entity          = self;
-                other_vtable->OnCollided(other, other_result);
-            }
-            if (other->solid) {
-                new_position = Vector3Add(*position, Vector3Scale(movement, result.distance));
-            }
-            else {
-                new_position = Vector3Add(*position, movement);
-            }
+    if (Vector3Equals(movement, V3_ZERO)) return NO_COLLISION;
+    
+    Scene *scene = Engine_getScene(ENTITY_TO_PRIVATE(self)->engine);
+    CollisionResult result = Scene_checkContinuous(scene, self, movement);
+    
+    // Handle the movement based on collision result
+    if (!result.hit) {
+        // No collision - move freely
+        self->position = Vector3Add(self->position, movement);
+    } else {
+        // Collision detected - move to safe distance from collision point
+        float safe_distance = fmaxf(0.0f, result.distance - SEPARATION_EPSILON);
+        Vector3 safe_movement = Vector3Scale(movement, safe_distance);
+        self->position = Vector3Add(self->position, safe_movement);
+        
+        // Trigger collision callbacks
+        EntityVTable *vtable = self->vtable;
+        if (vtable && vtable->OnCollision) {
+            vtable->OnCollision(self, result);
         }
-        else {
-            new_position = Vector3Add(*position, Vector3Scale(movement, result.distance));
+        
+        // Notify the other entity if it exists and has a callback
+        if (result.entity && result.entity->vtable && result.entity->vtable->OnCollided) {
+            CollisionResult other_result = result;
+            other_result.entity = self;
+            result.entity->vtable->OnCollided(result.entity, other_result);
         }
-        *position = new_position;
-        if (entity_vtable && entity_vtable->OnCollision) entity_vtable->OnCollision(self, result);
-    }
-    else {
-        *position = Vector3Add(*position, movement);
     }
     
     return result;
 }
 
+/* Alternative simpler version without energy loss */
+CollisionResult
+Entity_moveAndSlide(Entity *entity, Vector3 movement, int max_slides)
+{
+    if (!max_slides) return Entity_move(entity, movement);
+    if (max_slides < 0) max_slides = 3;
+    
+    CollisionResult result = NO_COLLISION;
+    Vector3 remaining = movement;
+    
+    for (int i = 0; i < max_slides; i++) {
+        if (Vector3Length(remaining) <= 0.001f) break;
+        
+        CollisionResult test = Entity_move(entity, remaining);
+        
+        if (!test.hit) {
+            return test; /* No collision, we're done */
+        }
+        
+        result = test;
+        
+        /* Calculate remaining movement after collision */
+        Vector3 hit_normal = test.normal;
+        
+        /* Remove the component of remaining movement that goes into the surface */
+        float dot = Vector3DotProduct(remaining, hit_normal);
+        if (dot < 0) { /* Only remove if moving into surface */
+            remaining = Vector3Subtract(remaining, Vector3Scale(hit_normal, dot));
+        }
+        
+        /* Scale remaining movement by how much we didn't move */
+        remaining = Vector3Scale(remaining, 1.0f - test.distance);
+    }
+    
+    return result;
+}
 
 void
 Entity_render(Entity *entity, Head *head)

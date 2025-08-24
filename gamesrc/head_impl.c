@@ -113,71 +113,70 @@ testHeadPostRender(Head *head)
 void
 testHeadUpdate(Head *head, float delta)
 {
-	TestHeadData *data = Head_getUserData(head);
-	
-	if      (IsKeyPressed(KEY_EQUAL)) {
-		if (0 < data->viewport_scale) data->viewport_scale--;
-		else return;
+    TestHeadData *data = Head_getUserData(head);
+    
+    if      (IsKeyPressed(KEY_EQUAL)) {
+        if (0 < data->viewport_scale) data->viewport_scale--;
+        else return;
 
-		int
-			height = SCREEN_HEIGHT - (48 * data->viewport_scale),
-			width  = height * ASPECT_RATIO;
-		
-		Head_setViewport(head, width, height);
-		DBG_OUT("New Viewport dimensions: W-%d\tH-%d", width, height);
-	}
-	else if (IsKeyPressed(KEY_MINUS)) {
-		if (data->viewport_scale < 12) data->viewport_scale++;
-		else return;
+        int
+            height = SCREEN_HEIGHT - (48 * data->viewport_scale),
+            width  = height * ASPECT_RATIO;
+        
+        Head_setViewport(head, width, height);
+    }
+    else if (IsKeyPressed(KEY_MINUS)) {
+        if (data->viewport_scale < 12) data->viewport_scale++;
+        else return;
 
-		int
-			height  = SCREEN_HEIGHT - (48 * data->viewport_scale),
-			width = height * ASPECT_RATIO;
-			
-		Head_setViewport(head, width, height);
-		DBG_OUT("New Viewport dimensions: W-%d\tH-%d", width, height);
-	}
-	
+        int
+            height  = SCREEN_HEIGHT - (48 * data->viewport_scale),
+            width = height * ASPECT_RATIO;
+            
+        Head_setViewport(head, width, height);
+    }
+    
     Camera *camera  = Head_getCamera(head);
-	if (!data->target) {
-		UpdateCamera(camera, CAMERA_FREE);
-		return;
-	}
+    if (!data->target) {
+        UpdateCamera(camera, CAMERA_FREE);
+        return;
+    }
 
-	CollisionResult collision;
-	Entity *player = data->target;
-	Engine *engine = Head_getEngine(head);
-	Vector2 
-		mouse_look = GetMouseDelta(),
-		move_dir   = GET_KEY_VECTOR(KEY_S, KEY_W, KEY_A, KEY_D);
-	
-	UpdateCameraPro(
-			camera,
-			V3_ZERO,
-			(Vector3){
+    CollisionResult collision;
+    Entity *player = data->target;
+    Engine *engine = Head_getEngine(head);
+    Vector2 
+        mouse_look = GetMouseDelta(),
+        move_dir   = GET_KEY_VECTOR(KEY_W, KEY_S, KEY_D, KEY_A);
+    
+    UpdateCameraPro(
+            camera,
+            V3_ZERO,
+            (Vector3){
                 mouse_look.x * MOUSE_SENSITIVITY,
                 mouse_look.y * MOUSE_SENSITIVITY,
                 0.0f
             },
             0.0f
         );
-		
-	Vector3 forward = Vector3Normalize(Vector3Subtract(camera->position, camera->target));
-	forward.y       = 0.0f;
-	forward         = Vector3Normalize(forward);
-	
-	Vector3 
-		prev_pos   = camera->position,
-		difference = V3_ZERO,
-		right      = Vector3RotateByAxisAngle(forward, V3_UP, -90.0f),
-		movement   = Vector3Add(
-				Vector3Scale(forward, move_dir.x * MOVE_SPEED * delta),
-				Vector3Scale(right,   move_dir.y * MOVE_SPEED * delta)
-			);
+        
+    /* FIX: Calculate forward direction FROM camera TO target */
+    Vector3 forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+    forward.y       = 0.0f;  /* Keep movement on horizontal plane */
+    forward         = Vector3Normalize(forward);
+    
+    Vector3 
+        prev_pos   = camera->position,
+        difference = V3_ZERO,
+        right      = Vector3CrossProduct(forward, V3_UP),  /* Cross product is cleaner than rotation */
+        movement   = Vector3Add(
+                Vector3Scale(forward, move_dir.x * MOVE_SPEED * delta),
+                Vector3Scale(right,   move_dir.y * MOVE_SPEED * delta)
+            );
 
-	collision  = Entity_move(player, movement);
+    collision = Entity_moveAndSlide(player, movement, 3);
 
-	camera->position = Vector3Add(     player->position, (Vector3){0.0f, data->eye_height, 0.0f});
-	difference       = Vector3Subtract(camera->position, prev_pos);
+    camera->position = Vector3Add(player->position, (Vector3){0.0f, data->eye_height, 0.0f});
+    difference       = Vector3Subtract(camera->position, prev_pos);
     camera->target   = Vector3Add(camera->target, difference);
 }

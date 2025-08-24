@@ -32,8 +32,16 @@ Entity
     float           lod_distances[MAX_LOD_LEVELS];
     uint8           lod_count;
     float           visibility_radius;
+    union {
+        Vector3 bounds;
+        struct {
+            float
+                radius,
+                height,
+                _unused;
+        };
+    };
     Vector3         
-                    bounds,
                     bounds_offset,
                     renderable_offset;
     void           *user_data;
@@ -115,7 +123,8 @@ uint64       Entity_getUniqueID(   Entity *entity);
 /*
     Methods
 */
-CollisionResult Entity_move(  Entity *entity, Vector3  movement);    
-void            Entity_render(Entity *entity, Head    *head);
+CollisionResult Entity_move(        Entity *entity, Vector3  movement);
+CollisionResult Entity_moveAndSlide(Entity *entity, Vector3  movement,  int max_slides);
+void            Entity_render(      Entity *entity, Head    *head);
 
 #endif /* ENTITY_H */

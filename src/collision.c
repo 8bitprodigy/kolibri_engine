@@ -91,7 +91,17 @@ CollisionScene__queryRegion(
 	int *count
 )
 {
-	return (Entity**)SpatialHash__queryRegion(scene->spatial_hash, bbox, count);;
+	*count = COL_QUERY_SIZE;
+	static Entity *candidates[COL_QUERY_SIZE]; 
+	
+	SpatialHash__queryRegion(
+			scene->spatial_hash, 
+			bbox,
+			&candidates,
+			count
+		);
+	
+	return &candidates;
 }
 
 /* Cylinder Collision */
@@ -317,7 +327,7 @@ Collision__checkDiscreet(Entity *a, Entity *b)
 		return Collision__checkCylinder(a, b);
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_BOX):
-		return Collision__checkMixed(a, b, false);
+		return Collision__checkMixed(b, a, false);
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_SPHERE):
 		break;
@@ -334,7 +344,11 @@ Collision__checkDiscreet(Entity *a, Entity *b)
 
 /* Check collision for entity moving to new position */
 CollisionResult
-CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to)
+CollisionScene__checkCollision(
+	CollisionScene *scene, 
+	Entity         *entity, 
+	Vector3         to
+)
 {
 	CollisionResult result = {0};
 	result.hit             = false;
@@ -359,8 +373,8 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 
 	/* Query spatial hash for potential collisions */
 	int      candidate_count;
-	Entity **candidates = SpatialHash__queryRegion(
-		scene->spatial_hash,
+	Entity **candidates = CollisionScene__queryRegion(
+		scene,
 		(BoundingBox){min_bounds, max_bounds},
 		&candidate_count
 	);
@@ -371,7 +385,10 @@ CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to
 		if (other == entity) continue; /* Skip self */
 		if (!other->collision_shape) continue;
 
-		CollisionResult test_result = Collision__checkDiscreet(&temp_entity, other);
+		CollisionResult test_result = Collision__checkDiscreet(
+				&temp_entity, 
+				other
+			);
 		if (test_result.hit) {
 			result = test_result;
 			break; /* Return first collision found */
@@ -426,7 +443,9 @@ Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 		c_coeff = Vector2DotProduct(rel_pos, rel_pos) - radius_sum * radius_sum,
 
 		discriminant = b_coeff * b_coeff - 4.0f * a_coeff *c_coeff;
-	if (discriminant < 0.0f || fabsf(a_coeff) < 0.0001f) return result; /* No collision */
+
+	/* No collision */
+	if (discriminant < 0.0f || fabsf(a_coeff) < 0.0001f) return result;
 
 	float
 		sqrt_disc = sqrtf(discriminant),
@@ -444,7 +463,8 @@ Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 		b_bottom    = b->position.y,
 		b_top       = b->position.y + b->bounds.y;
 
-	if (b_top < a_bottom || a_top < b_bottom) return result; /* No Y-axis overlap */
+	/* No Y-axis overlap */
+	if (b_top < a_bottom || a_top < b_bottom) return result;
 
 	/* Collision found */
 	result.hit      = true;
@@ -454,7 +474,12 @@ Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 
 	/* Calculate normal at contact point */
 	Vector2 contact_pos_2d = {result.position.x, result.position.z};
-	Vector2 normal_2d      = Vector2Normalize(Vector2Subtract(contact_pos_2d, center_b));
+	Vector2 normal_2d      = Vector2Normalize(
+		Vector2Subtract(
+				contact_pos_2d, 
+				center_b
+			)
+		);
 	result.normal          = (Vector3){normal_2d.x, 0.0f, normal_2d.y};
 	
 	return result;
@@ -561,126 +586,212 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
     return result;
 }
 
-/* CCD: AABB - Cylinder (either can be moving) */
+
+/* CCD: AABB - Cylinder using Minkowski sum approach */
 CollisionResult
-Collision__checkContinuousMixed(Entity *aabb, Entity *cylinder, Vector3 movement, bool aabb_is_moving)
+Collision__checkContinuousMixed(
+	Entity  *aabb, 
+	Entity  *cylinder, 
+	Vector3  movement, 
+	bool     aabb_is_moving
+)
 {
-	DBG_OUT("Entering Collision__checkContinuousMixed(). aabb_is_moving: %s", aabb_is_moving?"true":"false");
     CollisionResult result = {0};
-    result.hit             = false;
-    result.distance        = 1.0f;
+    result.hit = false;
+    result.distance = 1.0f;
+
+    /* Check collision masks first */
+    Entity *moving_entity = aabb_is_moving ? aabb : cylinder;
+    Entity *static_entity = aabb_is_moving ? cylinder : aabb;
+    
+    if (!(moving_entity->collision.masks & static_entity->collision.layers) &&
+        !(static_entity->collision.masks & moving_entity->collision.layers)) {
+        return result;
+    }
 
     float move_length = Vector3Length(movement);
     if (move_length < 0.0001f) {
-    	DBG_OUT("\tUsing discreet collision");
-        /* No movement, use discrete collision */
+        /* No significant movement, use discrete collision */
+        Entity temp_entity = *moving_entity;
+        temp_entity.position = Vector3Add(moving_entity->position, movement);
+        
         if (aabb_is_moving) {
-            Entity temp_aabb = *aabb;
-            temp_aabb.position = Vector3Add(aabb->position, movement);
-            return Collision__checkMixed(&temp_aabb, cylinder, true);
-        } 
-        else {
-            Entity temp_cylinder = *cylinder;
-            temp_cylinder.position = Vector3Add(cylinder->position, movement);
-            return Collision__checkMixed(aabb, &temp_cylinder, true);
+            return Collision__checkMixed(&temp_entity, cylinder, true);
+        } else {
+            return Collision__checkMixed(aabb, &temp_entity, true);
         }
     }
 
-    Vector3 
-        aabb_pos = aabb->position,
-        cyl_pos = cylinder->position;
+    /* Minkowski sum approach: Create expanded shape and raycast against it */
+    Vector3 ray_start, ray_direction;
+    Vector3 minkowski_center;
     
-    /* Adjust positions based on which entity is moving */
-    if (!aabb_is_moving) {
-        /* Cylinder is moving - convert to AABB moving by inverting movement */
-        movement = Vector3Scale(movement, -1.0f);
-        /* Swap reference frame: cylinder becomes stationary, AABB moves relatively */
-        Vector3 temp = aabb_pos;
-        aabb_pos     = Vector3Add(cyl_pos, movement);
-        cyl_pos      = temp;
-    }
-
-    /* Now we always have AABB moving towards stationary cylinder */
-    /* Expand cylinder by AABB size for swept test */
-    float expanded_radius = cylinder->bounds.x * 0.5f + fmaxf(aabb->bounds.x, aabb->bounds.z) * 0.5f;
-
-    /* 2D swept point vs expanded circle */
-    Vector2 
-        aabb_center = {aabb_pos.x, aabb_pos.z},
-        cyl_center  = {cyl_pos.x, cyl_pos.z},
-        velocity    = {movement.x, movement.z};
-
-    Vector2 rel_pos = Vector2Subtract(aabb_center, cyl_center);
+    /* The Minkowski sum of AABB + Cylinder creates a shape where:
+     * - The cylinder is expanded by the AABB's half-extents
+     * - We raycast the moving entity's center against this expanded shape
+     */
     
-    /* Quadratic collision detection */
-    float
-        a_coeff = Vector2DotProduct(velocity, velocity),
-        b_coeff = 2.0f * Vector2DotProduct(rel_pos, velocity),
-        c_coeff = Vector2DotProduct(rel_pos, rel_pos) - expanded_radius * expanded_radius,
-
-		t_collision = 1.0f;
-    bool found_collision = false;
-
-    if (fabsf(a_coeff) < 0.0001f) {
-        /* Linear motion case */
-        if (fabsf(b_coeff) >= 0.0001f) {
-            float t = -c_coeff / b_coeff;
-            if (t >= 0.0f && t <= 1.0f) {
-                t_collision = t;
-                found_collision = true;
-            }
-        }
-    } 
-    else {
-        float discriminant = b_coeff * b_coeff - 4.0f * a_coeff * c_coeff;
-        if (discriminant >= 0.0f) {
-            float 
-                sqrt_disc = sqrtf(discriminant),
-                t1 = (-b_coeff - sqrt_disc) / (2.0f * a_coeff),
-                t2 = (-b_coeff + sqrt_disc) / (2.0f * a_coeff),
-
-				t = (t1 >= 0.0f && t1 <= 1.0f) ? t1 : t2;
-            if (t >= 0.0f && t <= 1.0f) {
-                t_collision = t;
-                found_collision = true;
-            }
-        }
-    }
-
-    if (!found_collision) return result;
-
-    /* Check Y overlap at collision time */
-    float 
-        collision_y = aabb_pos.y + movement.y * t_collision,
-        aabb_bottom = collision_y,
-        aabb_top    = collision_y + aabb->bounds.y,
-        cyl_bottom  = cyl_pos.y,
-        cyl_top     = cyl_pos.y + cylinder->bounds.y;
-
-    if (aabb_bottom > cyl_top || aabb_top < cyl_bottom) return result;
-
-    /* Collision found */
-    result.hit      = true;
-    result.distance = t_collision;
-    result.entity   = aabb_is_moving ? cylinder : aabb; /* Return the non-moving entity */
-    
-    /* Calculate contact position in world space */
     if (aabb_is_moving) {
-        result.position = Vector3Add(aabb->position, Vector3Scale(movement, t_collision));
+        ray_start = aabb->position;
+        ray_direction = Vector3Normalize(movement);
+        minkowski_center = cylinder->position;
     } else {
-        result.position = Vector3Add(cylinder->position, Vector3Scale(movement, t_collision));
+        ray_start = cylinder->position;
+        ray_direction = Vector3Normalize(movement);
+        minkowski_center = aabb->position;
     }
-
-    /* Calculate normal - always points from cylinder center toward contact */
-    Vector2 
-        contact_2d = {result.position.x, result.position.z},
-        normal_2d  = Vector2Normalize(Vector2Subtract(contact_2d, cyl_center));
     
-    /* Adjust normal direction based on which entity is moving */
-    float normal_sign = aabb_is_moving ? 1.0f : -1.0f;
-    result.normal     = (Vector3){normal_2d.x * normal_sign, 0.0f, normal_2d.y * normal_sign};
-	
-	DBG_OUT("\tresult.hit: %s", result.hit?"true":"false");
+    float ray_length = move_length;
+    
+    /* Create the Minkowski sum shape */
+    float cyl_radius = cylinder->radius;
+    float cyl_height = cylinder->height;
+    Vector3 aabb_half = Vector3Scale(aabb->bounds, 0.5f);
+    
+    /* The Minkowski sum creates a rounded box:
+     * - Original cylinder expanded by AABB half-extents
+     * - Height is sum of both heights
+     * - In XZ plane: rounded rectangle with corner radius = cylinder radius
+     */
+    float expanded_radius = cyl_radius;
+    float expanded_half_x = aabb_half.x;
+    float expanded_half_z = aabb_half.z;
+    float expanded_height = cyl_height + aabb->bounds.y;
+    
+    /* Y-axis intersection test first */
+    float t_y_enter = -1.0f, t_y_exit = 2.0f;
+    
+    if (fabs(ray_direction.y) > 0.0001f) {
+        float y_bottom = minkowski_center.y;
+        float y_top = minkowski_center.y + expanded_height;
+        
+        float t1 = (y_bottom - ray_start.y) / ray_direction.y;
+        float t2 = (y_top - ray_start.y) / ray_direction.y;
+        
+        if (t1 > t2) {
+            float temp = t1; t1 = t2; t2 = temp;
+        }
+        
+        t_y_enter = t1;
+        t_y_exit = t2;
+    } else {
+        /* Ray is horizontal, check if it's within Y bounds */
+        if (ray_start.y < minkowski_center.y || ray_start.y > minkowski_center.y + expanded_height) {
+            return result; /* No Y intersection possible */
+        }
+    }
+    
+    /* XZ-plane intersection test with rounded rectangle */
+    float t_collision = 2.0f;
+    Vector3 collision_normal = {0};
+    
+    /* Test intersection with the rounded rectangle in XZ plane */
+    Vector2 ray_start_2d = {ray_start.x, ray_start.z};
+    Vector2 ray_dir_2d = {ray_direction.x, ray_direction.z};
+    Vector2 center_2d = {minkowski_center.x, minkowski_center.z};
+    
+    /* Check intersection with the rectangular part */
+    float rect_min_x = minkowski_center.x - expanded_half_x;
+    float rect_max_x = minkowski_center.x + expanded_half_x;
+    float rect_min_z = minkowski_center.z - expanded_half_z;
+    float rect_max_z = minkowski_center.z + expanded_half_z;
+    
+    /* Ray vs rectangle intersection */
+    float t_x_enter = -1.0f, t_x_exit = 2.0f;
+    float t_z_enter = -1.0f, t_z_exit = 2.0f;
+    
+    if (fabs(ray_dir_2d.x) > 0.0001f) {
+        float t1 = (rect_min_x - ray_start_2d.x) / ray_dir_2d.x;
+        float t2 = (rect_max_x - ray_start_2d.x) / ray_dir_2d.x;
+        if (t1 > t2) { float temp = t1; t1 = t2; t2 = temp; }
+        t_x_enter = t1; t_x_exit = t2;
+    } else {
+        if (ray_start_2d.x < rect_min_x || ray_start_2d.x > rect_max_x) {
+            t_x_enter = 2.0f; /* No intersection */
+        }
+    }
+    
+    if (fabs(ray_dir_2d.y) > 0.0001f) {
+        float t1 = (rect_min_z - ray_start_2d.y) / ray_dir_2d.y;
+        float t2 = (rect_max_z - ray_start_2d.y) / ray_dir_2d.y;
+        if (t1 > t2) { float temp = t1; t1 = t2; t2 = temp; }
+        t_z_enter = t1; t_z_exit = t2;
+    } else {
+        if (ray_start_2d.y < rect_min_z || ray_start_2d.y > rect_max_z) {
+            t_z_enter = 2.0f; /* No intersection */
+        }
+    }
+    
+    float t_rect_enter = fmaxf(t_x_enter, t_z_enter);
+    float t_rect_exit = fminf(t_x_exit, t_z_exit);
+    
+    if (t_rect_enter <= t_rect_exit && t_rect_enter >= 0.0f && t_rect_enter <= 1.0f) {
+        /* Hit the rectangular part */
+        t_collision = t_rect_enter;
+        
+        /* Calculate normal based on which face was hit first */
+        if (t_x_enter > t_z_enter) {
+            collision_normal = (Vector3){(ray_dir_2d.x > 0) ? -1.0f : 1.0f, 0.0f, 0.0f};
+        } else {
+            collision_normal = (Vector3){0.0f, 0.0f, (ray_dir_2d.y > 0) ? -1.0f : 1.0f};
+        }
+    }
+    
+    /* Also test intersection with rounded corners if we didn't hit the rectangle part */
+    if (t_collision >= 2.0f) {
+        /* Test the four rounded corners */
+        Vector2 corners[4] = {
+            {rect_min_x, rect_min_z},
+            {rect_max_x, rect_min_z},
+            {rect_min_x, rect_max_z},
+            {rect_max_x, rect_max_z}
+        };
+        
+        for (int i = 0; i < 4; i++) {
+            Vector2 corner = corners[i];
+            Vector2 to_start = Vector2Subtract(ray_start_2d, corner);
+            
+            /* Ray-circle intersection at this corner */
+            float a = Vector2DotProduct(ray_dir_2d, ray_dir_2d);
+            float b = 2.0f * Vector2DotProduct(to_start, ray_dir_2d);
+            float c = Vector2DotProduct(to_start, to_start) - expanded_radius * expanded_radius;
+            
+            float discriminant = b * b - 4 * a * c;
+            if (discriminant >= 0 && fabs(a) > 0.0001f) {
+                float sqrt_disc = sqrtf(discriminant);
+                float t1 = (-b - sqrt_disc) / (2 * a);
+                float t2 = (-b + sqrt_disc) / (2 * a);
+                
+                float t = (t1 >= 0 && t1 <= 1.0f) ? t1 : t2;
+                if (t >= 0 && t <= 1.0f && t < t_collision) {
+                    t_collision = t;
+                    
+                    /* Calculate normal from corner center to collision point */
+                    Vector2 collision_2d = Vector2Add(ray_start_2d, Vector2Scale(ray_dir_2d, t));
+                    Vector2 normal_2d = Vector2Normalize(Vector2Subtract(collision_2d, corner));
+                    collision_normal = (Vector3){normal_2d.x, 0.0f, normal_2d.y};
+                }
+            }
+        }
+    }
+    
+    /* Combine Y and XZ intersection times */
+    float final_t = fmaxf(fmaxf(t_collision, t_y_enter), 0.0f);
+    
+    if (final_t >= 2.0f || final_t > 1.0f || final_t > fminf(t_y_exit, 1.0f)) {
+        return result;
+    }
+    
+    /* Apply small safety margin */
+    final_t = fmaxf(0.0f, final_t - 0.001f);
+    
+    /* Fill result */
+    result.hit = true;
+    result.distance = final_t;
+    result.entity = static_entity;
+    result.position = Vector3Add(ray_start, Vector3Scale(movement, final_t));
+    result.normal = collision_normal;
+    
     return result;
 }
 
@@ -688,12 +799,10 @@ Collision__checkContinuousMixed(Entity *aabb, Entity *cylinder, Vector3 movement
 CollisionResult
 Collision__checkContinuous(Entity *a, Entity *b, Vector3 movement)
 {
-	DBG_OUT("Collision__checkContinuous() entered...");
     if (
     	   !(a->collision.masks & b->collision.layers) 
     	&& !(b->collision.masks & a->collision.layers)
     ) {
-    	DBG_OUT("NO COLLISION. Exiting early.");
         return NO_COLLISION;
     }
 
@@ -701,26 +810,20 @@ Collision__checkContinuous(Entity *a, Entity *b, Vector3 movement)
 
 	switch (colliders) {
 	case COLLIDERS(COLLISION_BOX,      COLLISION_BOX):
-		DBG_OUT("Box-Box");
 		return Collision__checkContinuousAABB(a, b, movement);
 		break;
 	case COLLIDERS(COLLISION_BOX,      COLLISION_CYLINDER):
-		DBG_OUT("Box-Cylinder");
         return Collision__checkContinuousMixed(a, b, movement, true); /* AABB moving */
 		break;
 	case COLLIDERS(COLLISION_BOX,      COLLISION_SPHERE):
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_CYLINDER):
-		DBG_OUT("Cylinder-Cylinder");
         return Collision__checkContinuousCylinder(a, b, movement);
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_BOX):
-		DBG_OUT("Cylinder-Box");
-		DBG_OUT("Well, it should show up here...");
-        return Collision__checkContinuousMixed(b, a, movement, false); /* Cylinder moving */
+        return Collision__checkContinuousMixed(a, b, movement, false); /* Cylinder moving */
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_SPHERE):
-		DBG_OUT("Cylinder-Sphere");
 		break;
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_SPHERE): /* FALLTHROUGH */
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_BOX):
@@ -728,16 +831,18 @@ Collision__checkContinuous(Entity *a, Entity *b, Vector3 movement)
 	default:
 		break;
 	}
-
-	DBG_OUT("NO COLLISION. At least we tried, this time...");
+	
 	return NO_COLLISION;
 }
 
 /* Primary method for moving entities with CCD */
 CollisionResult
-CollisionScene__moveEntity(CollisionScene *scene, Entity *entity, Vector3 movement)
+CollisionScene__moveEntity(
+    CollisionScene *scene, 
+    Entity         *entity, 
+    Vector3         movement
+)
 {
-	DBG_OUT("Entered CollisionScene__moveEntity()...");
     CollisionResult result = {0};
     result.hit = false;
     result.distance = 1.0f;
@@ -749,53 +854,94 @@ CollisionScene__moveEntity(CollisionScene *scene, Entity *entity, Vector3 moveme
         return CollisionScene__checkCollision(scene, entity, to);
     }
 
-    Vector3 
-		e_bounds = entity->bounds,
-		b_offset = entity->bounds_offset,
-		from     = entity->position,
-		to       = Vector3Add(from, movement);
+    /* First check if we're currently overlapping (discrete check at current position) */
+    CollisionResult overlap_check = CollisionScene__checkCollision(scene, entity, entity->position);
+    
+    if (overlap_check.hit && overlap_check.entity && overlap_check.entity->solid) {
+        /* We're stuck inside something - this is a special case, always allow movement away */
+        Vector3 to_other = Vector3Subtract(overlap_check.entity->position, entity->position);
+        Vector3 movement_normalized = Vector3Normalize(movement);
+        Vector3 to_other_normalized = Vector3Normalize(to_other);
+        
+        /* If moving away from the object we're stuck in, allow it */
+        float dot = Vector3DotProduct(movement_normalized, to_other_normalized);
+        if (dot < -0.1f) {
+            /* Moving away from overlap - allow the movement */
+            result.hit = false;
+            result.distance = 1.0f;
+            return result;
+        }
+    }
 
+    /* Check if we're moving toward any objects */
+    Vector3 e_bounds = entity->bounds;
+    Vector3 b_offset = entity->bounds_offset;
+    Vector3 from = entity->position;
+    Vector3 to = Vector3Add(from, movement);
 
     /* Expand query bounds to cover entire swept path */
     BoundingBox bounds = { 
-			.min = {
-				fminf(from.x, to.x) - (e_bounds.x * 0.5f) + b_offset.x,
-				fminf(from.y, to.y) - (e_bounds.y * 0.5f) + b_offset.y,
-				fminf(from.z, to.z) - (e_bounds.z * 0.5f) + b_offset.z
-			},
-			.max = {
-				fmaxf(from.x, to.x) + (e_bounds.x * 0.5f) + b_offset.x,
-				fmaxf(from.y, to.y) + (e_bounds.y * 0.5f) + b_offset.y,
-				fmaxf(from.z, to.z) + (e_bounds.z * 0.5f) + b_offset.z
-			}
-        };
-
-	DBG_OUT(
-			"Bounding box:\n\tmin - x: %.8f\ty: %.8f\tz: %.8f\n\tmax - x: %.8f\ty: %.8f\tz: %.8f",
-			bounds.min.x, bounds.min.y, bounds.min.z,    bounds.max.x, bounds.max.y, bounds.max.z
-		);
-	
+        .min = Vector3Add(
+            Vector3Subtract(
+                Vector3Min(from, to), 
+                Vector3Scale(e_bounds, 0.5f)
+            ), 
+            b_offset
+        ),
+        .max = Vector3Add(
+            Vector3Add(
+                Vector3Max(from, to), 
+                Vector3Scale(e_bounds, 0.5f)
+            ), 
+            b_offset
+        )
+    };
+    
     int candidate_count;
-    Entity **candidates = SpatialHash__queryRegion(
-			scene->spatial_hash, 
-			bounds, 
-			&candidate_count
-		);
-	
-	DBG_OUT("Num candidates: %d", candidate_count);
+    Entity **candidates = CollisionScene__queryRegion(
+        scene, 
+        bounds, 
+        &candidate_count
+    );
+    
     for (int i = 0; i < candidate_count; i++) {
         Entity *other = candidates[i];
         if (other == entity || !other->collision_shape) continue;
 
-        /* Create temporary entity for CCD */
-        Entity temp_entity = *entity;
-
-        CollisionResult test_result = Collision__checkContinuous(&temp_entity, other, movement);
+        /* Check direction of movement relative to this object */
+        Vector3 to_other = Vector3Subtract(other->position, entity->position);
+        Vector3 movement_normalized = Vector3Normalize(movement);
+        Vector3 to_other_normalized = Vector3Normalize(to_other);
         
-        if (test_result.hit && test_result.distance < result.distance) result = test_result;
+        float dot = Vector3DotProduct(movement_normalized, to_other_normalized);
+        
+        /* Only use CCD if we're moving toward the object */
+        if (dot > 0.1f) {
+            /* Moving toward object - use continuous collision detection */
+            Entity temp_entity = *entity;
+            CollisionResult test_result = Collision__checkContinuous(&temp_entity, other, movement);
+            
+            if (test_result.hit && test_result.distance < result.distance) {
+                result = test_result;
+            }
+        } else {
+            /* Moving away from or parallel to object - check if final position would overlap */
+            Entity temp_entity = *entity;
+            temp_entity.position = to;
+            
+            CollisionResult final_check = Collision__checkDiscreet(&temp_entity, other);
+            
+            if (final_check.hit && other->solid) {
+                /* Would still be overlapping - this is a problem */
+                /* But only if the object is solid */
+                result = final_check;
+                result.distance = 0.0f; /* Can't move at all */
+                break;
+            }
+            /* If not solid or no overlap at final position, allow the movement */
+        }
     }
-
-	DBG_OUT("Result: %d", result.hit);
+    
     return result;
 }
 
@@ -925,9 +1071,17 @@ Collision__checkRayCylinder(K_Ray ray, Entity *entity)
         /* Check bottom cap (y = cylinder_bottom) */
         float t_bottom = (cylinder_bottom - ray_start.y) / ray_dir.y;
         if (t_bottom > 0) {
-            Vector3 bottom_hit = Vector3Add(ray_start, Vector3Scale(ray_dir, t_bottom));
-            float dist_from_axis_sq = (bottom_hit.x - cylinder_center.x) * (bottom_hit.x - cylinder_center.x) +
-                                     (bottom_hit.z - cylinder_center.z) * (bottom_hit.z - cylinder_center.z);
+            Vector3 bottom_hit = Vector3Add(
+					ray_start, 
+					Vector3Scale(
+							ray_dir, 
+							t_bottom
+						)
+					);
+            float dist_from_axis_sq = (bottom_hit.x - cylinder_center.x) 
+									* (bottom_hit.x - cylinder_center.x) 
+									+ (bottom_hit.z - cylinder_center.z) 
+									* (bottom_hit.z - cylinder_center.z);
             if (dist_from_axis_sq <= radius * radius) {
                 if (t_bottom < t_caps) {
                     t_caps = t_bottom;
@@ -940,9 +1094,17 @@ Collision__checkRayCylinder(K_Ray ray, Entity *entity)
         /* Check top cap (y = cylinder_top) */
         float t_top = (cylinder_top - ray_start.y) / ray_dir.y;
         if (t_top > 0) {
-            Vector3 top_hit = Vector3Add(ray_start, Vector3Scale(ray_dir, t_top));
-            float dist_from_axis_sq = (top_hit.x - cylinder_center.x) * (top_hit.x - cylinder_center.x) +
-                                     (top_hit.z - cylinder_center.z) * (top_hit.z - cylinder_center.z);
+            Vector3 top_hit = Vector3Add(
+					ray_start, 
+					Vector3Scale(
+							ray_dir, 
+							t_top
+						)
+					);
+            float dist_from_axis_sq = (top_hit.x - cylinder_center.x) 
+									* (top_hit.x - cylinder_center.x) 
+									+ (top_hit.z - cylinder_center.z) 
+									* (top_hit.z - cylinder_center.z);
             if (dist_from_axis_sq <= radius * radius) {
                 if (t_top < t_caps) {
                     t_caps = t_top;
@@ -963,7 +1125,13 @@ Collision__checkRayCylinder(K_Ray ray, Entity *entity)
     /* Fill result */
     result.hit = true;
     result.distance = final_t;
-    result.position = Vector3Add(ray_start, Vector3Scale(ray_dir, final_t));
+    result.position = Vector3Add(
+			ray_start, 
+			Vector3Scale(
+					ray_dir, 
+					final_t
+				)
+			);
     
     /* Recalculate normal for the chosen intersection */
     if (final_t == t_caps) {
@@ -1006,25 +1174,17 @@ Collision__raycast(CollisionScene *scene, K_Ray ray)
 		);
 	/* Get bounds along ray path */
 	BoundingBox bbox = {
-			{
-				fminf(ray.position.x, to.x),
-				fminf(ray.position.y, to.y),
-				fminf(ray.position.z, to.z)
-			},
-			{
-				fmaxf(ray.position.x, to.x),
-				fmaxf(ray.position.y, to.y),
-				fmaxf(ray.position.z, to.z)
-			}
+			.min = Vector3Min(ray.position, to),
+			.max = Vector3Max(ray.position, to)
 		};
 	
 	/* Query spatial hash */
 	int      candidate_count;
 	Entity **candidates = CollisionScene__queryRegion(
-		scene, 
-		bbox,
-		&candidate_count
-	);
+			scene, 
+			bbox,
+			&candidate_count
+		);
 	
 	for (int i = 0; i < candidate_count; i++) {
 		Entity *entity = candidates[i];
