@@ -226,6 +226,17 @@ K_Ray
 }
 K_Ray;
 
+typedef struct
+Region
+{
+	int
+		x,
+		y,
+		width,
+		height
+}
+Region;
+
 /*
 	Renderable
 */
@@ -316,6 +327,14 @@ invLerp(float a, float b, float value)
 {
 	if (a==b) return 0.0f;
 	return (value - a) / (b - a);
+}
+
+static void
+moveCamera(Camera *cam, Vector3 new_position)
+{
+	Vector3 diff  = Vector3Subtract(cam->target, cam->position);
+	cam->position = new_position;
+	cam->target   = Vector3Add(new_position, diff);
 }
 
 

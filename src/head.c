@@ -104,6 +104,7 @@ updateHeadFrustum(Head *head)
 Head *
 Head_new(
 	int         Controller_ID,
+    Region      region,
     HeadVTable *VTable,
     Engine     *engine
 )
@@ -124,7 +125,7 @@ Head_new(
 	head->camera.projection = CAMERA_PERSPECTIVE;
 	head->engine            = engine;
 	head->user_data         = NULL;
-	head->region            = (Rectangle){0.0f, 0.0f, 0.0f, 0.0f};
+	head->region            = region;
 
 	head->vtable            = VTable;
 
@@ -210,31 +211,18 @@ Head_getViewport(Head *Self)
 }
 
 
-void
-Head_setViewport(Head *Self, int Width, int Height)
-{
-	Self->viewport = LoadRenderTexture(Width, Height);
-	Rectangle *region = &Self->region;
-	region->x      = 0;
-	region->y      = 0;
-	region->width  = Width;
-	region->height = -Height;
-}
-
-Rectangle
+Region
 Head_getRegion(Head *Self)
 {
 	return Self->region;
 }
 
 void
-Head_setRegion(Head *Self, int X, int Y, int Width, int Height)
+Head_setRegion(Head *Self, Region reg)
 {
-	Rectangle *region = &Self->region;
-	region->x      = X;
-	region->y      = Y;
-	region->width  = Width;
-	region->height = Height;
+	Region *region = &Self->region;
+	*region = reg;
+	Self->viewport = LoadRenderTexture(reg.width, reg.height);
 }
 
 

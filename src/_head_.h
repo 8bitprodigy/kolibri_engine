@@ -18,7 +18,7 @@ Head
         prev_width,
         prev_height;
     RenderTexture             viewport;
-    Rectangle                 region;
+    Region                    region;
 	RendererSettings          settings;
     Frustum                   frustum;
     Engine                   *engine;

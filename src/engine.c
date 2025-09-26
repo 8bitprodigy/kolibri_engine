@@ -242,24 +242,26 @@ void
 Engine_render(Engine *self)
 {
 	const EngineVTable *vtable = self->vtable;
-	/* Loop through Heads */
-	/* Render to Head stage */
-	for (uint i = 0; i < self->head_count; i++) {
-		Head *current_head = &self->heads[i];
-		
-		BeginTextureMode(*Head_getViewport(current_head));
-			Head_preRender(current_head); /* Skyboxes, perhaps */
-			BeginMode3D(*Head_getCamera(current_head));
-				if (self->scene) Scene_render(self->scene, current_head);
-				Head_render(current_head); /* Called on render */
-			EndMode3D();
-			Head_postRender(current_head); /* UI overlays, etc. */
-		EndTextureMode();	
-	}
-	/* End loop through Heads */
-	/* Composition stage */
 	BeginDrawing();
-		/* This is how the final frame is composited together */
+		ClearBackground(BLACK);
+		/* Loop through Heads */
+		/* Render to Head stage */
+		for (uint i = 0; i < self->head_count; i++) {
+			Head *current_head = &self->heads[i];
+			Region region = Head_getRegion(current_head);
+			BeginScissorMode(region.x, region.y, region.width, region.height);
+				rlViewport(region.x, region.y, region.width, region.height);
+				Head_preRender(current_head); /* Skyboxes, perhaps */
+				BeginMode3D(*Head_getCamera(current_head));
+					if (self->scene) Scene_render(self->scene, current_head);
+					Head_render(current_head); /* Called on render */
+				EndMode3D();
+				Head_postRender(current_head); /* UI overlays, etc. */
+			EndScissorMode();	
+		}
+		/* End loop through Heads */
+		/* Final stage. If you need to render stuff over the frame, do it here */
+		rlViewport(0,0, GetScreenWidth(), GetScreenHeight());
 		if (vtable && vtable->Render) vtable->Render(self);
 	EndDrawing();
 }

@@ -28,7 +28,7 @@ typedef struct
 Entity 
 {
     
-    Renderable     *renderables[MAX_LOD_LEVELS];
+    Renderable     *renderables[  MAX_LOD_LEVELS];
     float           lod_distances[MAX_LOD_LEVELS];
     uint8           lod_count;
     float           visibility_radius;
@@ -94,7 +94,8 @@ Entity
             bool
                 active         :1,
                 visible        :1;
-            CollisionShape collision_shape:2; /* 0 = None | 1 = AABB | 2 = Cylinder | 3 = Sphere */
+            CollisionShape 
+                collision_shape:2; /* 0 = None | 1 = AABB | 2 = Cylinder | 3 = Sphere */
             bool
                 solid          :1, /* Solid or area collision */
                 _flag_5        :1,

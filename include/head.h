@@ -52,6 +52,7 @@ RendererSettings;
 /* Constructor */
 Head *Head_new(  
 	int              Controller_ID,
+    Region           region,
     HeadVTable      *vtable,
     Engine          *engine
 );
@@ -66,9 +67,8 @@ Camera3D         *Head_getCamera(          Head *head);
 Engine           *Head_getEngine(          Head *head);
 Frustum          *Head_getFrustum(         Head *head);
 RenderTexture    *Head_getViewport(        Head *head);
-void              Head_setViewport(        Head *head, int   width,     int                      height);
-Rectangle         Head_getRegion(          Head *head);
-void              Head_setRegion(          Head *head, int   x,         int                      y,        int width, int height);
+Region            Head_getRegion(          Head *head);
+void              Head_setRegion(          Head *head, Region region);
 void             *Head_getUserData(        Head *head);
 void              Head_setUserData(        Head *head, void *user_data);
 void              Head_setVTable(          Head *head, HeadVTable *vtable);

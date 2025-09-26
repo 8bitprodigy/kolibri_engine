@@ -1,8 +1,28 @@
 #include "game.h"
+#include "menu.h"
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
 
 
 Entity *player;
 TestHeadData *head_data;
+
+
+void 
+runEngine(void *data)
+{
+	Engine_run((Engine*)data, 0);
+}
+
+void 
+closeAll(void *data)
+{
+	EndDrawing();
+	Engine_requestExit((Engine*)data);
+	CloseWindow();
+}
+
+
 
 int
 main(void)
@@ -10,9 +30,13 @@ main(void)
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 	
 	Engine *engine = Engine_new(&engine_Callbacks);
-	Head   *head   = Head_new(0, &head_Callbacks, engine);
-
-	Head_setViewport(head, SCREEN_WIDTH, SCREEN_HEIGHT);
+	Head   *head   = Head_new(
+			0, 
+			(Region){0,0,SCREEN_WIDTH, SCREEN_HEIGHT}, 
+			&head_Callbacks, 
+			engine
+		);
+	
 	RendererSettings *settings = Head_getRendererSettings(head);
 //	settings->frustum_culling = false;
 	Camera3D *cam = Head_getCamera(head);
@@ -47,8 +71,27 @@ main(void)
 	head_data->target     = player;
 	head_data->eye_height = 1.75f;
 	
+	MenuItem mainMenu[] = {
+			{ "Run",     runEngine, engine},
+			{ "Options", NULL,        NULL},
+			{ "Exit",    CloseWindow, NULL}
+		};
+	
+	while (!WindowShouldClose()) {
+		BeginDrawing();
+			ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
 
-	Engine_run(engine, 0);
+			Menu(
+				mainMenu,
+				3,
+				(Vector2i){SCREEN_WIDTH, SCREEN_HEIGHT},
+				(Vector2i){220, 30},
+				10
+			);
+		EndDrawing();
+	}
+	
 
+	CloseWindow();
 	return 0;
 }

@@ -45,6 +45,7 @@ TestHeadData;
 extern EngineVTable engine_Callbacks;
 
 void testEngineRun(      Engine *engine);
+void testEngineExit(     Engine *engine);
 void testEngineComposite(Engine *engine);
 
 /* Entity Implementation */

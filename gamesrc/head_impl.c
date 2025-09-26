@@ -94,7 +94,7 @@ testHeadPreRender(Head *head)
 {
 	TestHeadData *data = Head_getUserData(head);
 	Camera3D     *cam  = Head_getCamera(head);
-	ClearBackground(WHITE);
+	//ClearBackground(WHITE);
 	BeginMode3D(*cam);
 		rlDisableDepthMask();
 		rlDisableBackfaceCulling();
@@ -123,7 +123,7 @@ testHeadUpdate(Head *head, float delta)
             height = SCREEN_HEIGHT - (48 * data->viewport_scale),
             width  = height * ASPECT_RATIO;
         
-        Head_setViewport(head, width, height);
+        Head_setRegion(head, (Region){GetScreenWidth()/2 - width/2 , GetScreenHeight()/2 - height/2 ,width, height});
     }
     else if (IsKeyPressed(KEY_MINUS)) {
         if (data->viewport_scale < 12) data->viewport_scale++;
@@ -133,7 +133,7 @@ testHeadUpdate(Head *head, float delta)
             height  = SCREEN_HEIGHT - (48 * data->viewport_scale),
             width = height * ASPECT_RATIO;
             
-        Head_setViewport(head, width, height);
+        Head_setRegion(head, (Region){GetScreenWidth()/2 - width/2 , GetScreenHeight()/2 - height/2 ,width, height});
     }
     
     Camera *camera  = Head_getCamera(head);
@@ -176,7 +176,11 @@ testHeadUpdate(Head *head, float delta)
 
     collision = Entity_moveAndSlide(player, movement, 3);
 
-    camera->position = Vector3Add(player->position, (Vector3){0.0f, data->eye_height, 0.0f});
-    difference       = Vector3Subtract(camera->position, prev_pos);
-    camera->target   = Vector3Add(camera->target, difference);
+    moveCamera(
+			camera, 
+			Vector3Add(
+					player->position, 
+					(Vector3){0.0f, data->eye_height, 0.0f}
+				)
+		);
 }
