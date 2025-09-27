@@ -20,17 +20,17 @@ typedef EntityList      (*SceneRenderCallback)(   Scene *scene, Head    *head);
 typedef struct
 SceneVTable
 {
-    SceneDataCallback       Setup;
-    SceneCallback           Enter;
-    SceneUpdateCallback     Update;
-    SceneEntityCallback     EntityEnter;
-    SceneEntityCallback     EntityExit;
-    SceneCollisionCallback  CheckCollision; 
-    SceneCollisionCallback  MoveEntity; 
-    SceneRaycastCallback    Raycast; 
-    SceneRenderCallback     Render;
-    SceneCallback           Exit;
-    SceneDataCallback       Free;
+    SceneDataCallback       Setup;          /* Called on initialization */
+    SceneCallback           Enter;          /* Called on entering the engine */
+    SceneUpdateCallback     Update;         /* Called once every frame after updating all the entities and before rendering */
+    SceneEntityCallback     EntityEnter;    /* Called every time an Entity enters the scene */
+    SceneEntityCallback     EntityExit;     /* Called every time an Entity exits the scene */
+    SceneCollisionCallback  CheckCollision; /* Called when checking if an entity would collide if moved */
+    SceneCollisionCallback  MoveEntity;     /* Called Every time an Entity moves in order to check if it has collided with the scene */
+    SceneRaycastCallback    Raycast;        /* Called Every time a raycast is performed in order to check if has collided with the scene */
+    SceneRenderCallback     Render;         /* Called once every frame in order to render the scene */
+    SceneCallback           Exit;           /* Called upon Scene exiting the engine */
+    SceneDataCallback       Free;           /* Called upon freeing the Scene from memory */
 }
 SceneVTable;
 

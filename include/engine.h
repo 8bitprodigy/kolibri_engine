@@ -11,15 +11,15 @@ typedef void (*EngineResizeCallback)(Engine *engine, uint width, uint height);
 typedef struct
 EngineVTable
 {
-    EngineCallback       Setup;
-    EngineCallback       Run;
-    EngineUpdateCallback Update;
-    EngineCallback       Render;
-    EngineResizeCallback Resize;
-    EngineCallback       Pause;
-    EngineCallback       Unpause;
-    EngineCallback       Exit;
-    EngineCallback       Free;
+    EngineCallback       Setup;   /* Called upon creating a new Engine */
+    EngineCallback       Run;     /* Called at the beginning of Engine_run() */
+    EngineUpdateCallback Update;  /* Called once every frame after updating all Entities and Heads */
+    EngineCallback       Render;  /* Called once every frame after rendering the scene */
+    EngineResizeCallback Resize;  /* Called upon window resize */
+    EngineCallback       Pause;   /* Called on pausing the Engine */
+    EngineCallback       Unpause; /* Called on unpausing the Engine */ 
+    EngineCallback       Exit;    /* Called at end of Engine_run(), after exiting the main loop */
+    EngineCallback       Free;    /* Called upon freeing Engine from Memory  with Engine_free()*/
 }
 EngineVTable;
 

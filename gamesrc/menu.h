@@ -3,6 +3,7 @@
 
 
 #include "common.h"
+#include "raygui.h"
 
 typedef void (*MenuAction)(void *data);
 
@@ -19,10 +20,12 @@ MenuItem;
 void
 Menu(
 	MenuItem *items, 
-	size_t   size, 
-	Vector2i screen_size, 
-	Vector2i item_size, 
-	int      padding
+	size_t    size, 
+	Vector2i  screen_size, 
+	Vector2i  item_size, 
+	int       padding,
+	int      *selection,
+	int      selected
 )
 {
 	Vector2i 
@@ -37,18 +40,24 @@ Menu(
 
 	int i;
 	for (i = 0; i < size; i++) {
+		if (i == *selection) {
+			GuiSetState(STATE_FOCUSED);
+			if (selected && items[i].action) items[i].action(items[i].data);
+		}
+		else GuiSetState(STATE_NORMAL);
+		
 		if (
-				GuiButton(
-						(Rectangle){
-							position.x,
-							position.y + (i * (item_size.y + padding)), 
-							item_size.w, 
-							item_size.h
-						}, 
-						items[i].str
-					)
-			) 
-				if (items[i].action) items[i].action(items[i].data);
+			GuiButton(
+					(Rectangle){
+						position.x,
+						position.y + (i * (item_size.y + padding)), 
+						item_size.w, 
+						item_size.h
+					}, 
+					items[i].str
+				)
+		) 
+			if (items[i].action) items[i].action(items[i].data);
 	}
 }
 

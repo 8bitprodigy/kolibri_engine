@@ -147,7 +147,17 @@ testHeadUpdate(Head *head, float delta)
     Engine *engine = Head_getEngine(head);
     Vector2 
         mouse_look = GetMouseDelta(),
-        move_dir   = GET_KEY_VECTOR(KEY_W, KEY_S, KEY_D, KEY_A);
+        move_dir   = GET_KEY_OR_BUTTON_VECTOR(
+				0, 
+				GAMEPAD_BUTTON_RIGHT_FACE_UP,
+				KEY_W, 
+				GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
+				KEY_S, 
+				GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
+				KEY_D, 
+				GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
+				KEY_A
+			);
     
     UpdateCameraPro(
             camera,

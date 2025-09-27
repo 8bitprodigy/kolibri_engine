@@ -12,14 +12,14 @@ typedef void (*EntityUpdateCallback)(   Entity *entity, float           delta);
 typedef struct
 EntityVTable
 {
-    EntityCallback          Setup;
-    EntityCallback          Enter;
-    EntityUpdateCallback    Update;
-    EntityCallback          Render;
-    EntityCollisionCallback OnCollision;
-    EntityCollisionCallback OnCollided;
-    EntityCallback          Exit;
-    EntityCallback          Free;
+    EntityCallback          Setup;       /* Called on initialization of a new Entity */
+    EntityCallback          Enter;       /* Called upon Entity entering the scene */
+    EntityUpdateCallback    Update;      /* Called once every frame prior to rendering */
+    EntityCallback          Render;      /* Called once every frame during the render portion to render the Entity */
+    EntityCollisionCallback OnCollision; /* Called when the Entity collides with something while moving */
+    EntityCollisionCallback OnCollided;  /* Called when another Entity collides with this Entity */
+    EntityCallback          Exit;        /* Called upon Entity exiting the scene */
+    EntityCallback          Free;        /* Called upon freeing Entity from memory */
 }
 EntityVTable;
 

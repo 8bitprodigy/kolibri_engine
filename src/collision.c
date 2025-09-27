@@ -460,7 +460,7 @@ Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 {
 	CollisionResult result = {0};
 	result.hit             = false;
-	result.distance        = 1.0f;
+	result.distance        = Vector3Length(movement);
 
 	Vector3
 		from          = a->position,

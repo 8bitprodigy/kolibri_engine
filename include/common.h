@@ -81,6 +81,11 @@
         GET_KEY_OR_BUTTON_DOWN( (Controller), (Btn_Neg), (Key_Neg) )   \
     )
 
+#define GET_KEY_OR_BUTTON_AXIS_PRESSED( Controller, Btn_Pos, Key_Pos, Btn_Neg, Key_Neg ) ( \
+        GET_KEY_OR_BUTTON_PRESSED( (Controller), (Btn_Pos), (Key_Pos) ) - \
+        GET_KEY_OR_BUTTON_PRESSED( (Controller), (Btn_Neg), (Key_Neg) )   \
+    )
+
 #define GET_KEY_OR_BUTTON_VECTOR( Controller, Btn_Pos_X, Key_Pos_X, Btn_Neg_X, Key_Neg_X, Btn_Pos_Y, Key_Pos_Y, Btn_Neg_Y, Key_Neg_Y ) \
     (Vector2){ \
         GET_KEY_OR_BUTTON_AXIS( (Controller), (Btn_Pos_X), (Key_Pos_X), (Btn_Neg_X), (Key_Neg_X) ), \
@@ -132,7 +137,6 @@ typedef int8_t       int8;
 typedef unsigned int uint;
 typedef size_t       word;
 
-
 typedef enum
 {
 	COLLISION_NONE     = 0,
@@ -142,7 +146,21 @@ typedef enum
 }
 CollisionShape;
 
-/* Structs */
+typedef enum
+{
+	FRUSTUM_LEFT,
+	FRUSTUM_RIGHT,
+	FRUSTUM_TOP,
+	FRUSTUM_BOTTOM,
+	FRUSTUM_NEAR,
+	FRUSTUM_FAR
+}
+FrustumPlaneIndices;
+
+
+/* 
+	Structs 
+*/
 typedef struct 
 CollisionResult 
 {
@@ -178,17 +196,6 @@ Plane
 }
 Plane;
 
-typedef enum
-{
-	FRUSTUM_LEFT,
-	FRUSTUM_RIGHT,
-	FRUSTUM_TOP,
-	FRUSTUM_BOTTOM,
-	FRUSTUM_NEAR,
-	FRUSTUM_FAR
-}
-FrustumPlaneIndices;
-
 typedef struct 
 Frustum
 {
@@ -211,6 +218,10 @@ Frustum
 }
 Frustum;
 
+/*
+	K_Ray
+		Wrapper around a raylib Ray, adding a length field.
+*/
 typedef struct
 K_Ray
 {
@@ -226,6 +237,10 @@ K_Ray
 }
 K_Ray;
 
+/*
+	Region
+		Used by Head to define the screen region it draws to.
+*/
 typedef struct
 Region
 {

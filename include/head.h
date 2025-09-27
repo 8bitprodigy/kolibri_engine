@@ -16,14 +16,14 @@ typedef void        (*HeadResizeCallback)(      Head *head, uint  width,  uint h
 typedef struct
 HeadVTable
 {
-    HeadCallback       Setup;
-    HeadUpdateCallback Update;
-    HeadCallback       PreRender;
+    HeadCallback       Setup;      /* Called immediately after initialization */
+    HeadUpdateCallback Update;     /* Called every frame before rendering */
+    HeadCallback       PreRender;  /* Called during render, prior to rendering the scene.*/
     HeadCallback       Render;
-    HeadCallback       PostRender;
-    HeadResizeCallback Resize;
-    HeadCallback       Exit;
-    HeadCallback       Free;
+    HeadCallback       PostRender; /* Called after rendering the scene */
+    HeadResizeCallback Resize;     /* Called upon window resize */
+    HeadCallback       Exit;       /* Called upon removal of Head from engine */
+    HeadCallback       Free;       /* Called upon freeing the Head from memory */
 }
 HeadVTable;
 

@@ -1,5 +1,6 @@
 #include "game.h"
 #include "menu.h"
+#include <raylib.h>
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
@@ -27,6 +28,7 @@ closeAll(void *data)
 int
 main(void)
 {
+	
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 	
 	Engine *engine = Engine_new(&engine_Callbacks);
@@ -76,17 +78,37 @@ main(void)
 			{ "Options", NULL,        NULL},
 			{ "Exit",    CloseWindow, NULL}
 		};
+	const size_t numMenuItems = sizeof(mainMenu)/sizeof(mainMenu[0]);
+	int selection = -1;
 	
 	while (!WindowShouldClose()) {
 		BeginDrawing();
 			ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
 
+			int axis;
+			if (
+				axis = GET_KEY_OR_BUTTON_AXIS_PRESSED(
+						0, 
+						GAMEPAD_BUTTON_LEFT_FACE_DOWN, 
+						KEY_DOWN, 
+						GAMEPAD_BUTTON_LEFT_FACE_UP, 
+						KEY_UP
+					)
+			)
+			{
+				selection += axis;
+				if (selection    <  0)         selection = numMenuItems - 1;
+				if (numMenuItems <= selection) selection = 0;
+			}
+			
 			Menu(
 				mainMenu,
-				3,
+				numMenuItems,
 				(Vector2i){SCREEN_WIDTH, SCREEN_HEIGHT},
 				(Vector2i){220, 30},
-				10
+				10,
+				&selection,
+				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
 			);
 		EndDrawing();
 	}
