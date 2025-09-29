@@ -184,11 +184,9 @@ Engine_getVTable(Engine *engine)
 
 
 void
-Engine_run(Engine *self, uint Target_FPS)
+Engine_run(Engine *self)
 {
 	const EngineVTable *vtable = self->vtable;
-	
-	if (0 < Target_FPS) SetTargetFPS(Target_FPS);
 	
 	if (vtable && vtable->Run) vtable->Run(self);
 	
@@ -254,7 +252,6 @@ Engine_render(Engine *self)
 				Head_preRender(current_head); /* Skyboxes, perhaps */
 				BeginMode3D(*Head_getCamera(current_head));
 					if (self->scene) Scene_render(self->scene, current_head);
-					Head_render(current_head); /* Called on render */
 				EndMode3D();
 				Head_postRender(current_head); /* UI overlays, etc. */
 			EndScissorMode();	

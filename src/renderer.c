@@ -120,7 +120,7 @@ Renderer__queryFrustum(
     SpatialHash__queryRegion(
         renderer->visibility_hash,
         (BoundingBox){min_bounds, max_bounds},
-        &candidates,
+        (void*)&candidates,
         &candidate_count
     );
 

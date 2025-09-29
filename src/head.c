@@ -303,14 +303,6 @@ Head_preRender(Head *Self)
 
 
 void
-Head_render(Head *Self)
-{
-	HeadVTable *vtable = Self->vtable;
-	if (vtable && vtable->Render) vtable->Render(Self);
-}
-
-
-void
 Head_postRender(Head *Self)
 {
 	HeadVTable *vtable = Self->vtable;

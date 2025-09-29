@@ -80,7 +80,7 @@ CollisionScene__insertEntity(CollisionScene *scene, Entity *entity)
 void
 CollisionScene__clear(CollisionScene *scene)
 {
-	SpatialHash__clear(scene);
+	SpatialHash__clear((SpatialHash*)scene);
 }
 
 /* Query entities in a region */
@@ -97,11 +97,11 @@ CollisionScene__queryRegion(
 	SpatialHash__queryRegion(
 			scene->spatial_hash, 
 			bbox,
-			&candidates,
+			(void*)&candidates,
 			count
 		);
 	
-	return &candidates;
+	return (void*)&candidates;
 }
 
 /* Cylinder Collision */

@@ -27,9 +27,9 @@ SpatialHash *SpatialHash__new( void);
 void         SpatialHash__free(SpatialHash *hash);
 
 /* Private Methods */
-void SpatialHash__clear(      SpatialHash *hash);
-void SpatialHash__insert(     SpatialHash *hash, void        *data,   Vector3   center,        Vector3  bounds);
-void SpatialHash__queryRegion(SpatialHash *hash, BoundingBox  region, void    **query_results, int     *count);
+void  SpatialHash__clear(      SpatialHash *hash);
+void  SpatialHash__insert(     SpatialHash *hash, void        *data,   Vector3   center,        Vector3  bounds);
+void *SpatialHash__queryRegion(SpatialHash *hash, BoundingBox  region, void    **query_results, int     *count);
 
 
 #endif /* SPATIAL_HASH_PRIVATE_H */

@@ -43,6 +43,10 @@ This engine is so simple, it weighs in at only \~1800 lines of C.
 
 These are the APIs used to make your game(s).
 
+### **kolibri.h**
+
+This just imports all the other headers.
+
 ### **common.h**:
 
 Defines macros, constants, enums, and types used commonly throughout the engine and game codebase.
@@ -113,7 +117,7 @@ Defines macros, constants, enums, and types used commonly throughout the engine 
 
 - *Typedefs*:
   
-  - *Callbacks:*
+  - *Callback types:*
     
     - `void (*EngineCallback)(Engine *engine)`: General callback.
     
@@ -147,13 +151,39 @@ Defines macros, constants, enums, and types used commonly throughout the engine 
       
       - `void Engine_free(Engine *engine)`: Frees up an `Engine` from memory. This will call the `Free` callback if it has been provided.
 
+    - *Setters*
+
+      - `void Engine_setVTable(Engine *engine, EngineVTable *vtable)`: Sets the engine's VTable to a different EngineVTable.
+      
+    - *Getters*
+
+      - `float Engine_getDeltaTime(Engine *engine)`: Gets the delta time for the current frame.
+
+      - `uint64 EngineGetFrameNumber(Engine *engine)`: Gets the number of frames which have been rendered since running the engine.
+
+      - `EntityList *Engine_getEntityList(Engine *engine)`: Gets a list of all the Entities subordinate to the Engine.
+
+      - `Head *Engine_getHeads(Engine *engine)`: Returns a pointer to the root Head.
+
+      - `Scene *Engine_getScene(Engine *engine)`: Returns a pointer to the current Scene.
+
+    - *Methods*
+
+      - `void Engine_run(Engine *engine)`: Runs the Engine, starting the simulation.
+
+      - `void Engine_pause(Engine *engine, bool paused)`: Sets the paused state of the engine. Useful for pausing the simulation, and to pass control between the Engine and a menu.
+
+      - `void Engine_requestExit(Engine *engine)`: Requests the engine to exit on the next update.
+
 ### **head.h**:
+
+### **entity.h**:
 
 ### **scene.h**:
 
 ## Protected API:
 
-These APIs are used internally within the engine. They are NOT to be used to make games. They are documented here in order to document the engine itself, and enable developers to better understand the engine for education or modification.
+These APIs are used internally within the engine. They are NOT to be used to make games. They are documented here in order to enable developers to better understand the engine for education and modification.
 
 ### **\_collison\_.h**:
 

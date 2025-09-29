@@ -38,7 +38,7 @@ Entity
             float
                 radius,
                 height,
-                _unused;
+                _reserved_;
         };
     };
     Vector3         
@@ -93,11 +93,11 @@ Entity
         struct {
             bool
                 active         :1,
-                visible        :1;
+                visible        :1,
+                solid          :1; /* Solid or area collision */
             CollisionShape 
                 collision_shape:2; /* 0 = None | 1 = AABB | 2 = Cylinder | 3 = Sphere */
             bool
-                solid          :1, /* Solid or area collision */
                 _flag_5        :1,
                 _flag_6        :1,
                 _flag_7        :1;

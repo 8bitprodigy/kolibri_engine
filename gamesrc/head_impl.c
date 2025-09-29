@@ -22,7 +22,6 @@ HeadVTable head_Callbacks = {
 	testHeadSetup, 
 	testHeadUpdate, 
 	testHeadPreRender, 
-	NULL, 
 	testHeadPostRender,
 	NULL, 
 	NULL, 
@@ -78,13 +77,14 @@ testHeadSetup(Head *head)
 	UpdateMeshBuffer(*skyMesh, 0, skyMesh->vertices, skyMesh->vertexCount*3*sizeof(float), 0);
 	UpdateMeshBuffer(*skyMesh, 1, skyMesh->texcoords, skyMesh->vertexCount*2*sizeof(float), 0);
 
-	Texture2D skyTexture = LoadTexture("resources/sky/SBS_sky_panorama.png");
+	Texture2D skyTexture = LoadTexture("resources/sky/SBS_sky_panorama_full.png");
 	if (skyTexture.id == 0) {
 		ERR_OUT("Failed to load sky texture!");
 		skyTexture = LoadTexture("");
 	}
 	
 	SetMaterialTexture(&skysphere->materials[0], MATERIAL_MAP_ALBEDO, skyTexture);
+	SetTextureFilter(skyTexture, TEXTURE_FILTER_BILINEAR);
 
 	Head_setUserData(head, user_data);
 }

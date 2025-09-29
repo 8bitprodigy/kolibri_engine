@@ -185,7 +185,7 @@ SpatialHash__insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bound
 }
 
 /* Query region */
-void 
+void *
 SpatialHash__queryRegion(
     SpatialHash  *hash, 
     BoundingBox   region, 
@@ -224,5 +224,5 @@ SpatialHash__queryRegion(
         }
     }
 
-    return query_results;
+    return (void*)query_results;
 }

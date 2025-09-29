@@ -9,10 +9,10 @@
 
 
 #ifndef SCREEN_WIDTH
-	#define SCREEN_WIDTH 854
+	#define SCREEN_WIDTH 1920
 #endif
 #ifndef SCREEN_HEIGHT
-	#define SCREEN_HEIGHT 480
+	#define SCREEN_HEIGHT 1080
 #endif
 #define ASPECT_RATIO ((float)SCREEN_WIDTH/(float)SCREEN_HEIGHT)
 

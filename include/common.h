@@ -248,7 +248,7 @@ Region
 		x,
 		y,
 		width,
-		height
+		height;
 }
 Region;
 

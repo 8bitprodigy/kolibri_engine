@@ -19,7 +19,6 @@ HeadVTable
     HeadCallback       Setup;      /* Called immediately after initialization */
     HeadUpdateCallback Update;     /* Called every frame before rendering */
     HeadCallback       PreRender;  /* Called during render, prior to rendering the scene.*/
-    HeadCallback       Render;
     HeadCallback       PostRender; /* Called after rendering the scene */
     HeadResizeCallback Resize;     /* Called upon window resize */
     HeadCallback       Exit;       /* Called upon removal of Head from engine */
@@ -79,7 +78,6 @@ RendererSettings *Head_getRendererSettings(Head *head);
 void Head_setup(     Head *head);
 void Head_update(    Head *head, float delta);
 void Head_preRender( Head *head);
-void Head_render(    Head *head);
 void Head_postRender(Head *head);
 void Head_exit(      Head *head);
 

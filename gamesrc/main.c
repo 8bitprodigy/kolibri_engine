@@ -5,22 +5,22 @@
 #include "raygui.h"
 
 
-Entity *player;
+Entity       *player;
 TestHeadData *head_data;
+bool          readyToClose;
 
 
 void 
 runEngine(void *data)
 {
-	Engine_run((Engine*)data, 0);
+	Engine_run((Engine*)data);
 }
 
 void 
 closeAll(void *data)
 {
-	EndDrawing();
 	Engine_requestExit((Engine*)data);
-	CloseWindow();
+	readyToClose = true;
 }
 
 
@@ -28,7 +28,7 @@ closeAll(void *data)
 int
 main(void)
 {
-	
+	readyToClose = false;
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 	
 	Engine *engine = Engine_new(&engine_Callbacks);
@@ -75,13 +75,13 @@ main(void)
 	
 	MenuItem mainMenu[] = {
 			{ "Run",     runEngine, engine},
-			{ "Options", NULL,        NULL},
-			{ "Exit",    CloseWindow, NULL}
+			{ "Options", NULL,      NULL},
+			{ "Exit",    closeAll,  engine}
 		};
 	const size_t numMenuItems = sizeof(mainMenu)/sizeof(mainMenu[0]);
 	int selection = -1;
 	
-	while (!WindowShouldClose()) {
+	while (!readyToClose) {
 		BeginDrawing();
 			ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
 
@@ -112,8 +112,8 @@ main(void)
 			);
 		EndDrawing();
 	}
-	
 
+	
 	CloseWindow();
 	return 0;
 }
