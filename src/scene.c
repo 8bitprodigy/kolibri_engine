@@ -4,6 +4,13 @@
 #include "_renderer_.h"
 #include "common.h"
 #include <raylib.h>
+#include <stdbool.h>
+
+
+#define HANDLE_SCENE_CALLBACK(scene, method, ...) do{ \
+        SceneVTable *vtable = (scene)->vtable; \
+        if (vtable && vtable->method) return vtable->method((scene), ##__VA_ARGS__); \
+    }while(0)
 
 
 void insertScene(Scene *scene, Scene *to);
@@ -37,21 +44,20 @@ Scene_new(
     if (map_type->Setup) map_type->Setup(scene, data);
 
     return scene;
-}
+} /* Scene_new */
 /*
     DESTRUCTOR
 */
 void
 Scene_free(Scene *scene)
 {
-    SceneVTable *vtable = scene->vtable;
-    
+    SceneVTable *vtable = scene->vtable; 
     if (vtable && vtable->Free) vtable->Free(scene, scene->map_data);
     
     Engine__removeScene(scene->engine, scene);
     
     free(scene);
-}
+} /* Scene_free */
 
 void
 Scene__freeAll(Scene *scene)
@@ -90,28 +96,28 @@ Scene_getMapData(Scene *self)
 void
 Scene_enter(Scene *self)
 {
-    SceneVTable *vtable = self->vtable;
+    SceneVTable *vtable = self->vtable; 
     if (vtable && vtable->Enter) vtable->Enter(self);
 }
 
 void
 Scene_update(Scene *self, float delta)
 {
-    SceneVTable *vtable = self->vtable;
+    SceneVTable *vtable = self->vtable; 
     if (vtable && vtable->Update) vtable->Update(self, delta);
 }
 
 void 
 Scene_entityEnter(Scene *self, Entity *entity)
 {
-    SceneVTable *vtable = self->vtable;
+    SceneVTable *vtable = self->vtable; 
     if (vtable && vtable->EntityEnter) vtable->EntityEnter(self, entity);
 }
 
 void 
 Scene_entityExit(Scene *self, Entity *entity)
 {
-    SceneVTable *vtable = self->vtable;
+    SceneVTable *vtable = self->vtable; 
     if (vtable && vtable->EntityExit) vtable->EntityExit(self, entity);
 }
 
@@ -176,51 +182,18 @@ Scene_checkContinuous(Scene *self, Entity *entity, Vector3 to)
     
     return result;
 }
-/*
-CollisionResult
-Scene_moveEntity(Scene *scene, Entity *entity, Vector3 to)
-{
-    CollisionResult result;
-    Vector3
-        *position = &entity->position;
-    result = Scene_checkContinuous(scene, entity, to);
 
-    if (result.hit) {
-        EntityVTable *entity_vtable = entity->vtable;
-        Entity *other               = result.entity;
-        Vector3 new_position;
-        if (other) {
-            EntityVTable *other_vtable   = other->vtable;
-            if (other_vtable && other_vtable->OnCollided) {
-                CollisionResult other_result = result;
-                other_result.entity          = entity;
-                other_vtable->OnCollided(other, other_result);
-            }
-            if (other->solid) {
-                new_position = Vector3Add(*position, Vector3Scale(to, result.distance));
-            }
-            else {
-                new_position = Vector3Add(*position, to);
-            }
-        }
-        else {
-            new_position = Vector3Add(*position, Vector3Scale(to, result.distance));
-        }
-        *position = new_position;
-        if (entity_vtable && entity_vtable->OnCollision) entity_vtable->OnCollision(entity, result);
-    }
-    else {
-        *position = Vector3Add(*position, to);
-    }
-    
-    return result;
+bool
+Scene_isEntityOnFloor(Scene *self, Entity  *entity)
+{
+    HANDLE_SCENE_CALLBACK(self, EntityOnFloor, entity);
+    return false;
 }
-*/
+
 CollisionResult
 Scene_raycast(Scene *self, Vector3 from, Vector3 to)
 {
-    SceneVTable *vtable = self->vtable;
-    if (vtable && vtable->Raycast) return vtable->Raycast(self, from, to);
+    HANDLE_SCENE_CALLBACK(self, Raycast, from, to);
     return NO_COLLISION;
 }
 
@@ -242,6 +215,5 @@ Scene_render(Scene *self, Head *head)
 void
 Scene_exit(Scene *self)
 {
-    SceneVTable *vtable = self->vtable;
-    if (vtable && vtable->Exit) vtable->Exit(self);
+    HANDLE_SCENE_CALLBACK(self, Exit);
 }

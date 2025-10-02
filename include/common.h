@@ -31,6 +31,10 @@
 #ifndef MAX_NUM_ENTITIES
 	#define MAX_NUM_ENTITIES 1024
 #endif
+/* Head-related settings */
+#ifdef HEAD_USE_RENDER_TEXTURE
+	#define HEAD_USE_RENDER_TEXTURE 1
+#endif
 /* Renderable-related constants */
 #ifndef MAX_LOD_LEVELS
 	#define MAX_LOD_LEVELS 4

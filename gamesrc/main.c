@@ -1,14 +1,32 @@
 #include "game.h"
-#include "menu.h"
-#include <raylib.h>
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
+#include <raylib.h>
 
+
+void switchMenu(void *data);
+void runEngine( void *data);
+void closeAll  (void *data);
+
+Engine       *engine;
 Entity       *player;
 TestHeadData *head_data;
 bool          readyToClose;
+int           selection;
 
+Menu
+	*currentMenu,
+	 mainMenu,
+	 optionsMenu;
+
+
+void
+switchMenu(void *data)
+{
+	currentMenu = (Menu*)data;
+	selection   = -1;
+}
 
 void 
 runEngine(void *data)
@@ -29,9 +47,11 @@ int
 main(void)
 {
 	readyToClose = false;
+
+	SetTargetFPS(240);
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 	
-	Engine *engine = Engine_new(&engine_Callbacks);
+	engine = Engine_new(&engine_Callbacks);
 	Head   *head   = Head_new(
 			0, 
 			(Region){0,0,SCREEN_WIDTH, SCREEN_HEIGHT}, 
@@ -50,7 +70,8 @@ main(void)
 	Scene_new(&scene_Callbacks, NULL, engine);
 	
 	Entity *ents[21][21][2];
-	int z = 0;
+	int z = 0; 
+/*
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
 //			for (int z = 0; z < 21; z++) {
@@ -65,21 +86,26 @@ main(void)
 //			}
 		}
 	}
-
+*/
 	player    = Entity_new(&playerTemplate, engine);
 	player->position = (Vector3){2.0f, 0.0f, 2.0f};
 	head_data = (TestHeadData*)Head_getUserData(head);
 
-	head_data->target     = player;
-	head_data->eye_height = 1.75f;
+	head_data->target      = player;
+	head_data->target_data = player->user_data;
+	head_data->eye_height  = 1.75f;
+
+	mainMenu = Menu( "Main Menu",
+			(MenuItem){ "Run",     runEngine,  engine},
+			(MenuItem){ "Options...", switchMenu, &optionsMenu},
+			(MenuItem){ "Exit",    closeAll,   engine}
+		),
+	optionsMenu = Menu( "Options",
+			{ "Back...", switchMenu, &mainMenu }
+		);
+	currentMenu = &mainMenu;
 	
-	MenuItem mainMenu[] = {
-			{ "Run",     runEngine, engine},
-			{ "Options", NULL,      NULL},
-			{ "Exit",    closeAll,  engine}
-		};
-	const size_t numMenuItems = sizeof(mainMenu)/sizeof(mainMenu[0]);
-	int selection = -1;
+	selection = -1;
 	
 	while (!readyToClose) {
 		BeginDrawing();
@@ -97,17 +123,18 @@ main(void)
 			)
 			{
 				selection += axis;
-				if (selection    <  0)         selection = numMenuItems - 1;
-				if (numMenuItems <= selection) selection = 0;
+				if (selection    <  0)         selection = currentMenu->size - 1;
+				if (currentMenu->size <= selection) selection = 0;
 			}
 			
-			Menu(
-				mainMenu,
-				numMenuItems,
-				(Vector2i){SCREEN_WIDTH, SCREEN_HEIGHT},
-				(Vector2i){220, 30},
-				10,
-				&selection,
+			Menu_draw(
+				currentMenu,
+				SCREEN_WIDTH, 
+				SCREEN_HEIGHT,
+				MENU_WIDTH, 
+				MENU_ITEM_HEIGHT,
+				MENU_PADDING,
+				selection,
 				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
 			);
 		EndDrawing();

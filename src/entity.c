@@ -1,6 +1,7 @@
 #include "_engine_.h"
 #include "_entity_.h"
 #include "_head_.h"
+#include "_scene_.h"
 #include "common.h"
 #include <raylib.h>
 #include <raymath.h>
@@ -32,7 +33,7 @@ Entity_new(const Entity *entity, Engine *engine)
 	node->prev   = node;
 	node->engine = engine;
 
-	Entity *base = PRIVATE_TO_ENTITY(node);
+	Entity *base = NODE_TO_ENTITY(node);
 	*base = *entity;
 
 	base->user_data = NULL;
@@ -50,34 +51,34 @@ Entity_new(const Entity *entity, Engine *engine)
 void
 Entity_free(Entity *self)
 {
-	EntityNode__free(ENTITY_TO_PRIVATE(self));
+	EntityNode__free(ENTITY_TO_NODE(self));
 }
 
 
 Entity *
 Entity_getNext(Entity *self)
 {
-	return &ENTITY_TO_PRIVATE(self)->next->base;
+	return &ENTITY_TO_NODE(self)->next->base;
 }
 
 
 Entity *
 Entity_getPrev(Entity *self)
 {
-	return &ENTITY_TO_PRIVATE(self)->prev->base;
+	return &ENTITY_TO_NODE(self)->prev->base;
 }
 
 
 uint64
 Entity_getUniqueID(Entity *entity)
 {
-	return ENTITY_TO_PRIVATE(entity)->unique_ID;
+	return ENTITY_TO_NODE(entity)->unique_ID;
 }
 
 Engine *
 Entity_getEngine(Entity *entity)
 {
-	return ENTITY_TO_PRIVATE(entity)->engine;
+	return ENTITY_TO_NODE(entity)->engine;
 }
 
 BoundingBox
@@ -108,7 +109,7 @@ Entity_move(Entity *self, Vector3 movement)
 {
     if (Vector3Equals(movement, V3_ZERO)) return NO_COLLISION;
     
-    Scene *scene = Engine_getScene(ENTITY_TO_PRIVATE(self)->engine);
+    Scene *scene = Engine_getScene(ENTITY_TO_NODE(self)->engine);
     CollisionResult result = Scene_checkContinuous(scene, self, movement);
     
     // Handle the movement based on collision result
@@ -197,13 +198,21 @@ Entity_render(Entity *entity, Head *head)
 }
 
 
+bool
+Entity_isOnFloor(Entity *self)
+{
+	Scene *scene = Engine_getScene(ENTITY_TO_NODE(self)->engine);
+	return Scene_isEntityOnFloor(scene, self);
+}
+
+
 /*
 	Private Methods
 */
 void
 EntityNode__free(EntityNode *self)
 {
-	Entity       *entity = PRIVATE_TO_ENTITY(self);
+	Entity       *entity = NODE_TO_ENTITY(self);
 	
 	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Free) vtable->Free(entity);
@@ -233,7 +242,7 @@ EntityNode__updateAll(EntityNode *node, float delta)
 	EntityNode *starting_node = node;
 	
 	do {
-		Entity *entity = PRIVATE_TO_ENTITY(node);
+		Entity *entity = NODE_TO_ENTITY(node);
 		EntityVTable *vtable = entity->vtable;
 		if (vtable && vtable->Update) vtable->Update(entity, delta);
 

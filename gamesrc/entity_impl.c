@@ -50,7 +50,7 @@ Entity entityTemplate = (Entity){
 	.user_data         = NULL,
 	.vtable            = &entity_Callbacks,
 	.position          = V3_ZERO,
-	.rotation          = V4_ZERO,
+	.orientation       = V4_ZERO,
 	.scale             = V3_ONE,
 	.collision         = {.layers = 1, .masks = 1},
 	.active            = true,

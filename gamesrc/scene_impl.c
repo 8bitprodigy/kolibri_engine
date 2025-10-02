@@ -1,11 +1,14 @@
 #include "game.h"
 
 
+#define ENTITY_ON_ENTITY_TEST_VECTOR ((Vector3){0.0f, -0.01f, 0.0f})
+
 /*
 	Callback Forward Declarations
 */
-EntityList      testSceneRender(   Scene *scene, Head *head);
-CollisionResult testSceneCollision(Scene *scene, Entity *entity, Vector3 to);
+EntityList      testSceneRender(         Scene *scene, Head   *head);
+CollisionResult testSceneCollision(      Scene *scene, Entity *entity, Vector3 to);
+bool            testSceneEntityIsOnFloor(Scene *scene, Entity *entity);
 
 
 /*
@@ -19,6 +22,7 @@ SceneVTable scene_Callbacks = {
 	.EntityExit     = NULL, 
 	.CheckCollision = testSceneCollision, 
 	.MoveEntity     = NULL, 
+	.EntityOnFloor  = testSceneEntityIsOnFloor,
 	.Raycast        = NULL,
 	.Render         = testSceneRender, 
 	.Exit           = NULL, 
@@ -68,3 +72,16 @@ testSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 }
 
 
+bool
+testSceneEntityIsOnFloor(Scene *self, Entity *entity)
+{
+	if (entity->position.y <= 0.0f) {
+		entity->position.y = 0.0f;
+		entity->velocity.y = 0.0f;
+		return true;
+	}
+
+	//return testSceneCollision(self, entity, ENTITY_ON_ENTITY_TEST_VECTOR).hit;
+
+	return false;
+}

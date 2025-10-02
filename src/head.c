@@ -36,7 +36,7 @@ updateHeadFrustum(Head *head)
 
     /* Calculate FOV values */
     frustum->vfov_rad     = DEG2RAD * camera->fovy;
-    frustum->aspect_ratio = (float)head->viewport.texture.width / (float)head->viewport.texture.height;
+    frustum->aspect_ratio = (float)head->region.width / (float)head->region.height;
     frustum->hfov_rad     = 2.0f * atanf(tanf(frustum->vfov_rad * 0.5f) * frustum->aspect_ratio);
 
     /* Calculate frustum limits */
@@ -148,8 +148,9 @@ Head_free(Head *Self)
 	if (vtable && vtable->Free) vtable->Free(Self);
 	
 	Engine__removeHead(Self->engine, Self);
-	
+#ifdef HEAD_USE_RENDER_TEXTURE
 	UnloadRenderTexture(Self->viewport);
+#endif /* HEAD_USE_RENDER_TEXTURE */
 	
 	free(Self);
 }
@@ -204,11 +205,14 @@ Head_getFrustum(Head *head)
     return &head->frustum;
 }
 
+
+#ifdef HEAD_USE_RENDER_TEXTURE
 RenderTexture *
 Head_getViewport(Head *Self)
 {
 	return &Self->viewport;
 }
+#endif /* HEAD_USE_RENDER_TEXTURE */
 
 
 Region
@@ -222,7 +226,9 @@ Head_setRegion(Head *Self, Region reg)
 {
 	Region *region = &Self->region;
 	*region = reg;
+#ifdef HEAD_USE_RENDER_TEXTURE
 	Self->viewport = LoadRenderTexture(reg.width, reg.height);
+#endif /* HEAD_USE_RENDER_TEXTURE */
 }
 
 
@@ -278,8 +284,8 @@ Head_update(Head *Self, float delta)
 		   !Vector3Equals(Self->prev_position, camera->position)
 		|| !Vector3Equals(Self->prev_target, camera->target)
 		|| Self->prev_fovy   != camera->fovy
-		|| Self->prev_width  != Self->viewport.texture.width
-		|| Self->prev_height != Self->viewport.texture.height;
+		|| Self->prev_width  != Self->region.width
+		|| Self->prev_height != Self->region.height;
 
 	if (!(camera_changed || Self->frustum.dirty)) return;
 
@@ -289,8 +295,8 @@ Head_update(Head *Self, float delta)
 	Self->prev_position = camera->position;
 	Self->prev_target   = camera->target;
 	Self->prev_fovy     = camera->fovy;
-	Self->prev_width    = Self->viewport.texture.width;
-	Self->prev_height   = Self->viewport.texture.height;
+	Self->prev_width    = Self->region.width;
+	Self->prev_height   = Self->region.height;
 }
 
 

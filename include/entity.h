@@ -43,7 +43,8 @@ Entity
     };
     Vector3         
                     bounds_offset,
-                    renderable_offset;
+                    renderable_offset,
+                    velocity;
     void           *user_data;
     EntityVTable   *vtable;
     
@@ -51,7 +52,7 @@ Entity
         Transform transform;
         struct {
             Vector3    position;
-            Quaternion rotation;
+            Quaternion orientation;
             Vector3    scale;
         };
     };
@@ -120,12 +121,13 @@ Engine      *Entity_getEngine(     Entity *entity);
 Entity      *Entity_getNext(       Entity *entity);
 Entity      *Entity_getPrev(       Entity *entity);
 uint64       Entity_getUniqueID(   Entity *entity);
+bool         Entity_isOnFloor(     Entity *entity);
 
 /*
     Methods
 */
-CollisionResult Entity_move(        Entity *entity, Vector3  movement);
-CollisionResult Entity_moveAndSlide(Entity *entity, Vector3  movement,  int max_slides);
-void            Entity_render(      Entity *entity, Head    *head);
+CollisionResult Entity_move(        Entity *entity, Vector3 movement);
+CollisionResult Entity_moveAndSlide(Entity *entity, Vector3 movement,  int   max_slides);
+void            Entity_render(      Entity *entity, Head *head);
 
 #endif /* ENTITY_H */

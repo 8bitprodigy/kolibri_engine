@@ -1,9 +1,10 @@
 #include "game.h"
+#include <raylib.h>
 #include <raymath.h>
 
 
 #define MOUSE_SENSITIVITY 0.05f
-#define MOVE_SPEED 5.0f
+#define MOVE_SPEED        5.0f
 
 
 /*
@@ -43,6 +44,7 @@ testHeadSetup(Head *head)
 
 	user_data->viewport_scale = 1;
 	user_data->target         = NULL;
+	user_data->target_data    = NULL;
 	
 	Model *skysphere = &user_data->model;
 	
@@ -114,10 +116,11 @@ void
 testHeadUpdate(Head *head, float delta)
 {
     TestHeadData *data = Head_getUserData(head);
-    
+
+    /* Adjust viewport size */
     if      (IsKeyPressed(KEY_EQUAL)) {
         if (0 < data->viewport_scale) data->viewport_scale--;
-        else return;
+        else goto PLAYER_INPUT;
 
         int
             height = SCREEN_HEIGHT - (48 * data->viewport_scale),
@@ -127,15 +130,16 @@ testHeadUpdate(Head *head, float delta)
     }
     else if (IsKeyPressed(KEY_MINUS)) {
         if (data->viewport_scale < 12) data->viewport_scale++;
-        else return;
+        else goto PLAYER_INPUT;
 
         int
             height  = SCREEN_HEIGHT - (48 * data->viewport_scale),
             width = height * ASPECT_RATIO;
             
         Head_setRegion(head, (Region){GetScreenWidth()/2 - width/2 , GetScreenHeight()/2 - height/2 ,width, height});
-    }
-    
+    } /* End adjust viewport size */
+
+PLAYER_INPUT:
     Camera *camera  = Head_getCamera(head);
     if (!data->target) {
         UpdateCamera(camera, CAMERA_FREE);
@@ -143,8 +147,15 @@ testHeadUpdate(Head *head, float delta)
     }
 
     CollisionResult collision;
-    Entity *player = data->target;
-    Engine *engine = Head_getEngine(head);
+    Entity     *player      = data->target;
+    PlayerData *player_data = data->target_data;
+    Engine     *engine      = Head_getEngine(head);
+
+	if (
+		GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_MIDDLE, KEY_ESCAPE)
+    )
+		Engine_pause(engine, true);
+	
     Vector2 
         mouse_look = GetMouseDelta(),
         move_dir   = GET_KEY_OR_BUTTON_VECTOR(
@@ -169,23 +180,33 @@ testHeadUpdate(Head *head, float delta)
             },
             0.0f
         );
-        
+
+	/* Calculate player inputs */
     /* FIX: Calculate forward direction FROM camera TO target */
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
     forward.y       = 0.0f;  /* Keep movement on horizontal plane */
     forward         = Vector3Normalize(forward);
     
     Vector3 
-        prev_pos   = camera->position,
-        difference = V3_ZERO,
-        right      = Vector3CrossProduct(forward, V3_UP),  /* Cross product is cleaner than rotation */
+        side      = Vector3CrossProduct(forward, V3_UP),  /* Cross product is cleaner than rotation */
         movement   = Vector3Add(
-                Vector3Scale(forward, move_dir.x * MOVE_SPEED * delta),
-                Vector3Scale(right,   move_dir.y * MOVE_SPEED * delta)
+                Vector3Scale(forward, move_dir.x),
+                Vector3Scale(side,   move_dir.y)
             );
 
-    collision = Entity_moveAndSlide(player, movement, 3);
-
+	player_data->move_dir     = movement;
+	if (
+		GET_KEY_OR_BUTTON_PRESSED(
+			0, 
+			GAMEPAD_BUTTON_LEFT_TRIGGER_1, 
+			KEY_SPACE
+		)
+	)
+	{
+		player_data->request_jump = true;
+	}
+	/* End calculate player inputs */
+	
     moveCamera(
 			camera, 
 			Vector3Add(
@@ -193,4 +214,6 @@ testHeadUpdate(Head *head, float delta)
 					(Vector3){0.0f, data->eye_height, 0.0f}
 				)
 		);
+
+	DBG_OUT("End of Head Update function.");
 }

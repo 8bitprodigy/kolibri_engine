@@ -2,6 +2,18 @@
 #include "_engine_.h"
 
 
+#ifdef HEAD_USE_RENDER_TEXTURES
+	#define BeginRenderMode( head ) BeginTextureMode(*Head_getViewport((head)))
+	#define EndRenderMode() EndTextureMode()
+#else /* HEAD_USE_RENDER_TEXTURES */
+	#define BeginRenderMode( head ) do{\
+			Region region = Head_getRegion((head)); \
+					BeginScissorMode(region.x, region.y, region.width, region.height); \
+						rlViewport(region.x, region.y, region.width, region.height); \
+		}while(0)
+	#define EndRenderMode() EndScissorMode()
+#endif /* HEAD_USE_RENDER_TEXTURES */
+
 /*
 	MAIN STRUCT
 */
@@ -15,14 +27,15 @@ Engine
 	CollisionScene *collision_scene;
 	Renderer       *renderer;
 	
-	uint64     frame_num;
-	uint       head_count;
-	uint       entity_count;
-	uint       target_fps;
+	uint64          frame_num;
+	uint       
+		            head_count,
+		            entity_count,
+		            target_fps;
 	
-	float      delta;
+	float           delta;
 
-	EntityList entity_list;
+	EntityList      entity_list;
 	
 	
 	union {
@@ -145,7 +158,7 @@ Engine_getEntityList(Engine *self)
 	int index = 0;
 
 	do {
-		self->entity_list.entities[index++] = PRIVATE_TO_ENTITY(current);
+		self->entity_list.entities[index++] = NODE_TO_ENTITY(current);
 		current                             = current->next;
 	} while (current != self->entities);
 	
@@ -188,14 +201,18 @@ Engine_run(Engine *self)
 {
 	const EngineVTable *vtable = self->vtable;
 	
+	SetExitKey(KEY_NULL);
+	
 	if (vtable && vtable->Run) vtable->Run(self);
 	
 	if (self->head_count) {
 		while(!self->request_exit) {
 			self->request_exit = WindowShouldClose();
-
+			
 			Engine_update(self);
-			Engine_render(self);
+			BeginDrawing();
+				Engine_render(self);
+			EndDrawing();
 
 			self->frame_num++;
 		}
@@ -240,27 +257,23 @@ void
 Engine_render(Engine *self)
 {
 	const EngineVTable *vtable = self->vtable;
-	BeginDrawing();
-		ClearBackground(BLACK);
-		/* Loop through Heads */
-		/* Render to Head stage */
-		for (uint i = 0; i < self->head_count; i++) {
-			Head *current_head = &self->heads[i];
-			Region region = Head_getRegion(current_head);
-			BeginScissorMode(region.x, region.y, region.width, region.height);
-				rlViewport(region.x, region.y, region.width, region.height);
-				Head_preRender(current_head); /* Skyboxes, perhaps */
-				BeginMode3D(*Head_getCamera(current_head));
-					if (self->scene) Scene_render(self->scene, current_head);
-				EndMode3D();
-				Head_postRender(current_head); /* UI overlays, etc. */
-			EndScissorMode();	
-		}
-		/* End loop through Heads */
-		/* Final stage. If you need to render stuff over the frame, do it here */
-		rlViewport(0,0, GetScreenWidth(), GetScreenHeight());
-		if (vtable && vtable->Render) vtable->Render(self);
-	EndDrawing();
+	ClearBackground(BLACK);
+	/* Loop through Heads */
+	/* Render to Head stage */
+	for (uint i = 0; i < self->head_count; i++) {
+		Head *current_head = &self->heads[i];
+		BeginRenderMode(current_head);
+			Head_preRender(current_head); /* Skyboxes, perhaps */
+			BeginMode3D(*Head_getCamera(current_head));
+				if (self->scene) Scene_render(self->scene, current_head);
+			EndMode3D();
+			Head_postRender(current_head); /* UI overlays, etc. */
+		EndRenderMode();	
+	}
+	/* End loop through Heads */
+	/* Final stage. If you need to render stuff over the frame, do it here */
+	rlViewport(0,0, GetScreenWidth(), GetScreenHeight());
+	if (vtable && vtable->Render) vtable->Render(self);
 }
 
 

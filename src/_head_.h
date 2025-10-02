@@ -17,7 +17,9 @@ Head
     int
         prev_width,
         prev_height;
+#ifdef HEAD_USE_RENDER_TEXTURE
     RenderTexture             viewport;
+#endif /* HEAD_USE_RENDER_TEXTURE */
     Region                    region;
 	RendererSettings          settings;
     Frustum                   frustum;

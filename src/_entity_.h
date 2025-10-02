@@ -7,8 +7,8 @@
 #include "entity.h"
 
 
-#define ENTITY_TO_PRIVATE(e) (((EntityNode*)((char*)(e) - offsetof(EntityNode, base))))
-#define PRIVATE_TO_ENTITY(p) (&((p)->base))
+#define ENTITY_TO_NODE(e) (((EntityNode*)((char*)(e) - offsetof(EntityNode, base))))
+#define NODE_TO_ENTITY(p) (&((p)->base))
 
 
 typedef struct

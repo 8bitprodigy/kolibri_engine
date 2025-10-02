@@ -5,16 +5,26 @@
 #include <raylib.h>
 
 #include "kolibri.h"
+#include "menu.h"
 #include "readarg.h"
 
 
 #ifndef SCREEN_WIDTH
-	#define SCREEN_WIDTH 1920
+	#define SCREEN_WIDTH 854
 #endif
 #ifndef SCREEN_HEIGHT
-	#define SCREEN_HEIGHT 1080
+	#define SCREEN_HEIGHT 480
 #endif
 #define ASPECT_RATIO ((float)SCREEN_WIDTH/(float)SCREEN_HEIGHT)
+#ifndef MENU_WIDTH
+	#define MENU_WIDTH 220
+#endif
+#ifndef MENU_ITEM_HEIGHT
+	#define MENU_ITEM_HEIGHT 30
+#endif
+#ifndef MENU_PADDING
+	#define MENU_PADDING 10
+#endif
 
 
 typedef struct
@@ -23,6 +33,39 @@ TestRenderableData
 	Color color;
 }
 TestRenderableData;
+
+
+/* Player Constants */
+#define GRAVITY             32.0f
+#define MAX_SPEED           20.0f
+
+#define JUMP_HEIGHT          2.5f
+#define JUMP_TIME_TO_PEAK    0.5f
+#define JUMP_TIME_TO_DESCENT 0.4f
+
+#define JUMP_GRAVITY      ((2.0f * JUMP_HEIGHT) / (JUMP_TIME_TO_PEAK    * JUMP_TIME_TO_PEAK))
+#define FALL_GRAVITY      ((2.0f * JUMP_HEIGHT) / (JUMP_TIME_TO_DESCENT * JUMP_TIME_TO_DESCENT))
+#define JUMP_VELOCITY     ( 1.5f * JUMP_HEIGHT) / JUMP_TIME_TO_PEAK
+#define TERMINAL_VELOCITY FALL_GRAVITY * 5
+
+#define MAX_ACCEL 150.0f
+
+#define FRICTION    0.86f
+#define AIR_DRAG    0.98f
+#define CONTROL    15.0f
+#define MAX_SLIDES  3
+
+
+/* Player data */
+typedef struct
+PlayerData
+{
+	Vector3 
+		move_dir,
+		direction;
+	bool    request_jump;
+}
+PlayerData;
 
 
 /* Head Implementation */
@@ -37,18 +80,23 @@ TestHeadData
 	float   eye_height;
 	Vector2 look;
 	Entity *target;
+	void   *target_data;
 }
 TestHeadData;
 
 
-/* Engine Implementation */
+/* 
+	Engine Implementation 
+*/
 extern EngineVTable engine_Callbacks;
 
-void testEngineRun(      Engine *engine);
-void testEngineExit(     Engine *engine);
-void testEngineComposite(Engine *engine);
+void engineRun(      Engine *engine);
+void engineExit(     Engine *engine);
+void engineComposite(Engine *engine);
 
-/* Entity Implementation */
+/* 
+	Entity Implementation 
+*/
 extern TestRenderableData rd_1, rd_2, rd_3;
 extern Renderable         r_1,  r_2,  r_3;
 
@@ -56,14 +104,20 @@ extern Renderable         r_1,  r_2,  r_3;
 extern EntityVTable entity_Callbacks;
 extern Entity       entityTemplate;
 
-/* Head Implementation */
+/* 
+	Head Implementation 
+*/
 extern HeadVTable head_Callbacks;
 
-/* Player Implementation */
+/* 
+	Player Implementation 
+*/
 extern EntityVTable player_Callbacks;
 extern Entity       playerTemplate;
 
-/* Scene Implementation */
+/* 
+	Scene Implementation 
+*/
 extern SceneVTable scene_Callbacks;
 
 EntityList      testSceneRender(   Scene *scene, Head   *head);
