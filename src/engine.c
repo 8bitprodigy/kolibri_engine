@@ -290,6 +290,7 @@ void
 Engine_pause(Engine *self, bool Paused)
 {
 	if (self->paused != Paused) {
+		self->paused = Paused;
 		EngineVTable *vtable = self->vtable;
 		if (Paused) {
 			if (vtable && vtable->Pause) vtable->Pause(self);
@@ -297,7 +298,6 @@ Engine_pause(Engine *self, bool Paused)
 			if (vtable && vtable->Unpause) vtable->Unpause(self);
 		}
 	}
-	self->paused = Paused;
 }
 
 

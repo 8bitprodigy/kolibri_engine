@@ -86,7 +86,7 @@ TestHeadData;
 
 
 /* 
-	Engine Implementation 
+	engine_impl.c
 */
 extern EngineVTable engine_Callbacks;
 
@@ -95,28 +95,27 @@ void engineExit(     Engine *engine);
 void engineComposite(Engine *engine);
 
 /* 
-	Entity Implementation 
+	entity_impl.c
 */
 extern TestRenderableData rd_1, rd_2, rd_3;
 extern Renderable         r_1,  r_2,  r_3;
 
-/* Entity Implementation */
 extern EntityVTable entity_Callbacks;
 extern Entity       entityTemplate;
 
 /* 
-	Head Implementation 
+	head_impl.c
 */
 extern HeadVTable head_Callbacks;
 
 /* 
-	Player Implementation 
+	player.c
 */
 extern EntityVTable player_Callbacks;
 extern Entity       playerTemplate;
 
 /* 
-	Scene Implementation 
+	scene_impl.c
 */
 extern SceneVTable scene_Callbacks;
 

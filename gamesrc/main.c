@@ -48,7 +48,7 @@ main(void)
 {
 	readyToClose = false;
 
-	SetTargetFPS(240);
+	SetTargetFPS(60);
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 	
 	engine = Engine_new(&engine_Callbacks);

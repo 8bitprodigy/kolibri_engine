@@ -154,7 +154,9 @@ PLAYER_INPUT:
 	if (
 		GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_MIDDLE, KEY_ESCAPE)
     )
+    {
 		Engine_pause(engine, true);
+	}
 	
     Vector2 
         mouse_look = GetMouseDelta(),
@@ -214,6 +216,4 @@ PLAYER_INPUT:
 					(Vector3){0.0f, data->eye_height, 0.0f}
 				)
 		);
-
-	DBG_OUT("End of Head Update function.");
 }

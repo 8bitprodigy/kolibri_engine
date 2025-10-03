@@ -86,7 +86,6 @@ playerFree(Entity *self)
 void
 playerUpdate(Entity *self, float delta)
 {
-	DBG_OUT("Start of Player Update function.");
 	PlayerData *data     = self->user_data;
 	Vector3    
 		*position  = &self->position,
@@ -128,5 +127,4 @@ playerUpdate(Entity *self, float delta)
 	
 	Vector3 intended_movement = Vector3Scale(*velocity, delta);
 	Entity_moveAndSlide(self, intended_movement, 3);
-	DBG_OUT("End of Player Update function");
 }
