@@ -117,26 +117,30 @@ testHeadUpdate(Head *head, float delta)
 {
     TestHeadData *data = Head_getUserData(head);
 
+	int 
+		screen_width   = GetScreenWidth(),
+		screen_height  = GetScreenHeight();
+	float aspect_ratio = (float)screen_width / (float)screen_height;
     /* Adjust viewport size */
     if      (IsKeyPressed(KEY_EQUAL)) {
         if (0 < data->viewport_scale) data->viewport_scale--;
         else goto PLAYER_INPUT;
 
         int
-            height = SCREEN_HEIGHT - (48 * data->viewport_scale),
-            width  = height * ASPECT_RATIO;
+            height = screen_width - (48 * data->viewport_scale),
+            width  = height * aspect_ratio;
         
-        Head_setRegion(head, (Region){GetScreenWidth()/2 - width/2 , GetScreenHeight()/2 - height/2 ,width, height});
+        Head_setRegion(head, (Region){screen_width/2 - width/2 , screen_height/2 - height/2 ,width, height});
     }
     else if (IsKeyPressed(KEY_MINUS)) {
         if (data->viewport_scale < 12) data->viewport_scale++;
         else goto PLAYER_INPUT;
 
         int
-            height  = SCREEN_HEIGHT - (48 * data->viewport_scale),
-            width = height * ASPECT_RATIO;
+            height  = screen_height - (48 * data->viewport_scale),
+            width = height * aspect_ratio;
             
-        Head_setRegion(head, (Region){GetScreenWidth()/2 - width/2 , GetScreenHeight()/2 - height/2 ,width, height});
+        Head_setRegion(head, (Region){screen_width/2 - width/2 , screen_height/2 - height/2 ,width, height});
     } /* End adjust viewport size */
 
 PLAYER_INPUT:

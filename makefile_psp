@@ -1,0 +1,77 @@
+PROJECTNAME = kolibritest
+PLATFORM    = psp
+
+SRCDIR     = src
+GAMESRCDIR = gamesrc
+OBJDIR     = obj/$(PLATFORM)
+
+TARGET = $(PROJECTNAME)
+EXTRA_TARGETS = EBOOT.PBP
+PSP_EBOOT_TITLE = Kolibri Engine Test
+
+# Source files
+ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
+GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
+
+ENGINE_OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
+GAME_OBJS   = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
+
+OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
+
+# PSP SDK paths
+PSPSDK = $(shell psp-config --pspsdk-path)
+PSPDIR = $(shell psp-config --psp-prefix)
+
+# Compiler and flags
+INCDIR = include $(PSPDIR)/include
+CFLAGS = -G0 -Wall -O3 -g3 -DSCREEN_HEIGHT=272 -DSCREEN_WIDTH=480
+CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
+ASFLAGS = $(CFLAGS)
+
+# Libraries
+LIBDIR = $(PSPDIR)/lib
+LIBS = -lraylib -lGL -lpspgum -lpspgu -lpspdisplay -lpspge -lpspctrl \
+       -lpspsdk -lpspnet_inet -lpspuser -lpspkernel -lm
+
+# Build system
+BUILD_PRX = 1
+
+.PHONY: all clean prepare
+
+all: prepare $(EXTRA_TARGETS)
+
+clean:
+	rm -rf $(OBJDIR)
+	rm -f $(TARGET).elf $(TARGET).prx EBOOT.PBP PARAM.SFO
+
+clean-all:
+	rm -rf obj
+	rm -f $(TARGET).elf $(TARGET).prx EBOOT.PBP PARAM.SFO
+
+prepare:
+	mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR)/engine
+	mkdir -p $(OBJDIR)/game
+
+$(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
+	psp-gcc $(CFLAGS) $(addprefix -I,$(INCDIR)) -c -o $@ $
+
+$(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c
+	psp-gcc $(CFLAGS) $(addprefix -I,$(INCDIR)) -c -o $@ $
+
+$(TARGET).elf: $(OBJS)
+	psp-gcc $(CFLAGS) $(OBJS) -o $@ $(addprefix -L,$(LIBDIR)) $(LIBS)
+	psp-fixup-imports $@
+
+debug:
+	@echo "PLATFORM:       $(PLATFORM)"
+	@echo "ENGINE_SOURCES: $(ENGINE_SRC)"
+	@echo "GAME_SOURCES:   $(GAME_SRC)"
+	@echo "ENGINE_OBJS:    $(ENGINE_OBJS)"
+	@echo "GAME_OBJS:      $(GAME_OBJS)"
+	@echo "OBJS:           $(OBJS)"
+	@echo "PSPSDK:         $(PSPSDK)"
+	@echo "PSPDIR:         $(PSPDIR)"
+
+# Include PSP build rules (must be at end)
+include $(PSPSDK)/lib/build.mak

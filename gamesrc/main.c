@@ -48,7 +48,8 @@ main(void)
 {
 	readyToClose = false;
 
-	SetTargetFPS(60);
+	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
+	SetTargetFPS(180);
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 	
 	engine = Engine_new(&engine_Callbacks);
@@ -71,7 +72,7 @@ main(void)
 	
 	Entity *ents[21][21][2];
 	int z = 0; 
-/*
+	
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
 //			for (int z = 0; z < 21; z++) {
@@ -86,7 +87,7 @@ main(void)
 //			}
 		}
 	}
-*/
+	
 	player    = Entity_new(&playerTemplate, engine);
 	player->position = (Vector3){2.0f, 0.0f, 2.0f};
 	head_data = (TestHeadData*)Head_getUserData(head);
@@ -129,8 +130,8 @@ main(void)
 			
 			Menu_draw(
 				currentMenu,
-				SCREEN_WIDTH, 
-				SCREEN_HEIGHT,
+				GetScreenWidth(), 
+				GetScreenHeight(),
 				MENU_WIDTH, 
 				MENU_ITEM_HEIGHT,
 				MENU_PADDING,

@@ -186,8 +186,20 @@ Scene_checkContinuous(Scene *self, Entity *entity, Vector3 to)
 bool
 Scene_isEntityOnFloor(Scene *self, Entity  *entity)
 {
-    HANDLE_SCENE_CALLBACK(self, EntityOnFloor, entity);
-    return false;
+    bool scene_on_floor = false;
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->EntityOnFloor) 
+        scene_on_floor = vtable->EntityOnFloor(self, entity);
+
+    CollisionResult collision = {0};
+    collision.hit = false;
+    collision = Scene_checkContinuous(
+            self, 
+            entity, 
+            Vector3Add(entity->position, (Vector3){0.0f, -0.001f, 0.0f})
+        ); 
+        
+    return scene_on_floor || collision.hit;
 }
 
 CollisionResult

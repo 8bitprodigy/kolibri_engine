@@ -39,7 +39,7 @@ TestRenderableData;
 #define GRAVITY             32.0f
 #define MAX_SPEED           20.0f
 
-#define JUMP_HEIGHT          2.5f
+#define JUMP_HEIGHT          3.5f
 #define JUMP_TIME_TO_PEAK    0.5f
 #define JUMP_TIME_TO_DESCENT 0.4f
 

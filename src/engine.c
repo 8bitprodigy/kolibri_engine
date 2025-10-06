@@ -28,6 +28,7 @@ Engine
 	Renderer       *renderer;
 	
 	uint64          frame_num;
+	Vector2i        screen_size;
 	uint       
 		            head_count,
 		            entity_count,
@@ -208,6 +209,20 @@ Engine_run(Engine *self)
 	if (self->head_count) {
 		while(!self->request_exit) {
 			self->request_exit = WindowShouldClose();
+
+			/* Handle screen resolution changes */
+			Vector2i new_screen_size = (Vector2i){
+					GetScreenWidth(), 
+					GetScreenHeight()
+				};
+			if (
+				new_screen_size.w    != self->screen_size.w
+				&& new_screen_size.h != self->screen_size.h
+				&& vtable 
+				&& vtable->Resize
+			)
+				Engine_resize(self, new_screen_size.w, new_screen_size.h);
+			self->screen_size = new_screen_size;
 			
 			Engine_update(self);
 			BeginDrawing();
@@ -282,7 +297,14 @@ Engine_resize(Engine *self, uint width, uint height)
 {
 	const EngineVTable *vtable = self->vtable;
 
-	if(vtable && vtable->Resize) vtable->Resize(self, width, height);
+	if (vtable && vtable->Resize) vtable->Resize(self, width, height);
+
+	Head *head = self->heads;
+	do {
+		HeadVTable *hvtable = head->vtable;
+		if (hvtable && hvtable->Resize) hvtable->Resize(head, width, height);
+		head = head->next;
+	} while(head != self->heads);
 }
 
 
