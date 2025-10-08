@@ -222,12 +222,12 @@ Head_getRegion(Head *Self)
 }
 
 void
-Head_setRegion(Head *Self, Region reg)
+Head_setRegion(Head *Self, Region new_region)
 {
 	Region *region = &Self->region;
-	*region = reg;
+	*region = new_region;
 #ifdef HEAD_USE_RENDER_TEXTURE
-	Self->viewport = LoadRenderTexture(reg.width, reg.height);
+	Self->viewport = LoadRenderTexture(new_region.width, new_region.height);
 #endif /* HEAD_USE_RENDER_TEXTURE */
 }
 

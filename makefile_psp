@@ -13,65 +13,55 @@ PSP_EBOOT_TITLE = Kolibri Engine Test
 ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
 GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
 
-ENGINE_OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
-GAME_OBJS   = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
-
-OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
+# Don't separate engine/game objects - let PSP SDK handle it
+OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o) \
+       $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/%.o)
 
 # PSP SDK paths
 PSPSDK = $(shell psp-config --pspsdk-path)
 PSPDIR = $(shell psp-config --psp-prefix)
 
 # Compiler and flags
-INCDIR = include $(PSPDIR)/include
+INCDIR = include $(PSPDIR)/include/raylib $(PSPDIR)/include/raylib
 CFLAGS = -G0 -Wall -O3 -g3 -DSCREEN_HEIGHT=272 -DSCREEN_WIDTH=480
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
 # Libraries
-LIBDIR = $(PSPDIR)/lib
-LIBS = -lraylib -lGL -lpspgum -lpspgu -lpspdisplay -lpspge -lpspctrl \
-       -lpspsdk -lpspnet_inet -lpspuser -lpspkernel -lm
+LIBS = -lraylib -lpspvfpu -lpspaudio -lm \
+       -lpspgum_vfpu -lpspvram -lpspgu \
+       -lpspdisplay -lpspge -lpspctrl \
+       -lpspnet_inet -lpsppower -lpsputility \
+       -lpspuser -lpspkernel
 
 # Build system
 BUILD_PRX = 1
 
-.PHONY: all clean prepare
+# Include PSP build rules FIRST
+include $(PSPSDK)/lib/build.mak
 
-all: prepare $(EXTRA_TARGETS)
+# Add custom rules for compiling from src/ and gamesrc/
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCDIR:%=-I%) -c $< -o $@
 
-clean:
-	rm -rf $(OBJDIR)
-	rm -f $(TARGET).elf $(TARGET).prx EBOOT.PBP PARAM.SFO
+$(OBJDIR)/%.o: $(GAMESRCDIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCDIR:%=-I%) -c $< -o $@
+
+.PHONY: prepare clean-all debug
+
+prepare:
+	@mkdir -p $(OBJDIR)
 
 clean-all:
 	rm -rf obj
 	rm -f $(TARGET).elf $(TARGET).prx EBOOT.PBP PARAM.SFO
 
-prepare:
-	mkdir -p $(OBJDIR)
-	mkdir -p $(OBJDIR)/engine
-	mkdir -p $(OBJDIR)/game
-
-$(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
-	psp-gcc $(CFLAGS) $(addprefix -I,$(INCDIR)) -c -o $@ $
-
-$(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c
-	psp-gcc $(CFLAGS) $(addprefix -I,$(INCDIR)) -c -o $@ $
-
-$(TARGET).elf: $(OBJS)
-	psp-gcc $(CFLAGS) $(OBJS) -o $@ $(addprefix -L,$(LIBDIR)) $(LIBS)
-	psp-fixup-imports $@
-
 debug:
 	@echo "PLATFORM:       $(PLATFORM)"
 	@echo "ENGINE_SOURCES: $(ENGINE_SRC)"
 	@echo "GAME_SOURCES:   $(GAME_SRC)"
-	@echo "ENGINE_OBJS:    $(ENGINE_OBJS)"
-	@echo "GAME_OBJS:      $(GAME_OBJS)"
 	@echo "OBJS:           $(OBJS)"
 	@echo "PSPSDK:         $(PSPSDK)"
 	@echo "PSPDIR:         $(PSPDIR)"
-
-# Include PSP build rules (must be at end)
-include $(PSPSDK)/lib/build.mak

@@ -8,8 +8,8 @@
 #else /* HEAD_USE_RENDER_TEXTURES */
 	#define BeginRenderMode( head ) do{\
 			Region region = Head_getRegion((head)); \
-					BeginScissorMode(region.x, region.y, region.width, region.height); \
-						rlViewport(region.x, region.y, region.width, region.height); \
+			BeginScissorMode(region.x, region.y, region.width, region.height); \
+				rlViewport(region.x, region.y, region.width, region.height); \
 		}while(0)
 	#define EndRenderMode() EndScissorMode()
 #endif /* HEAD_USE_RENDER_TEXTURES */

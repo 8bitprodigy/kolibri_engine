@@ -1,8 +1,14 @@
+#include <raylib.h>
+
 #include "game.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-#include <raylib.h>
+
+#ifdef __PSP__
+	#include <pspsdk.h>
+	PSP_MODULE_INFO("TEST", 0, 1, 0);
+#endif
 
 
 void switchMenu(void *data);
@@ -13,7 +19,6 @@ Engine       *engine;
 Entity       *player;
 TestHeadData *head_data;
 bool          readyToClose;
-int           selection;
 
 Menu
 	*currentMenu,
@@ -25,7 +30,7 @@ void
 switchMenu(void *data)
 {
 	currentMenu = (Menu*)data;
-	selection   = -1;
+	currentMenu->selection   = -1;
 }
 
 void 
@@ -48,9 +53,12 @@ main(void)
 {
 	readyToClose = false;
 
+
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-	SetTargetFPS(180);
+	//SetTargetFPS(180);
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
+	
+	initMouse();
 	
 	engine = Engine_new(&engine_Callbacks);
 	Head   *head   = Head_new(
@@ -72,7 +80,7 @@ main(void)
 	
 	Entity *ents[21][21][2];
 	int z = 0; 
-	
+/* 
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
 //			for (int z = 0; z < 21; z++) {
@@ -87,7 +95,7 @@ main(void)
 //			}
 		}
 	}
-	
+*/
 	player    = Entity_new(&playerTemplate, engine);
 	player->position = (Vector3){2.0f, 0.0f, 2.0f};
 	head_data = (TestHeadData*)Head_getUserData(head);
@@ -106,27 +114,9 @@ main(void)
 		);
 	currentMenu = &mainMenu;
 	
-	selection = -1;
-	
 	while (!readyToClose) {
 		BeginDrawing();
 			ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
-
-			int axis;
-			if (
-				axis = GET_KEY_OR_BUTTON_AXIS_PRESSED(
-						0, 
-						GAMEPAD_BUTTON_LEFT_FACE_DOWN, 
-						KEY_DOWN, 
-						GAMEPAD_BUTTON_LEFT_FACE_UP, 
-						KEY_UP
-					)
-			)
-			{
-				selection += axis;
-				if (selection    <  0)         selection = currentMenu->size - 1;
-				if (currentMenu->size <= selection) selection = 0;
-			}
 			
 			Menu_draw(
 				currentMenu,
@@ -135,7 +125,13 @@ main(void)
 				MENU_WIDTH, 
 				MENU_ITEM_HEIGHT,
 				MENU_PADDING,
-				selection,
+				GET_KEY_OR_BUTTON_AXIS_PRESSED(
+						0, 
+						GAMEPAD_BUTTON_LEFT_FACE_DOWN, 
+						KEY_DOWN, 
+						GAMEPAD_BUTTON_LEFT_FACE_UP, 
+						KEY_UP
+					),
 				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
 			);
 		EndDrawing();

@@ -53,6 +53,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
 #include "raygui.h"
+#include <raylib.h>
 
 
 #ifndef MENU_LABEL_FONT_SIZE
@@ -61,9 +62,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #define Menu( label_str, ... ) \
 	(Menu){ \
-		.label = (label_str), \
-		.size  = sizeof((MenuItem[]){__VA_ARGS__}) / sizeof(MenuItem), \
-		.items = (MenuItem[]){__VA_ARGS__} \
+		(label_str), \
+		sizeof((MenuItem[]){__VA_ARGS__}) / sizeof(MenuItem), \
+		-1, \
+		(MenuItem[]){__VA_ARGS__} \
 	}
 
 
@@ -83,6 +85,7 @@ Menu
 {
 	char     *label;
 	size_t    size;
+	int       selection;
 	MenuItem *items;
 }
 Menu;
@@ -115,25 +118,32 @@ Menu_draw(
 			MENU_LABEL_FONT_SIZE, 
 			BLACK
 		);
+
+	if (selection != 0)
+	{
+		menu->selection += selection;
+		if (menu->selection <  0)               menu->selection = menu->size - 1;
+		if (menu->size      <= menu->selection) menu->selection = 0;
+	}
 	
 	for (i = 0; i < menu->size; i++) {
-		if (i == selection) {
+		Rectangle rectangle = (Rectangle){
+				pos_x,
+				pos_y + (i * (item_height + padding)), 
+				item_width, 
+				item_height
+			};
+		
+		if (CheckCollisionPointRec(GetMousePosition(), rectangle))
+			menu->selection = i;
+		
+		if (i == menu->selection) {
 			GuiSetState(STATE_FOCUSED);
 			if (selected && items[i].action) items[i].action(items[i].data);
 		}
 		else GuiSetState(STATE_NORMAL);
-		
-		if (
-			GuiButton(
-					(Rectangle){
-						pos_x,
-						pos_y + (i * (item_height + padding)), 
-						item_width, 
-						item_height
-					}, 
-					items[i].label
-				)
-		) 
+
+		if (GuiButton(rectangle, items[i].label)) 
 			if (items[i].action) items[i].action(items[i].data);
 	}
 }

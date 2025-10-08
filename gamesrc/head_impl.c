@@ -3,8 +3,13 @@
 #include <raymath.h>
 
 
-#define MOUSE_SENSITIVITY 0.05f
-#define MOVE_SPEED        5.0f
+#define MOUSE_SENSITIVITY   0.05f
+#define MOVE_SPEED          5.0f
+#define VIEWPORT_INCREMENT 48
+
+#ifndef SKY_PATH
+	#define SKY_PATH "resources/sky/SBS_sky_panorama_full.png"
+#endif
 
 
 /*
@@ -14,6 +19,7 @@ void testHeadSetup(     Head *head);
 void testHeadPreRender( Head *head);
 void testHeadPostRender(Head *head);
 void testHeadUpdate(    Head *head, float delta);
+void testHeadResize(    Head *head, uint   width, uint height);
 
 
 /*
@@ -24,11 +30,62 @@ HeadVTable head_Callbacks = {
 	testHeadUpdate, 
 	testHeadPreRender, 
 	testHeadPostRender,
-	NULL, 
+	testHeadResize, 
 	NULL, 
 	NULL
 };
 
+/*
+	Misc functions
+*/
+void
+drawCrosshairs(
+	int   center_x, 
+	int   center_y, 
+	int   hair_thickness,
+	int   outline_thickness, 
+	int   length, 
+	int   spread,
+	bool  center_dot, 
+	Color outline, 
+	Color hair
+)
+{
+	if (hair_thickness    < 0) hair_thickness    = 0;
+	if (outline_thickness < 0) outline_thickness = 0;
+	int
+		h_hair_y   = center_y - (hair_thickness/2),
+		h_hair_l_x = center_x - length - spread,
+		h_hair_r_x = center_x + spread,
+		v_hair_x   = center_x - (hair_thickness/2),
+		v_hair_u_y = center_y - length - spread,
+		v_hair_d_y = center_y + spread,
+
+		h_outline_y   = h_hair_y   - (outline_thickness/2) - 1,
+		h_outline_l_x = h_hair_l_x - outline_thickness,
+		h_outline_r_x = h_hair_r_x - outline_thickness,
+		v_outline_x   = v_hair_x   - (outline_thickness/2) - 1,
+		v_outline_u_y = v_hair_u_y - outline_thickness,
+		v_outline_d_y = v_hair_d_y - outline_thickness,
+		
+		outline_width  = hair_thickness + (2 * outline_thickness),
+		outline_height = length         + (2 * outline_thickness);
+
+	DrawRectangle(h_outline_l_x,     h_outline_y,       outline_height, outline_width,  outline);
+	DrawRectangle(h_outline_r_x + 1, h_outline_y,       outline_height, outline_width,  outline);
+	DrawRectangle(v_outline_x,       v_outline_u_y,     outline_width,  outline_height, outline);
+	DrawRectangle(v_outline_x,       v_outline_d_y + 1, outline_width,  outline_height, outline);
+	if (center_dot)
+		DrawRectangle(v_outline_x,     h_outline_y,       outline_width,  outline_width,  outline);
+
+	DrawRectangle(h_hair_l_x,     h_hair_y,       length,         hair_thickness, hair);
+	DrawRectangle(h_hair_r_x + 1, h_hair_y,       length,         hair_thickness, hair);
+	DrawRectangle(v_hair_x,       v_hair_u_y,     hair_thickness, length,         hair);
+	DrawRectangle(v_hair_x,       v_hair_d_y + 1, hair_thickness, length,         hair);
+	if (center_dot)
+		DrawRectangle(v_hair_x,     h_hair_y,       hair_thickness, hair_thickness, hair);
+		
+}
 
 /*
 	Callback Definitions
@@ -79,7 +136,7 @@ testHeadSetup(Head *head)
 	UpdateMeshBuffer(*skyMesh, 0, skyMesh->vertices, skyMesh->vertexCount*3*sizeof(float), 0);
 	UpdateMeshBuffer(*skyMesh, 1, skyMesh->texcoords, skyMesh->vertexCount*2*sizeof(float), 0);
 
-	Texture2D skyTexture = LoadTexture("resources/sky/SBS_sky_panorama_full.png");
+	Texture2D skyTexture = LoadTexture(SKY_PATH);
 	if (skyTexture.id == 0) {
 		ERR_OUT("Failed to load sky texture!");
 		skyTexture = LoadTexture("");
@@ -109,7 +166,45 @@ testHeadPreRender(Head *head)
 void
 testHeadPostRender(Head *head)
 {
+	TestHeadData *data = Head_getUserData(head);
+	Region      region = Head_getRegion(head);
 	DrawFPS(10, 10);
+
+	int
+		screen_width  = region.width,
+		screen_height = region.height,
+		half_width    = screen_width/2,
+		half_height   = screen_height/2;
+
+	drawCrosshairs(
+			region.x + half_width,
+			region.y + half_height,
+			1,
+			1,
+			10,
+			5+(int)Vector3Length(data->target->velocity),
+			true,
+			BLACK,
+			WHITE
+		);
+}
+
+void
+testHeadResize(Head *head, uint width, uint height)
+{
+	TestHeadData *data = Head_getUserData(head);
+	float aspect_ratio = (float)width/(float)height;
+
+	int
+		region_height = height - (VIEWPORT_INCREMENT * data->viewport_scale),
+		region_width  = width  - (VIEWPORT_INCREMENT * data->viewport_scale);
+
+		Head_setRegion(head, (Region){
+				width/2 - region_width/2, 
+				height/2 - region_height/2, 
+				region_width, 
+				region_height
+			});
 }
 
 void
@@ -125,23 +220,27 @@ testHeadUpdate(Head *head, float delta)
     if      (IsKeyPressed(KEY_EQUAL)) {
         if (0 < data->viewport_scale) data->viewport_scale--;
         else goto PLAYER_INPUT;
-
-        int
-            height = screen_width - (48 * data->viewport_scale),
-            width  = height * aspect_ratio;
-        
-        Head_setRegion(head, (Region){screen_width/2 - width/2 , screen_height/2 - height/2 ,width, height});
     }
     else if (IsKeyPressed(KEY_MINUS)) {
         if (data->viewport_scale < 12) data->viewport_scale++;
         else goto PLAYER_INPUT;
+    }
+    else {
+			goto PLAYER_INPUT;
+    } 
 
-        int
-            height  = screen_height - (48 * data->viewport_scale),
-            width = height * aspect_ratio;
-            
-        Head_setRegion(head, (Region){screen_width/2 - width/2 , screen_height/2 - height/2 ,width, height});
-    } /* End adjust viewport size */
+		int 
+			height = screen_height - (VIEWPORT_INCREMENT * data->viewport_scale),
+			width  = height * aspect_ratio;
+
+		Head_setRegion(head, (Region){
+				screen_width/2  - width/2,
+				screen_height/2 - height/2,
+				width,
+				height
+			});
+    
+    /* End adjust viewport size */
 
 PLAYER_INPUT:
     Camera *camera  = Head_getCamera(head);

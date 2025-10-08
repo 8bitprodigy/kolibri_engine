@@ -25,6 +25,11 @@
 #ifndef MENU_PADDING
 	#define MENU_PADDING 10
 #endif
+#ifndef NO_MOUSE
+	#define initMouse()
+#else
+	#define initMouse() SetMousePosition(0, 0)
+#endif
 
 
 typedef struct

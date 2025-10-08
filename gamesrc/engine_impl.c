@@ -55,7 +55,6 @@ enginePause(Engine *engine)
 {
 	bool first_loop  = true;
 	paused           = true;
-	pauseSelection   = -1;
 	currentPauseMenu = &pauseMenu;
 
 	pauseMenu = Menu( "Paused",
@@ -64,6 +63,7 @@ enginePause(Engine *engine)
 		);
 	
 	EnableCursor();
+	initMouse();
 	
 	while(paused) {
 		BeginDrawing();
@@ -84,7 +84,13 @@ enginePause(Engine *engine)
 				MENU_WIDTH,
 				MENU_ITEM_HEIGHT,
 				MENU_PADDING,
-				pauseSelection,
+				GET_KEY_OR_BUTTON_AXIS_PRESSED(
+						0, 
+						GAMEPAD_BUTTON_LEFT_FACE_DOWN, 
+						KEY_DOWN, 
+						GAMEPAD_BUTTON_LEFT_FACE_UP, 
+						KEY_UP
+					),
 				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
 			);
 		EndDrawing();
