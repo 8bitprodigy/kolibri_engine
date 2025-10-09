@@ -34,7 +34,11 @@ Engine
 		            entity_count,
 		            target_fps;
 	
-	float           delta;
+	float           
+					delta, 
+					accumulator,
+					tick_length,
+					tick_time;
 
 	EntityList      entity_list;
 	
@@ -61,7 +65,7 @@ Engine;
 	CONSTRUCTOR
 ******************/
 Engine *
-Engine_new(EngineVTable *vtable)
+Engine_new(EngineVTable *vtable, int tick_rate)
 {
 	Engine *engine = malloc(sizeof(Engine));
 
@@ -80,6 +84,9 @@ Engine_new(EngineVTable *vtable)
 	engine->head_count       = 0;
 	engine->entity_count     = 0;
 	engine->delta            = 0.0f;
+	engine->accumulator      = 0.0f;
+	engine->tick_length      = 1.0f / tick_rate;
+	engine->tick_time        = 0.0f;
 
 	engine->paused           = false;
 	engine->request_exit     = false;
@@ -122,6 +129,12 @@ uint64
 Engine_getFrameNumber(Engine *self)
 {
 	return self->frame_num;
+}
+
+float
+Engine_getTickTime(Engine *self)
+{
+	return self->tick_time;
 }
 
 
@@ -250,21 +263,29 @@ Engine_update(Engine *self)
 {
 	const EngineVTable *vtable = self->vtable;
 	
-	float delta = GetFrameTime();
-	self->delta = delta;
+	float delta        = GetFrameTime();
+	self->delta        = delta;
+	self->accumulator += delta;
+	self->tick_time    = self->accumulator / self->tick_length;
 
 	Head__updateAll(self->heads, delta);
+	
+	if (
+		self->paused 
+		|| self->request_exit
+		|| self->accumulator < self->tick_length
+	) return;
 
-	if (self->paused || self->request_exit) return;
-
-	EntityNode__updateAll(self->entities, delta);
+	EntityNode__updateAll(self->entities, self->accumulator);
 
 	CollisionScene__markRebuild(self->collision_scene);
 	CollisionScene__update(     self->collision_scene);
 
-	Scene_update(self->scene, delta);
+	Scene_update(self->scene, self->accumulator);
 	
-	if (vtable && vtable->Update) vtable->Update(self, delta);
+	if (vtable && vtable->Update) vtable->Update(self, self->accumulator);
+
+	self->accumulator = 0.0f;
 }
 
 

@@ -109,6 +109,7 @@ playerUpdate(Entity *self, float delta)
 	float   
 		friction_per_second = (is_on_floor ? FRICTION : AIR_DRAG),
 		decel               = powf(friction_per_second, delta * 60.0f);
+	//DBG_OUT("delta=%f decel=%f", delta, decel);
 	Vector3 horiz_vel = (Vector3){vel.x * decel, 0.0f, vel.z * decel};
 	float   hvel_len  = Vector3Length(horiz_vel);
 	
@@ -126,5 +127,6 @@ playerUpdate(Entity *self, float delta)
 	velocity->z = horiz_vel.z;
 	
 	Vector3 intended_movement = Vector3Scale(*velocity, delta);
+	data->prev_position       = self->position;
 	Entity_moveAndSlide(self, intended_movement, 3);
 }

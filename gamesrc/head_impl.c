@@ -311,12 +311,20 @@ PLAYER_INPUT:
 		player_data->request_jump = true;
 	}
 	/* End calculate player inputs */
+	Vector3
+		old_camera_pos = player_data->prev_position,
+		new_camera_pos = player->position,
+		current_camera_pos = Vector3Add(
+				Vector3Lerp(
+					old_camera_pos,
+					new_camera_pos,
+					Engine_getTickTime(engine)
+				),
+				(Vector3){0.0f, data->eye_height, 0.0f}
+			);
 	
-    moveCamera(
-			camera, 
-			Vector3Add(
-					player->position, 
-					(Vector3){0.0f, data->eye_height, 0.0f}
-				)
-		);
+	moveCamera(
+		camera, 
+		current_camera_pos
+	);
 }

@@ -1,9 +1,11 @@
-#include "game.h"
 #include <raylib.h>
-//#include "menu.h"
 
-void unPause(   void *data);
-void exitToMain(void *data);
+#include "game.h"
+#include "menu.h"
+
+
+void unPause(   void *data, void *value);
+void exitToMain(void *data, void *value);
 
 void engineRun(    Engine *engine);
 void enginePause(  Engine *engine);
@@ -31,14 +33,14 @@ Menu
 
 
 void
-unPause(void *data)
+unPause(void *data, void *value)
 {
 	paused = false;
 	Engine_pause((Engine*)data, false);
 }
 
 void
-exitToMain(void *data)
+exitToMain(void *data, void *value)
 {
 	paused = false;
 	Engine_requestExit((Engine*)data);
@@ -58,8 +60,11 @@ enginePause(Engine *engine)
 	currentPauseMenu = &pauseMenu;
 
 	pauseMenu = Menu( "Paused",
-			(MenuItem){ "Return To Game", unPause,    engine},
-			(MenuItem){ "Exit Game",      exitToMain, engine}
+			MENU_WIDTH,
+			MENU_ITEM_HEIGHT,
+			MENU_PADDING,
+			MenuButton( "Return To Game", unPause,    engine),
+			MenuButton( "Exit Game",      exitToMain, engine)
 		);
 	
 	EnableCursor();
@@ -81,9 +86,6 @@ enginePause(Engine *engine)
 				currentPauseMenu,
 				GetScreenWidth(),
 				GetScreenHeight(),
-				MENU_WIDTH,
-				MENU_ITEM_HEIGHT,
-				MENU_PADDING,
 				GET_KEY_OR_BUTTON_AXIS_PRESSED(
 						0, 
 						GAMEPAD_BUTTON_LEFT_FACE_DOWN, 
@@ -91,6 +93,7 @@ enginePause(Engine *engine)
 						GAMEPAD_BUTTON_LEFT_FACE_UP, 
 						KEY_UP
 					),
+				0,0,
 				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
 			);
 		EndDrawing();

@@ -5,7 +5,6 @@
 #include <raylib.h>
 
 #include "kolibri.h"
-#include "menu.h"
 #include "readarg.h"
 
 
@@ -57,7 +56,7 @@ TestRenderableData;
 
 #define FRICTION    0.86f
 #define AIR_DRAG    0.98f
-#define CONTROL    15.0f
+#define CONTROL    20.0f
 #define MAX_SLIDES  3
 
 
@@ -65,7 +64,8 @@ TestRenderableData;
 typedef struct
 PlayerData
 {
-	Vector3 
+	Vector3
+		prev_position,
 		move_dir,
 		direction;
 	bool    request_jump;
@@ -127,6 +127,9 @@ extern SceneVTable scene_Callbacks;
 EntityList      testSceneRender(   Scene *scene, Head   *head);
 CollisionResult testSceneCollision(Scene *scene, Entity *entity, Vector3 to);
 
+/*
+	options.c
+*/
 
 /* Renderable Callback */
 static void

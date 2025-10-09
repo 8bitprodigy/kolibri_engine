@@ -2,7 +2,8 @@
 
 #include "game.h"
 #define RAYGUI_IMPLEMENTATION
-#include "raygui.h"
+#define MENU_IMPLEMENTATION
+#include "menu.h"
 
 
 #ifdef __PSP__
@@ -11,9 +12,9 @@
 #endif
 
 
-void switchMenu(void *data);
-void runEngine( void *data);
-void closeAll  (void *data);
+void switchMenu(void *data, void *value);
+void runEngine( void *data, void *value);
+void closeAll  (void *data, void *value);
 
 Engine       *engine;
 Entity       *player;
@@ -27,20 +28,20 @@ Menu
 
 
 void
-switchMenu(void *data)
+switchMenu(void *data, void *value)
 {
 	currentMenu = (Menu*)data;
 	currentMenu->selection   = -1;
 }
 
 void 
-runEngine(void *data)
+runEngine(void *data, void *value)
 {
 	Engine_run((Engine*)data);
 }
 
 void 
-closeAll(void *data)
+closeAll(void *data, void *value)
 {
 	Engine_requestExit((Engine*)data);
 	readyToClose = true;
@@ -55,12 +56,12 @@ main(void)
 
 
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-	//SetTargetFPS(180);
+	SetTargetFPS(180);
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 	
 	initMouse();
 	
-	engine = Engine_new(&engine_Callbacks);
+	engine = Engine_new(&engine_Callbacks, 15);
 	Head   *head   = Head_new(
 			0, 
 			(Region){0,0,SCREEN_WIDTH, SCREEN_HEIGHT}, 
@@ -105,16 +106,25 @@ main(void)
 	head_data->eye_height  = 1.75f;
 
 	mainMenu = Menu( "Main Menu",
-			(MenuItem){ "Run",     runEngine,  engine},
-			(MenuItem){ "Options...", switchMenu, &optionsMenu},
-			(MenuItem){ "Exit",    closeAll,   engine}
+			MENU_WIDTH,
+			MENU_ITEM_HEIGHT,
+			MENU_PADDING,
+			MenuButton( "Run",        runEngine,  engine),
+			MenuButton( "Options...", switchMenu, &optionsMenu),
+			MenuButton( "Exit",       closeAll,   engine)
 		),
 	optionsMenu = Menu( "Options",
-			{ "Back...", switchMenu, &mainMenu }
+			MENU_WIDTH,
+			MENU_ITEM_HEIGHT,
+			MENU_PADDING,
+			MenuButton( "Back...", switchMenu, &mainMenu ),
+			MenuLabel(  "This is a label." ),
+			MenuButton( "Back...", switchMenu, &mainMenu )
 		);
 	currentMenu = &mainMenu;
 	
 	while (!readyToClose) {
+		readyToClose = WindowShouldClose();
 		BeginDrawing();
 			ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
 			
@@ -122,9 +132,6 @@ main(void)
 				currentMenu,
 				GetScreenWidth(), 
 				GetScreenHeight(),
-				MENU_WIDTH, 
-				MENU_ITEM_HEIGHT,
-				MENU_PADDING,
 				GET_KEY_OR_BUTTON_AXIS_PRESSED(
 						0, 
 						GAMEPAD_BUTTON_LEFT_FACE_DOWN, 
@@ -132,6 +139,7 @@ main(void)
 						GAMEPAD_BUTTON_LEFT_FACE_UP, 
 						KEY_UP
 					),
+				0, 0,
 				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
 			);
 		EndDrawing();

@@ -38,12 +38,18 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 		```c
 			Menu_draw(
 				currentMenu,
-				SCREEN_WIDTH, 
-				SCREEN_HEIGHT,
-				220, 
-				30,
-				10,
-				&selection,
+				GetScreenWidth(),
+				GetScreenHeight(),
+				MENU_WIDTH,
+				MENU_ITEM_HEIGHT,
+				MENU_PADDING,
+				GET_KEY_OR_BUTTON_AXIS_PRESSED(
+						0, 
+						GAMEPAD_BUTTON_LEFT_FACE_DOWN, 
+						KEY_DOWN, 
+						GAMEPAD_BUTTON_LEFT_FACE_UP, 
+						KEY_UP
+					),
 				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
 			);
 		```
@@ -60,23 +66,217 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 	#define MENU_LABEL_FONT_SIZE 10
 #endif
 
-#define Menu( label_str, ... ) \
+
+#define MANAGE_INPUT( item_prefix, value ) \
+	if (i == menu->selection) { \
+		GuiSetState(STATE_FOCUSED); \
+		if (selected && items[i].(item_prefix).action) items[i].(item_prefix).action(items[i].(item_prefix).data, (value)); \
+	} \
+	else GuiSetState(STATE_NORMAL);
+
+
+#define Menu( label_str, item_width, item_height, padding, ... ) \
 	(Menu){ \
 		(label_str), \
-		sizeof((MenuItem[]){__VA_ARGS__}) / sizeof(MenuItem), \
+		(item_width), \
+		(item_height), \
+		(padding), \
 		-1, \
+		sizeof((MenuItem[]){__VA_ARGS__}) / sizeof(MenuItem), \
 		(MenuItem[]){__VA_ARGS__} \
 	}
 
+#define MenuLabel( label_str ) \
+	{ MENU_LABEL, {(label_str)} }
 
-typedef void (*MenuAction)(void *data);
+#define MenuButton( label_str, action, data ) \
+	{ \
+		MENU_BUTTON, \
+		{ \
+			(label_str), \
+			(action), \
+			(data) \
+		} \
+	}
+
+#define MenuCheckBox( label_str, checked, action, data) \
+	{ \
+		MENU_CHECKBOX, \
+		{ \
+			(label_str), \
+			(action), \
+			(data), \
+			(checked) \
+		} \
+	}
+
+#define MenuComboBox( entries, value, action, data ) \
+	{ \
+		MENU_COMBO, \
+		{ \
+			(entries),\
+			(value), \
+			(action), \
+			(data) \
+		} \
+	}
+
+#define MenuDropDown( entries, value, action, data) \
+	{ \
+		MENU_DROPDOWN, \
+		{ \
+			(entries), \
+			(value), \
+			false, \
+			(action), \
+			(data) \
+		} \
+	}
+	
+#define MenuSlider( label, value, min_val, max_val, action, data) \
+	{ \
+		MENU_SLIDER, \
+		{ \
+			(label_left), \
+			(value), \
+			(min_val), \
+			(max_val), \
+			(action), \
+			(data) \
+		} \
+	}
+	
+#define MenuSliderBar( label, value, min_val, max_val, action, data) \
+	{ \
+		MENU_SLIDERBAR, \
+		{ \
+			(label_left), \
+			(value), \
+			(min_val), \
+			(max_val), \
+			(action), \
+			(data) \
+		} \
+	}
+
+#define MenuTextBox( char_array, action, data) \
+	{ \
+		MENU_TEXTBOX, \
+		{ \
+			(char_array), \
+			false, \
+			(action), \
+			(data) \
+		} \
+	}
+
+
+typedef void (*MenuAction)(void *data, void *value);
+
+
+typedef enum
+{
+	MENU_LABEL,
+	MENU_BUTTON,
+	MENU_CHECKBOX,
+	MENU_COMBO,
+	MENU_DROPDOWN,
+	MENU_SLIDER,
+	MENU_SLIDERBAR,
+	MENU_TEXTBOX,
+}
+MenuItems;
+
 
 typedef struct
-MenuItem
+{
+	char *label;
+}
+MenuLabel;
+
+typedef struct
 {
 	char       *label;
 	MenuAction  action;
 	void       *data;
+}
+MenuButton;
+
+typedef struct
+{
+	char       *label;
+	bool        value;
+	MenuAction  action;
+	void       *data;
+}
+MenuCheckBox;
+
+typedef struct
+{
+	char       *label;
+	int         value;
+	MenuAction  action;
+	void       *data;
+}
+MenuComboBox;
+
+typedef struct
+{
+	char       *label;
+	int         value;
+	bool        edit_mode;
+	MenuAction  action;
+	void       *data;
+}
+MenuDropdownBox;
+
+typedef struct
+{
+	char       *label;
+	int       
+				value,
+				min,
+				max;
+	MenuAction  action;
+	void       *data;
+}
+MenuSlider;
+
+typedef struct
+{
+	char       *label;
+	float       
+				value,
+				min,
+				max;
+	MenuAction  action;
+	void       *data;
+}
+MenuSliderBar;
+
+typedef struct
+{
+	char       *text;
+	bool        edit_mode;
+	MenuAction  action;
+	void       *data;
+}
+MenuTextBox;
+
+
+typedef struct
+{
+	MenuItems type;
+	union {
+		MenuButton      btn;
+		MenuLabel       lbl;
+		MenuCheckBox    chk;
+		MenuComboBox    cbo;
+		MenuDropdownBox ddb;
+		MenuSlider      sld;
+		MenuSliderBar   sdb;
+		MenuTextBox     txb;
+	};
 }
 MenuItem;
 
@@ -84,46 +284,89 @@ typedef struct
 Menu
 {
 	char     *label;
+	int       
+			item_width,
+			item_height,
+			padding, 
+			selection;
 	size_t    size;
-	int       selection;
 	MenuItem *items;
 }
 Menu;
 
-
-static inline void
+void 
 Menu_draw(
 	Menu     *menu, 
 	int       screen_width, 
 	int       screen_height,
-	int       item_width,
-	int       item_height, 
-	int       padding,
 	int       selection,
-	int       selected
+	int       dial_pressed,
+	int       dial_down,
+	bool      selected
+);
+
+
+#endif /* MENU_H */
+#ifdef MENU_IMPLEMENTATION
+	
+int
+countEntries(char *entries)
+{
+	int 
+		i      = 0,
+		result = 0;
+	
+	while(entries[i]) {
+		if (entries[i] == ';') result++;
+	}
+	return result;
+}
+
+void
+Menu_draw(
+	Menu     *menu, 
+	int       screen_width, 
+	int       screen_height,
+	int       selection,
+	int       dial_pressed,
+	int       dial_down,
+	bool      selected
 )
 {
 	MenuItem *items = menu->items;
 	int 
 		i,
-		dim_w = item_width,
-		dim_h = (item_height + padding) * menu->size - padding,
-		pos_x = (screen_width / 2) - (dim_w / 2),
-		pos_y = (screen_height / 2) - (dim_h / 2);
+		item_width  = menu->item_width,
+		item_height = menu->item_height,
+		padding     = menu->padding,
+		dim_w       = item_width,
+		dim_h       = (item_height + padding) * menu->size - padding,
+		pos_x       = (screen_width / 2) - (dim_w / 2),
+		pos_y       = (screen_height / 2) - (dim_h / 2);
 
-	DrawText(
-			menu->label, 
-			pos_x, 
-			pos_y - MENU_LABEL_FONT_SIZE - padding, 
-			MENU_LABEL_FONT_SIZE, 
-			BLACK
+	GuiGroupBox(
+			(Rectangle){
+				pos_x - padding, 
+				pos_y - padding, 
+				item_width + (2 * padding),
+				dim_h + (2 * padding)
+			},
+			menu->label
 		);
 
-	if (selection != 0)
-	{
+	if (selection != 0) {
 		menu->selection += selection;
 		if (menu->selection <  0)               menu->selection = menu->size - 1;
 		if (menu->size      <= menu->selection) menu->selection = 0;
+		/* Skip labels - find next button */
+		int direction = (selection > 0) - (selection < 0);  // Branchless sign
+		int attempts = 0;
+		while (items[menu->selection].type == MENU_LABEL && attempts < menu->size) {
+			menu->selection += direction;
+			if (menu->selection <  0)               menu->selection = menu->size - 1;
+			if (menu->size      <= menu->selection) menu->selection = 0;
+			attempts++;
+		}
 	}
 	
 	for (i = 0; i < menu->size; i++) {
@@ -133,21 +376,83 @@ Menu_draw(
 				item_width, 
 				item_height
 			};
+
+		MenuItems item_type = items[i].type;
 		
-		if (CheckCollisionPointRec(GetMousePosition(), rectangle))
+		if (
+			CheckCollisionPointRec(GetMousePosition(), rectangle) 
+			&& item_type != MENU_LABEL
+		)
 			menu->selection = i;
 		
-		if (i == menu->selection) {
-			GuiSetState(STATE_FOCUSED);
-			if (selected && items[i].action) items[i].action(items[i].data);
-		}
-		else GuiSetState(STATE_NORMAL);
 
-		if (GuiButton(rectangle, items[i].label)) 
-			if (items[i].action) items[i].action(items[i].data);
+
+		switch(item_type)  {
+		case MENU_LABEL:
+			GuiSetState(STATE_NORMAL);
+			GuiLabel(rectangle, items[i].lbl.label);
+			break;
+		case MENU_BUTTON:
+			if (i == menu->selection) { 
+				GuiSetState(STATE_FOCUSED); 
+				if (selected && items[i].btn.action) items[i].btn.action(items[i].btn.data, NULL); 
+			} 
+			else GuiSetState(STATE_NORMAL);
+			
+			if (GuiButton(rectangle, items[i].btn.label)) 
+				if (items[i].btn.action) items[i].btn.action(items[i].btn.data, NULL);
+			break;
+		case MENU_CHECKBOX:
+			if (i == menu->selection) { 
+				GuiSetState(STATE_FOCUSED); 
+				if (selected && items[i].chk.action) {
+					items[i].chk.value = !items[i].chk.value;
+					items[i].chk.action(items[i].chk.data, &items[i].chk.value); 
+				}
+			}
+			else GuiSetState(STATE_NORMAL);
+
+			if (GuiCheckBox(rectangle, items[i].chk.label, &items[i].chk.value)) {
+				items[i].chk.value = !items[i].chk.value;
+				items[i].chk.action(items[i].chk.data, &items[i].chk.value); 
+			}
+			break;
+		case MENU_COMBO:
+			if (i == menu->selection) { 
+				GuiSetState(STATE_FOCUSED); 
+				if (selected && items[i].cbo.action) {
+					int entries = countEntries(items[i].cbo.label);
+					items[i].cbo.value++;
+					if (entries < items[i].cbo.value) items[i].cbo.value = 0;
+					items[i].cbo.action(items[i].cbo.data, &items[i].cbo.value);
+				}
+			}
+			else GuiSetState(STATE_NORMAL);
+
+			if (GuiComboBox(rectangle, items[i].cbo.label, &items[i].cbo.value)) {
+				items[i].cbo.action(items[i].cbo.data, &items[i].cbo.value);
+			}
+			break;
+		case MENU_DROPDOWN:
+			
+			if (i == menu->selection) { 
+				GuiSetState(STATE_FOCUSED); 
+				if (selected && items[i].ddb.action) {
+					items[i].ddb.edit_mode = !items[i].ddb.edit_mode;
+				}
+			}
+			else GuiSetState(STATE_NORMAL);
+
+			if (GuiDropdownBox(rectangle, items[i].ddb.label, &items[i].ddb.value, items[i].ddb.edit_mode)) {
+				items[i].ddb.edit_mode = !items[i].ddb.edit_mode;
+				items[i].ddb.action(items[i].ddb.data, &items[i].ddb.value);
+			}
+			break;
+		case MENU_SLIDER:
+		case MENU_SLIDERBAR:
+		case MENU_TEXTBOX:
+		}
 	}
 }
 
-
-
-#endif /* MENU_H */
+#endif /* MENU_IMPLEMENTATION */
