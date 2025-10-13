@@ -7,7 +7,6 @@
 #include <raymath.h>
 
 #include "kolibri.h"
-#include "../readarg.h"
 
 
 #ifndef SCREEN_WIDTH
@@ -26,10 +25,16 @@
 #ifndef MENU_PADDING
 	#define MENU_PADDING 10
 #endif
-#ifndef NO_MOUSE
-	#define initMouse()
-#else
+#ifdef NO_MOUSE
 	#define initMouse() SetMousePosition(0, 0)
+#else
+	#define initMouse()
+#endif
+#ifndef DEFAULT_TICK_RATE
+	#define DEFAULT_TICK_RATE 60
+#endif
+#ifndef DEFAULT_FRAME_RATE
+	#define DEFAULT_FRAME_RATE 180
 #endif
 
 

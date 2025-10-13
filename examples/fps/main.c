@@ -1,4 +1,5 @@
 #include <raylib.h>
+#include <stdlib.h>
 
 #include "game.h"
 #define RAYGUI_IMPLEMENTATION
@@ -9,13 +10,6 @@
 #ifdef __PSP__
 	#include <pspsdk.h>
 	PSP_MODULE_INFO("TEST", 0, 1, 0);
-#endif
-
-#ifndef TICK_RATE
-	#define TICK_RATE 60
-#endif
-#ifndef FRAME_RATE
-	#define FRAME_RATE 180
 #endif
 
 
@@ -32,6 +26,12 @@ Menu
 	*currentMenu,
 	 mainMenu,
 	 optionsMenu;
+
+int
+	tick_rate,
+	frame_rate,
+	screen_width,
+	screen_height;
 
 
 void
@@ -54,22 +54,55 @@ closeAll(void *data, void *value)
 	readyToClose = true;
 }
 
+void
+handleArgs(int argc, char **argv)
+{
+	for (int i = 1; i < argc; i++) {
+		char *c = &argv[i][2];
+		if (argv[i][0] == '-') {
+			switch (argv[i][1]) {
+			case 't':
+				tick_rate = atoi(c);
+				break;
+			case 'f':
+				frame_rate = atoi(c);
+				break;
+			case 'w':
+				screen_width = atoi(c);
+				break;
+			case 'h':
+				screen_height = atoi(c);
+				break;
+			default:
+				printf("Malformed argument %c\n", argv[i][1]);
+			}
+		}
+		else printf("Malformed argument %c\n", argv[i][0]);
+	}
+}
 
 
 int
-main(void)
+main(int argc, char **argv)
 {
 	readyToClose = false;
+	
+	tick_rate     = DEFAULT_TICK_RATE,
+	frame_rate    = DEFAULT_FRAME_RATE;
+	screen_width  = SCREEN_WIDTH;
+	screen_height = SCREEN_HEIGHT;
+
+	handleArgs(argc, argv);
 
 #ifndef ON_CONSOLE
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
 #endif /* ON_CONSOLE */
-	SetTargetFPS(FRAME_RATE);
+	SetTargetFPS(frame_rate);
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
 	
 	initMouse();
 	
-	engine = Engine_new(&engine_Callbacks, TICK_RATE);
+	engine = Engine_new(&engine_Callbacks, tick_rate);
 	Head   *head   = Head_new(
 			0, 
 			(Region){0,0,SCREEN_WIDTH, SCREEN_HEIGHT}, 
@@ -106,7 +139,7 @@ main(void)
 	}
 */
 	player    = Entity_new(&playerTemplate, engine);
-	player->position = (Vector3){2.0f, 0.0f, 2.0f};
+	player->position = (Vector3){0.0f, 0.0f, 0.0f};
 	head_data = (TestHeadData*)Head_getUserData(head);
 
 	head_data->target      = player;

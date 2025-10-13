@@ -1,7 +1,7 @@
 #include <raylib.h>
 #include <raymath.h>
 
-#include "reticle.h"
+#include "../reticle.h"
 #include "game.h"
 
 
@@ -121,7 +121,6 @@ testHeadPostRender(Head *head)
 	PlayerData   *target_data = data->target_data;
 	Region        region      = Head_getRegion(head);
 	Engine       *engine      = Head_getEngine(head);
-	DrawFPS(10, 10);
 
 	int
 		screen_width  = region.width,
@@ -139,33 +138,33 @@ testHeadPostRender(Head *head)
 	drawReticle(
 			center_x,
 			center_y,
-			3,
+			4,
 			12,
 			4 + spread_offset,
 			BLACK,
 			RETICLE_CENTER_DOT
-				| RETICLE_CIRCLE
+				//| RETICLE_CIRCLE
 				| RETICLE_CROSSHAIRS
 		);
 	drawReticle(
 			center_x,
 			center_y,
-			1,
+			2,
 			10,
 			5 + spread_offset,
 			WHITE,
 			RETICLE_CENTER_DOT
 				| RETICLE_CROSSHAIRS
 		);
-	drawReticle(
+	/*drawReticle(
 			center_x,
 			center_y,
-			1,
+			2,
 			10,
 			5 + spread_offset,
 			WHITE,
 			RETICLE_CIRCLE
-		);
+		);*/
 }
 
 void

@@ -64,9 +64,11 @@ playerSetup(Entity *self)
 		return;
 	}
 
-	data->move_dir     = V3_ZERO;
-	data->direction    = V3_ZERO;
-	data->request_jump = false;
+	data->prev_position = V3_ZERO;
+	data->prev_velocity = V3_ZERO;
+	data->move_dir      = V3_ZERO;
+	data->direction     = V3_ZERO;
+	data->request_jump  = false;
 
 	self->user_data = data;
 }

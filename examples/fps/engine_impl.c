@@ -6,6 +6,7 @@ void unPause(   void *data, void *value);
 void exitToMain(void *data, void *value);
 
 void engineRun(    Engine *engine);
+void engineRender( Engine *engine);
 void enginePause(  Engine *engine);
 void engineUnpause(Engine *engine);
 void engineExit(   Engine *engine);
@@ -15,7 +16,7 @@ EngineVTable engine_Callbacks = {
 	.Setup   = NULL, 
 	.Run     = engineRun, 
 	.Update  = NULL, 
-	.Render  = NULL, 
+	.Render  = engineRender, 
 	.Resize  = NULL, 
 	.Pause   = enginePause, 
 	.Unpause = engineUnpause, 
@@ -48,6 +49,12 @@ void
 engineRun(Engine *engine)
 {
 	DisableCursor();
+}
+
+void
+engineRender(Engine *engine)
+{
+	DrawFPS(10, 10);
 }
 
 void
