@@ -35,7 +35,8 @@ void    Engine_free(Engine       *engine);
 */
 float       Engine_getDeltaTime(  Engine *engine);
 uint64      Engine_getFrameNumber(Engine *engine);
-float       Engine_getTickTime(   Engine *engine);
+float       Engine_getTickElapsed(Engine *engine);
+void        Engine_setTickRate(   Engine *engine, int tick_rate);
 EntityList *Engine_getEntityList( Engine *engine);
 Head       *Engine_getHeads(      Engine *engine);
 Scene      *Engine_getScene(      Engine *engine);

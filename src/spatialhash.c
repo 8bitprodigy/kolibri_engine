@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "_spatial_hash_.h"
+#include "_spatialhash_.h"
 #include "common.h"
 
 

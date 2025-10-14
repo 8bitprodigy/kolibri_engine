@@ -35,7 +35,9 @@ It's so minimal, one could use it as a framework to build a more specific, more 
 
 - Simple renderer using sphere-frustum intersection to handle frustum culling
 
-This engine is so simple, it weighs in at only \~1800 lines of C.
+- A dynamic array container API (used internally, but exposed publicly)
+
+This engine is so simple, it weighs in at only \~3000 lines of C.
 
 ---
 
@@ -112,6 +114,8 @@ Defines macros, constants, enums, and types used commonly throughout the engine 
     - ` void (*RenderableCallback)(Renderable *renderable, Vector3 position, Vector3 rotation, Vector3 scale)`: a function pointer to the callback used to render the `Renderable`
   
   - `Xform` holds `position`, `rotation`, `scale`, and `skew`, internally union'd with `xf[4]` to allow for swizzling.
+  
+### **dynamicarray.h**
 
 ### **engine.h**:
 

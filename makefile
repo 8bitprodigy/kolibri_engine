@@ -1,75 +1,121 @@
-CC      = gcc-14
-CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0 -DDEBUG -DHEAD_USE_RENDER_TEXTURE
-LIBS    = -lraylib -lGL -lm
-INCLUDE = -Iinclude -I/usr/local/include
-LIBDIR  = -L/usr/local/lib
+# Library name
+LIBNAME = kolibri
+VERSION = 0.1.0
 
-PROJECTNAME = kolibritest
+# Compiler
+CC = gcc-14
+AR = ar
+ARFLAGS = rcs
 
-# Auto-detect platform using uname directly
+# Auto-detect platform
 PLATFORM := $(shell uname -s)
 
 # Platform-specific adjustments
 ifeq ($(PLATFORM),Darwin)
-    LIBS = -lraylib -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
+    # macOS
 endif
 ifeq ($(findstring MINGW,$(PLATFORM)),MINGW)
-    LIBS = -lraylib -lopengl32 -lgdi32 -lwinmm
-    TARGET_EXT = .exe
+    PLATFORM = mingw
 endif
 ifeq ($(findstring CYGWIN,$(PLATFORM)),CYGWIN)
-    LIBS = -lraylib -lopengl32 -lgdi32 -lwinmm
-    TARGET_EXT = .exe
+    PLATFORM = cygwin
 endif
 
-# Allow manual override: make PLATFORM=dc
+# Allow manual override: make PLATFORM_OVERRIDE=dc
 ifdef PLATFORM_OVERRIDE
     PLATFORM = $(PLATFORM_OVERRIDE)
 endif
 
-SRCDIR     = src
-GAMESRCDIR = gamesrc
-OBJDIR     = obj/$(PLATFORM)
+# Directories
+SRCDIR  = src
+INCDIR  = include
+OBJDIR  = obj/$(PLATFORM)
+LIBDIR  = lib
+INSTALLDIR = /usr/local
 
-TARGET       = $(PROJECTNAME)$(TARGET_EXT)
+# Output libraries
+LIB_RELEASE = $(LIBDIR)/lib$(LIBNAME).a
+LIB_DEBUG   = $(LIBDIR)/lib$(LIBNAME)_debug.a
 
-ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
-GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
+# Source files
+SRCS = $(wildcard $(SRCDIR)/*.c)
 
-ENGINE_OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
-GAME_OBJS   = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
+# Object files
+OBJS_RELEASE = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/release/%.o)
+OBJS_DEBUG   = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/debug/%.o)
 
-OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
+# Compiler flags
+CFLAGS_COMMON = -I$(INCDIR) -Wall -Wextra -Wpedantic
+CFLAGS_RELEASE = $(CFLAGS_COMMON) -O3 -DNDEBUG
+CFLAGS_DEBUG = $(CFLAGS_COMMON) -g3 -O0 -DDEBUG
 
-.PHONY: all clean rm-elf prepare
+.PHONY: all clean install uninstall release debug info
 
-all: rm-elf prepare $(TARGET)
+# Default target builds both versions
+all: release debug
 
-clean: rm-elf
-	rm -rf $(OBJDIR)
+# Release build
+release: $(LIB_RELEASE)
 
-rm-elf:
-	rm -f $(TARGET)
+$(LIB_RELEASE): $(OBJS_RELEASE)
+	@mkdir -p $(LIBDIR)
+	$(AR) $(ARFLAGS) $@ $^
+	@echo "Built release library: $@"
 
-prepare:
-	mkdir -p $(OBJDIR)
-	mkdir -p $(OBJDIR)/engine
-	mkdir -p $(OBJDIR)/game
+$(OBJDIR)/release/%.o: $(SRCDIR)/%.c
+	@mkdir -p $(OBJDIR)/release
+	$(CC) $(CFLAGS_RELEASE) -c $< -o $@
 
-$(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
-	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+# Debug build
+debug: $(LIB_DEBUG)
 
-$(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c
-	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+$(LIB_DEBUG): $(OBJS_DEBUG)
+	@mkdir -p $(LIBDIR)
+	$(AR) $(ARFLAGS) $@ $^
+	@echo "Built debug library: $@"
 
-$(TARGET): $(OBJS)
-	$(CC) -o $(TARGET) $(OBJS) $(LIBDIR) $(LIBS)
+$(OBJDIR)/debug/%.o: $(SRCDIR)/%.c
+	@mkdir -p $(OBJDIR)/debug
+	$(CC) $(CFLAGS_DEBUG) -c $< -o $@
 
-debug:
-	@echo "DETECTED PLATFORM: $(PLATFORM)"
-	@echo "TARGET:         $(TARGET)"
-	@echo "ENGINE_SOURCES: $(ENGINE_SRC)"
-	@echo "GAME_SOURCES:   $(GAME_SRC)"
-	@echo "ENGINE_OBJS:    $(ENGINE_OBJS)"
-	@echo "GAME_OBJS:      $(GAME_OBJS)"
-	@echo "OBJS:           $(OBJS)"
+# Clean build artifacts
+clean:
+	rm -rf $(LIBDIR) $(OBJDIR)
+
+# Install headers and libraries
+install: all
+	@echo "Installing headers to $(INSTALLDIR)/include/$(LIBNAME)/"
+	install -d $(INSTALLDIR)/include/$(LIBNAME)
+	install -m 644 $(INCDIR)/*.h $(INSTALLDIR)/include/$(LIBNAME)/
+	@echo "Installing libraries to $(INSTALLDIR)/lib/"
+	install -d $(INSTALLDIR)/lib
+	install -m 644 $(LIB_RELEASE) $(INSTALLDIR)/lib/
+	install -m 644 $(LIB_DEBUG) $(INSTALLDIR)/lib/
+	@echo "Installation complete"
+	@echo ""
+	@echo "To use in your project:"
+	@echo "  CFLAGS += -I$(INSTALLDIR)/include"
+	@echo "  LDFLAGS += -L$(INSTALLDIR)/lib -l$(LIBNAME)        # Release"
+	@echo "  LDFLAGS += -L$(INSTALLDIR)/lib -l$(LIBNAME)_debug  # Debug"
+
+# Uninstall
+uninstall:
+	rm -rf $(INSTALLDIR)/include/$(LIBNAME)
+	rm -f $(INSTALLDIR)/lib/lib$(LIBNAME).a
+	rm -f $(INSTALLDIR)/lib/lib$(LIBNAME)_debug.a
+	@echo "Uninstallation complete"
+
+# Show build info
+info:
+	@echo "Library:  $(LIBNAME) v$(VERSION)"
+	@echo "Platform: $(PLATFORM)"
+	@echo "Compiler: $(CC)"
+	@echo "Sources:  $(SRCS)"
+	@echo ""
+	@echo "Build outputs:"
+	@echo "  Release: $(LIB_RELEASE)"
+	@echo "  Debug:   $(LIB_DEBUG)"
+	@echo ""
+	@echo "Object directories:"
+	@echo "  Release: $(OBJDIR)/release/"
+	@echo "  Debug:   $(OBJDIR)/debug/"

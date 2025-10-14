@@ -2,17 +2,31 @@
 #include "_engine_.h"
 
 
-#ifdef HEAD_USE_RENDER_TEXTURES
-	#define BeginRenderMode( head ) BeginTextureMode(*Head_getViewport((head)))
+#define foreach_Head( head_ptr ) \
+	for (int i = 0; i < self->head_count && ((head_ptr) = &self->heads[i], 1); i++)
+	
+#ifdef HEAD_USE_RENDER_TEXTURE
+	#define BeginRenderMode( head ) do { \
+			Region region = Head_getRegion((head)); \
+			BeginTextureMode(*Head_getViewport((head))); \
+				rlViewport(region.x, region.y, region.width, region.height); \
+		} while(0)
+		
 	#define EndRenderMode() EndTextureMode()
-#else /* HEAD_USE_RENDER_TEXTURES */
+#elif ENGINE_SINGLE_HEAD_ONLY
+	#define foreach_Head( head_ptr ) \
+		for ((head_ptr) = &self->heads[0]; (head_ptr); (head_ptr) = NULL)
+	#define BeginRenderMode( head )
+	#define EndRenderMode()
+#else 
 	#define BeginRenderMode( head ) do{\
 			Region region = Head_getRegion((head)); \
 			BeginScissorMode(region.x, region.y, region.width, region.height); \
 				rlViewport(region.x, region.y, region.width, region.height); \
 		}while(0)
 	#define EndRenderMode() EndScissorMode()
-#endif /* HEAD_USE_RENDER_TEXTURES */
+#endif /* HEAD_USE_RENDER_TEXTURE */
+
 
 /*
 	MAIN STRUCT
@@ -27,21 +41,30 @@ Engine
 	CollisionScene *collision_scene;
 	Renderer       *renderer;
 	
-	uint64          frame_num;
+	uint64          
+					frame_num,
+					tick_num;
 	Vector2i        screen_size;
+	
+	double          
+					last_tick_time,
+					current_time,
+					tick_overshoot,
+					pause_time;
+	float           
+					delta, 
+					accumulator,
+					tick_length,
+					tick_elapsed;
+
 	uint       
 		            head_count,
 		            entity_count,
 		            target_fps;
 	
-	float           
-					delta, 
-					accumulator,
-					tick_length,
-					tick_time;
-
-	EntityList      entity_list;
+	int             tick_rate;
 	
+	EntityList      entity_list;
 	
 	union {
 		uint8 flags;
@@ -86,7 +109,10 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 	engine->delta            = 0.0f;
 	engine->accumulator      = 0.0f;
 	engine->tick_length      = 1.0f / tick_rate;
-	engine->tick_time        = 0.0f;
+	engine->tick_elapsed     = 0.0f;
+
+	engine->last_tick_time   = GetTime();
+	engine->current_time     = engine->last_tick_time;
 
 	engine->paused           = false;
 	engine->request_exit     = false;
@@ -132,11 +158,18 @@ Engine_getFrameNumber(Engine *self)
 }
 
 float
-Engine_getTickTime(Engine *self)
+Engine_getTickElapsed(Engine *self)
 {
-	return self->tick_time;
+	return self->tick_elapsed;
 }
 
+void
+Engine_setTickRate(Engine *self, int tick_rate)
+{
+	self->tick_rate   = tick_rate;
+	if (tick_rate <= 0) return;
+	self->tick_length = 1.0f / tick_rate;
+}
 
 EntityList *
 Engine_getEntityList(Engine *self)
@@ -261,19 +294,23 @@ Engine_run(Engine *self)
 void
 Engine_update(Engine *self)
 {
-	const EngineVTable *vtable = self->vtable;
-	
-	float delta        = GetFrameTime();
-	self->delta        = delta;
-	self->accumulator += delta;
-	self->tick_time    = self->accumulator / self->tick_length;
-
-	Head__updateAll(self->heads, delta);
-	
 	if (
 		self->paused 
 		|| self->request_exit
-		|| self->accumulator < self->tick_length
+	) return;
+	const EngineVTable *vtable = self->vtable;
+	
+	float delta         = GetFrameTime();
+	self->delta         = delta;
+	self->current_time  = GetTime();
+	self->accumulator  += delta; //self->current_time - self->last_tick_time;
+	self->tick_elapsed  = self->accumulator / self->tick_length;
+
+	Head__updateAll(self->heads, delta);
+	
+	if ( 
+		self->tick_rate <= 0
+		|| self->tick_elapsed < 1.0f 
 	) return;
 
 	EntityNode__updateAll(self->entities, self->accumulator);
@@ -285,7 +322,10 @@ Engine_update(Engine *self)
 	
 	if (vtable && vtable->Update) vtable->Update(self, self->accumulator);
 
-	self->accumulator = 0.0f;
+	self->accumulator    -= self->tick_length;
+	self->tick_overshoot  = self->current_time - self->last_tick_time;
+	self->last_tick_time  = self->current_time;
+	self->tick_num++;
 }
 
 
@@ -296,8 +336,9 @@ Engine_render(Engine *self)
 	ClearBackground(BLACK);
 	/* Loop through Heads */
 	/* Render to Head stage */
-	for (uint i = 0; i < self->head_count; i++) {
-		Head *current_head = &self->heads[i];
+	Head *current_head;
+	foreach_Head(current_head) {
+		//current_head = &self->heads[i];
 		BeginRenderMode(current_head);
 			Head_preRender(current_head); /* Skyboxes, perhaps */
 			BeginMode3D(*Head_getCamera(current_head));
@@ -336,8 +377,10 @@ Engine_pause(Engine *self, bool Paused)
 		self->paused = Paused;
 		EngineVTable *vtable = self->vtable;
 		if (Paused) {
+			self->pause_time = GetTime();
 			if (vtable && vtable->Pause) vtable->Pause(self);
 		} else {
+			self->last_tick_time += GetTime() - self->pause_time;
 			if (vtable && vtable->Unpause) vtable->Unpause(self);
 		}
 	}

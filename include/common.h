@@ -31,8 +31,19 @@
 #ifndef MAX_NUM_ENTITIES
 	#define MAX_NUM_ENTITIES 1024
 #endif
+#ifdef ENGINE_SINGLE_HEAD_ONLY
+	/*
+		If defined, only the first head can and will be used for rendering, and
+		The scene will be rendered to the window context directly. 
+	*/
+	#define HEAD_SINGLE_HEAD_ONLY 1
+#endif
 /* Head-related settings */
 #ifdef HEAD_USE_RENDER_TEXTURE
+	/* 
+		If defined, Viewports will be rendered to render Textures instead of
+		Scissor mode.
+	*/
 	#define HEAD_USE_RENDER_TEXTURE 1
 #endif
 /* Renderable-related constants */
@@ -81,13 +92,13 @@
 #define GET_KEY_OR_BUTTON_DOWN( Controller, Button, Key ) (int)(IsGamepadButtonDown(Controller, Button) || IsKeyDown(Key))
 
 #define GET_KEY_OR_BUTTON_AXIS( Controller, Btn_Pos, Key_Pos, Btn_Neg, Key_Neg ) ( \
-        GET_KEY_OR_BUTTON_DOWN( (Controller), (Btn_Pos), (Key_Pos) ) - \
-        GET_KEY_OR_BUTTON_DOWN( (Controller), (Btn_Neg), (Key_Neg) )   \
+        GET_KEY_OR_BUTTON_DOWN(   (Controller), (Btn_Pos), (Key_Pos) ) \
+        - GET_KEY_OR_BUTTON_DOWN( (Controller), (Btn_Neg), (Key_Neg) ) \
     )
 
 #define GET_KEY_OR_BUTTON_AXIS_PRESSED( Controller, Btn_Pos, Key_Pos, Btn_Neg, Key_Neg ) ( \
-        GET_KEY_OR_BUTTON_PRESSED( (Controller), (Btn_Pos), (Key_Pos) ) - \
-        GET_KEY_OR_BUTTON_PRESSED( (Controller), (Btn_Neg), (Key_Neg) )   \
+        GET_KEY_OR_BUTTON_PRESSED(   (Controller), (Btn_Pos), (Key_Pos) ) \
+        - GET_KEY_OR_BUTTON_PRESSED( (Controller), (Btn_Neg), (Key_Neg) ) \
     )
 
 #define GET_KEY_OR_BUTTON_VECTOR( Controller, Btn_Pos_X, Key_Pos_X, Btn_Neg_X, Key_Neg_X, Btn_Pos_Y, Key_Pos_Y, Btn_Neg_Y, Key_Neg_Y ) \
@@ -105,8 +116,8 @@
     }
 
 #define GET_BUTTON_AXIS( Controller, Btn_Pos, Btn_Neg ) ( \
-        (int)IsGamepadButtonDown((Controller), (Btn_Pos)) - \
-        (int)IsGamepadButtonDown((Controller), (Btn_Neg))   \
+        (int)IsGamepadButtonDown(  (Controller), (Btn_Pos)) \
+        - (int)IsGamepadButtonDown((Controller), (Btn_Neg)) \
     )
 
 #define GET_BUTTON_VECTOR( Controller, Btn_Pos_X, Btn_Neg_X, Btn_Pos_Y, Btn_Neg_Y ) \

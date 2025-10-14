@@ -8,7 +8,7 @@
 #include "_engine_.h"
 #include "_entity_.h"
 #include "_head_.h"
-#include "_spatial_hash_.h"
+#include "_spatialhash_.h"
 #include "common.h"
 
 

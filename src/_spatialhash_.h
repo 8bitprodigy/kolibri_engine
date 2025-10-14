@@ -2,11 +2,11 @@
 #define SPATIAL_HASH_PRIVATE_H
 
 
-#include "common.h"
-#include "entity.h"
+#include "spatialhash.h"
 
 
 typedef struct SpatialEntry SpatialEntry;
+
 
 typedef struct 
 SpatialHash
@@ -17,19 +17,9 @@ SpatialHash
 	int           pool_used;
     int           hash_size; /* Number of hash buckets */
     float         cell_size; /* Size of each cell */
-	SpatialEntry *cells[SPATIAL_HASH_SIZE]; /* Variable length array - MUST BE LAST */
+	SpatialEntry *cells[SPATIAL_HASH_SIZE]; 
 }
 SpatialHash;
-
-
-/* Constructor/Destructor */
-SpatialHash *SpatialHash__new( void);
-void         SpatialHash__free(SpatialHash *hash);
-
-/* Private Methods */
-void  SpatialHash__clear(      SpatialHash *hash);
-void  SpatialHash__insert(     SpatialHash *hash, void        *data,   Vector3   center,        Vector3  bounds);
-void *SpatialHash__queryRegion(SpatialHash *hash, BoundingBox  region, void    **query_results, int     *count);
 
 
 #endif /* SPATIAL_HASH_PRIVATE_H */
