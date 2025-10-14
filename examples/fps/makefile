@@ -1,5 +1,5 @@
 CC      = gcc-14
-CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0 -DDEBUG -DENGINE_SINGLE_HEAD_ONLY
+CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0 #-DDEBUG -DHEAD_USE_RENDER_TEXTURE
 LIBS    = -lraylib -lGL -lm
 INCLUDE = -I../../include -I/usr/local/include
 LIBDIR  = -L/usr/local/lib
