@@ -38,7 +38,7 @@ CollisionScene__new(Engine *engine)
 		return NULL;
 	}
 
-	scene->spatial_hash  = SpatialHash__new();
+	scene->spatial_hash  = SpatialHash_new();
 	scene->engine        = engine;
 	scene->needs_rebuild = true;
 
@@ -53,7 +53,7 @@ CollisionScene__free(CollisionScene *scene)
 {
 	if (!scene) return;
 
-	SpatialHash__free(scene->spatial_hash);
+	SpatialHash_free(scene->spatial_hash);
 	free(scene);
 }
 
@@ -73,14 +73,14 @@ CollisionScene__insertEntity(CollisionScene *scene, Entity *entity)
 {
 	if (!entity->collision_shape) return;
 
-	SpatialHash__insert(scene->spatial_hash, entity, entity->position, entity->bounds);
+	SpatialHash_insert(scene->spatial_hash, entity, entity->position, entity->bounds);
 	scene->needs_rebuild = true;
 }
 
 void
 CollisionScene__clear(CollisionScene *scene)
 {
-	SpatialHash__clear((SpatialHash*)scene);
+	SpatialHash_clear((SpatialHash*)scene);
 }
 
 /* Query entities in a region */
@@ -94,7 +94,7 @@ CollisionScene__queryRegion(
 	*count = COL_QUERY_SIZE;
 	static Entity *candidates[COL_QUERY_SIZE]; 
 	
-	SpatialHash__queryRegion(
+	SpatialHash_queryRegion(
 			scene->spatial_hash, 
 			bbox,
 			(void*)&candidates,
@@ -1123,7 +1123,7 @@ CollisionScene__update(CollisionScene *scene)
 {
 	if (!scene->needs_rebuild) return;
 	
-	SpatialHash__clear(scene->spatial_hash);
+	SpatialHash_clear(scene->spatial_hash);
 
 	EntityNode *first_entity = Engine__getEntities(scene->engine);
 	if (!first_entity) return;

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
 #ifdef DEBUG
     #define DBG_EXPR( expression ) expression
     #define DBG_OUT(  Text, ... ) do{printf( "[DEBUG] " Text "\n", ##__VA_ARGS__ ); fflush(stdout);} while(false)
@@ -19,7 +20,9 @@
     #define ERR_OUT(  Error_Text )
 #endif
 
-#define CLAMP(value, min, max) ((value) < (min) ? (min) : ((value) > (max) ? (max) : (value)))
+#ifndef CLAMP
+	#define CLAMP(value, min, max) ((value) < (min) ? (min) : ((value) > (max) ? (max) : (value)))
+#endif /* CLAMP */
 
 /****************
 	CONSTANTS
@@ -36,7 +39,7 @@
 		If defined, only the first head can and will be used for rendering, and
 		The scene will be rendered to the window context directly. 
 	*/
-	#define HEAD_SINGLE_HEAD_ONLY 1
+	#define ENGINE_SINGLE_HEAD_ONLY 1
 #endif
 /* Head-related settings */
 #ifdef HEAD_USE_RENDER_TEXTURE
@@ -55,7 +58,8 @@
 #endif
 /* Collision system-related constants */
 #ifndef SPATIAL_HASH_SIZE
-	#define SPATIAL_HASH_SIZE 2053
+	/* Should be a prime number */
+	#define SPATIAL_HASH_SIZE 4099
 #endif
 #ifndef CELL_SIZE
 	#define CELL_SIZE 20.0f
@@ -64,10 +68,10 @@
 	#define INITIAL_ENTITY_CAPACITY 256
 #endif
 #ifndef ENTRY_POOL_SIZE
-	#define ENTRY_POOL_SIZE 2048
+	#define ENTRY_POOL_SIZE 8192
 #endif
 #ifndef VIS_QUERY_SIZE
-	#define VIS_QUERY_SIZE 512
+	#define VIS_QUERY_SIZE 1024
 #endif
 #ifndef COL_QUERY_SIZE
 	#define COL_QUERY_SIZE 128

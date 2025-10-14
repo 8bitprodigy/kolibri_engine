@@ -120,24 +120,26 @@ main(int argc, char **argv)
 
 	Scene_new(&scene_Callbacks, NULL, engine);
 	
-	Entity *ents[21][21][2];
+	Entity *ents[21][21][21];
 	int z = 0; 
-/* 
+ 
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
-//			for (int z = 0; z < 21; z++) {
+			for (int z = 0; z < 1; z++) {
+				Vector3 position       = (Vector3){
+						(x * 5.0f) - 50.0f,
+						(z * 5.0f),
+						(y * 5.0f) - 50.0
+					};
+				if (Vector3Equals(position, V3_ZERO)) continue;
 				ents[x][y][z]           = Entity_new(&entityTemplate, engine);
 				ents[x][y][z]->visible  = true;
 				ents[x][y][z]->active   = true;
-				ents[x][y][z]->position = (Vector3){
-					(x * 5.0f) - 50.0f,
-					(z * 5.0f),
-					(y * 5.0f) - 50.0f
-				};
-//			}
+				ents[x][y][z]->position = position;
+			}
 		}
 	}
-*/
+
 	player    = Entity_new(&playerTemplate, engine);
 	player->position = (Vector3){0.0f, 0.0f, 0.0f};
 	head_data = (TestHeadData*)Head_getUserData(head);

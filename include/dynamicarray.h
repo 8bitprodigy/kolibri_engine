@@ -10,7 +10,7 @@
 #endif
 
 #define DynamicArray(type_, capacity) DynamicArray_new(sizeof(type_), capacity)
-#define DynamicArray_add(a, v) DynamicArray_append(&(a), (v), 1)
+#define DynamicArray_add(array, datum) DynamicArray_append(&(a), (v), 1)
 
 
 /* Constructor / Destructor */

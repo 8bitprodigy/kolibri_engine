@@ -100,7 +100,7 @@ freeEntry(SpatialHash *hash, SpatialEntry *entry)
 
 /* Constructor */
 SpatialHash *
-SpatialHash__new(void)
+SpatialHash_new(void)
 {
     SpatialHash *hash = malloc(sizeof(SpatialHash));
     if (!hash) {
@@ -125,18 +125,18 @@ SpatialHash__new(void)
 
 /* Destructor */
 void
-SpatialHash__free(SpatialHash *hash)
+SpatialHash_free(SpatialHash *hash)
 {
     if (!hash) return;
     
-    SpatialHash__clear(hash);
+    SpatialHash_clear(hash);
     free(hash->entry_pool);
     free(hash);
 }
 
 /* Clear all entries */
 void
-SpatialHash__clear(SpatialHash *hash)
+SpatialHash_clear(SpatialHash *hash)
 {
     for (int i = 0; i < SPATIAL_HASH_SIZE; i++) {
         SpatialEntry *entry = hash->cells[i];
@@ -151,7 +151,7 @@ SpatialHash__clear(SpatialHash *hash)
 
 /* Insert entity */
 void
-SpatialHash__insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bounds)
+SpatialHash_insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bounds)
 {
     BoundingBox 
         bbox = {
@@ -186,7 +186,7 @@ SpatialHash__insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bound
 
 /* Query region */
 void *
-SpatialHash__queryRegion(
+SpatialHash_queryRegion(
     SpatialHash  *hash, 
     BoundingBox   region, 
     void        **query_results, 

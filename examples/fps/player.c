@@ -63,8 +63,8 @@ playerSetup(Entity *self)
 		ERR_OUT("Failed to allocate PlayerData.");
 		return;
 	}
-
-	data->prev_position = V3_ZERO;
+	
+	data->prev_position = self->position;
 	data->prev_velocity = V3_ZERO;
 	data->move_dir      = V3_ZERO;
 	data->direction     = V3_ZERO;

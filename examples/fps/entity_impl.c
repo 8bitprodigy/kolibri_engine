@@ -41,7 +41,7 @@ EntityVTable entity_Callbacks = (EntityVTable){
 
 Entity entityTemplate = (Entity){
 	.renderables       = {&r_1,  &r_2,  &r_3},
-	.lod_distances     = {8.0f, 16.0f, 48.0f},
+	.lod_distances     = {16.0f, 48.0f, 128.0f},
 	.lod_count         = 3,
 	.renderable_offset = {0.0f, 0.5f, 0.0f},
 	.visibility_radius = 1.5f,

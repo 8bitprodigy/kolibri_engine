@@ -28,7 +28,7 @@ Renderer__new(Engine *engine)
 	}
 
 	renderer->engine          = engine;
-	renderer->visibility_hash = SpatialHash__new();
+	renderer->visibility_hash = SpatialHash_new();
 	renderer->dirty           = true;
 
 	return renderer;
@@ -38,7 +38,7 @@ Renderer__new(Engine *engine)
 void
 Renderer__free(Renderer *renderer)
 {
-	SpatialHash__free(renderer->visibility_hash);
+	SpatialHash_free(renderer->visibility_hash);
 	free(renderer);
 }
 
@@ -117,7 +117,7 @@ Renderer__queryFrustum(
 
     int            candidate_count = VIS_QUERY_SIZE;
     static Entity *candidates[VIS_QUERY_SIZE];
-    SpatialHash__queryRegion(
+    SpatialHash_queryRegion(
         renderer->visibility_hash,
         (BoundingBox){min_bounds, max_bounds},
         (void*)&candidates,
@@ -160,7 +160,7 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 	
 	/* Clear and populate the Renderer's visible scene */
 	if (renderer->dirty) {
-		SpatialHash__clear(renderer->visibility_hash);
+		SpatialHash_clear(renderer->visibility_hash);
 		
 		for (int i = 0; i < entities->count; i++) {
 			Entity *entity = entities->entities[i];
@@ -169,7 +169,7 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 				if (0 < entity->lod_count) {
 					render_center = Vector3Add(entity->position, entity->renderable_offset);
 				}
-				SpatialHash__insert(renderer->visibility_hash, entity, render_center, entity->bounds);
+				SpatialHash_insert(renderer->visibility_hash, entity, render_center, entity->bounds);
 			}
 		}
 

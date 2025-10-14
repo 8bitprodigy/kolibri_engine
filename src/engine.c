@@ -7,9 +7,10 @@
 	
 #ifdef HEAD_USE_RENDER_TEXTURE
 	#define BeginRenderMode( head ) do { \
-			Region region = Head_getRegion((head)); \
-			BeginTextureMode(*Head_getViewport((head))); \
-				rlViewport(region.x, region.y, region.width, region.height); \
+			Region         region = Head_getRegion((head)); \
+			RenderTexture *rtex   = Head_getViewport((head)); \
+			BeginTextureMode(*rtex); \
+				rlViewport(0, 0, rtex->texture.width, rtex->texture.height); \
 		} while(0)
 		
 	#define EndRenderMode() EndTextureMode()
@@ -18,7 +19,8 @@
 		for ((head_ptr) = &self->heads[0]; (head_ptr); (head_ptr) = NULL)
 	#define BeginRenderMode( head )
 	#define EndRenderMode()
-#else 
+#else /* SCISSOR MODE */
+	#define SCISSOR_MODE
 	#define BeginRenderMode( head ) do{\
 			Region region = Head_getRegion((head)); \
 			BeginScissorMode(region.x, region.y, region.width, region.height); \
@@ -104,12 +106,14 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 	engine->renderer         = Renderer__new(engine);
 	
 	engine->frame_num        = 0;
+	engine->tick_num         = 0;
 	engine->head_count       = 0;
 	engine->entity_count     = 0;
 	engine->delta            = 0.0f;
 	engine->accumulator      = 0.0f;
 	engine->tick_length      = 1.0f / tick_rate;
-	engine->tick_elapsed     = 0.0f;
+	engine->tick_elapsed     = 1.0f;
+	engine->tick_rate        = tick_rate;
 
 	engine->last_tick_time   = GetTime();
 	engine->current_time     = engine->last_tick_time;
@@ -126,6 +130,8 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 
 	if (vtable && vtable->Setup) vtable->Setup(engine);
 
+	DBG_OUT("Tick rate: %i ticks/second.", engine->tick_rate);
+	
 	return engine;
 }
 
@@ -313,6 +319,8 @@ Engine_update(Engine *self)
 		|| self->tick_elapsed < 1.0f 
 	) return;
 
+	//DBG_OUT("Tick #%i", self->tick_num);
+	
 	EntityNode__updateAll(self->entities, self->accumulator);
 
 	CollisionScene__markRebuild(self->collision_scene);
@@ -349,7 +357,6 @@ Engine_render(Engine *self)
 	}
 	/* End loop through Heads */
 	/* Final stage. If you need to render stuff over the frame, do it here */
-	rlViewport(0,0, GetScreenWidth(), GetScreenHeight());
 	if (vtable && vtable->Render) vtable->Render(self);
 }
 
