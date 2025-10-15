@@ -1,3 +1,4 @@
+#include <GL/gl.h>
 #include <raylib.h>
 #include <raymath.h>
 
@@ -53,8 +54,13 @@ testHeadSetup(Head *head)
 	user_data->viewport_scale = 1;
 	user_data->target         = NULL;
 	user_data->target_data    = NULL;
-	
-	Model *skysphere = &user_data->model;
+
+	user_data->current_weapon = 0;
+
+	/*
+		Handle Sky Sphere
+	*/
+	Model *skysphere = &user_data->skysphere;
 	
 	Mesh mesh = GenMeshSphere(1.0f, 13, 16);
 	*skysphere = LoadModelFromMesh(mesh);
@@ -95,6 +101,16 @@ testHeadSetup(Head *head)
 	
 	SetMaterialTexture(&skysphere->materials[0], MATERIAL_MAP_ALBEDO, skyTexture);
 	SetTextureFilter(skyTexture, TEXTURE_FILTER_BILINEAR);
+	/* End Handle Sky Sphere */
+
+	/*
+		Handle HUD Weapons
+	*/
+	Model *weapons = &user_data->weapons[0];
+	weapons[0] = LoadModel("resources/models/weapons/weapon2.obj");
+	Texture2D weaponTexture = LoadTexture("resources/models/weapons/weapon2.png");
+	SetMaterialTexture(&weapons->materials[0], MATERIAL_MAP_ALBEDO, weaponTexture);
+	SetTextureFilter(weaponTexture, TEXTURE_FILTER_BILINEAR);
 
 	Head_setUserData(head, user_data);
 }
@@ -108,7 +124,7 @@ testHeadPreRender(Head *head)
 	BeginMode3D(*cam);
 		rlDisableDepthMask();
 		rlDisableBackfaceCulling();
-			DrawModel(data->model, cam->position, 1.0, WHITE);
+			DrawModel(data->skysphere, cam->position, 1.0, WHITE);
 		rlEnableBackfaceCulling();
 		rlEnableDepthMask();
 	EndMode3D();
@@ -119,9 +135,34 @@ testHeadPostRender(Head *head)
 {
 	TestHeadData *data        = Head_getUserData(head);
 	PlayerData   *target_data = data->target_data;
+	Camera3D     *cam  = Head_getCamera(head);
 	Region        region      = Head_getRegion(head);
 	Engine       *engine      = Head_getEngine(head);
-
+	BeginMode3D(*cam);
+		rlPushMatrix();
+			glClear(GL_DEPTH_BUFFER_BIT);   
+			Vector3 
+				weap_offset = (Vector3){-0.25f, -0.5f, 1.0f},
+				cam_pos     = cam->position,
+				look_dir    = Vector3Normalize(Vector3Subtract(cam->target, cam->position));
+			float   
+				yaw_angle   = RAD2DEG * atan2f(look_dir.x, look_dir.z),
+				pitch_angle = RAD2DEG * asinf(-look_dir.y);
+			
+			rlTranslatef(cam_pos.x, cam_pos.y - 0.5f, cam_pos.z);
+			rlRotatef(yaw_angle,   0.0f, 1.0f, 0.0f);
+			rlRotatef(pitch_angle, 1.0f, 0.0f, 0.0f);
+			rlTranslatef(-0.25f, 0.0f, 1.0f);
+			
+			DrawModel(
+					data->weapons[0], 
+					V3_ZERO, 
+					0.25f, 
+					WHITE
+				);
+		rlPopMatrix();
+	EndMode3D();
+	
 	int
 		screen_width  = region.width,
 		screen_height = region.height,
@@ -266,7 +307,7 @@ PLAYER_INPUT:
 
 	/* Calculate player inputs */
     /* FIX: Calculate forward direction FROM camera TO target */
-    Vector3 forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+    Vector3 forward = Vector3Subtract(camera->target, camera->position);
     forward.y       = 0.0f;  /* Keep movement on horizontal plane */
     forward         = Vector3Normalize(forward);
     

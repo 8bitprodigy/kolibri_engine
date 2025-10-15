@@ -38,12 +38,7 @@
 #endif
 
 
-typedef struct
-TestRenderableData
-{
-	Color color;
-}
-TestRenderableData;
+#define NUM_WEAPONS 10
 
 
 /* Player Constants */
@@ -81,15 +76,27 @@ PlayerData
 PlayerData;
 
 
+typedef struct
+TestRenderableData
+{
+	Color color;
+}
+TestRenderableData;
+
+
 /* Head Implementation */
 extern HeadVTable head_Callbacks;
 
 typedef struct
 TestHeadData
 {
-	Model   model;
-	int     viewport_scale;
-	int     controller;
+	Model   
+			skysphere,
+			weapons[NUM_WEAPONS];
+	int     
+			current_weapon,
+			viewport_scale,
+			controller;
 	float   eye_height;
 	Vector2 look;
 	Entity *target;

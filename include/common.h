@@ -78,10 +78,17 @@
 #endif
 
 #define V2_ZERO      ((Vector2){0.0f, 0.0f})
+#define V2_EAST      ((Vector2){1.0f, 0.0f})
+#define V2_WEST      ((Vector2){-1.0f, 0.0f})
+#define V2_NORTH     ((Vector2){0.0f, 1.0f})
 #define V3_ZERO      ((Vector3){0.0f, 0.0f, 0.0f})
 #define V4_ZERO      ((Vector4){0.0f, 0.0f, 0.0f, 0.0f})
 #define V3_ONE       ((Vector3){1.0f, 1.0f, 1.0f})
+#define V3_HALF      ((Vector3){0.5f, 0.5f, 0.5f})
+#define V3_QUARTER   ((Vector3){0.25f, 0.25f, 0.25f})
+#define V3_EIGHTH    ((Vector3){0.125f, 0.125f, 0.125f})
 #define V3_UP        ((Vector3){0.0f, 1.0f, 0.0f})
+#define V3_FORWARD   ((Vector3){1.0f, 0.0f, 0.0f})
 #define XF_ZERO      ((Xform){V3_ZERO,V3_ZERO,V3_ZERO,V3_ZERO})
 #define NO_COLLISION ((CollisionResult){false,0.0f,V3_ZERO,V3_ZERO,0,NULL,NULL})
 
