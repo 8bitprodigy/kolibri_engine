@@ -17,7 +17,7 @@ GAME_OBJS   = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
 
 OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
 
-# KOS-specific flags and libraries (matching your working makefile)
+# KOS-specific flags and libraries
 KOSCCFLAGS += -Iinclude -I../../include -I/usr/local/include
 KOSCCFLAGS += -lraylib -lGL -lkosutils -g3 -O3 -flto 
 KOSCCFLAGS += -DSCREEN_HEIGHT=480 -DSCREEN_WIDTH=640

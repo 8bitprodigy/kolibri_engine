@@ -43,6 +43,7 @@ exitToMain(void *data, void *value)
 {
 	paused = false;
 	Engine_requestExit((Engine*)data);
+	Engine_pause((Engine*)data, paused);
 }
 
 void
@@ -116,5 +117,6 @@ engineUnpause(Engine *engine)
 void
 engineExit(Engine *engine)
 {
+	Engine_free(engine);
 	EnableCursor();
 }

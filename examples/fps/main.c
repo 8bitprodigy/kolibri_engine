@@ -44,7 +44,53 @@ switchMenu(void *data, void *value)
 void 
 runEngine(void *data, void *value)
 {
-	Engine_run((Engine*)data);
+	engine = Engine_new(&engine_Callbacks, tick_rate);
+	Head   *head   = Head_new(
+			0, 
+			(Region){0,0,screen_width, screen_height}, 
+			&head_Callbacks, 
+			engine
+		);
+	
+	RendererSettings *settings = Head_getRendererSettings(head);
+//	settings->frustum_culling = false;
+	Camera3D *cam = Head_getCamera(head);
+	cam->fovy     = 45.0f;
+	cam->up       = V3_UP;
+	cam->position = (Vector3){0.0f, 1.75f, 0.0f};
+	cam->target   = (Vector3){10.0f, 0.0f, 10.0f};
+
+	Scene_new(&scene_Callbacks, NULL, engine);
+
+	player    = Entity_new(&playerTemplate, engine);
+	player->position = (Vector3){0.0f, 0.0f, 0.0f};
+	head_data = (TestHeadData*)Head_getUserData(head);
+
+	head_data->target      = player;
+	head_data->target_data = player->user_data;
+	head_data->eye_height  = 1.75f;
+	
+	Entity *ents[21][21][21];
+	int z = 0; 
+ 
+	for (int x = 0; x < 21; x++) {
+		for (int y = 0; y < 21; y++) {
+			for (int z = 0; z < 7; z++) {
+				Vector3 position       = (Vector3){
+						(x * 5.0f) - 50.0f,
+						(z * 5.0f),
+						(y * 5.0f) - 50.0
+					};
+				if (Vector3Equals(position, V3_ZERO)) continue;
+				ents[x][y][z]           = Entity_new(&entityTemplate, engine);
+				ents[x][y][z]->visible  = true;
+				ents[x][y][z]->active   = true;
+				ents[x][y][z]->position = position;
+			}
+		}
+	}
+	
+	Engine_run(engine);
 }
 
 void 
@@ -98,55 +144,11 @@ main(int argc, char **argv)
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
 #endif /* ON_CONSOLE */
 	SetTargetFPS(frame_rate);
-	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Kolibri Engine Test");
+	InitWindow(screen_width, screen_height, "Kolibri Engine Test");
 	
 	initMouse();
 	
-	engine = Engine_new(&engine_Callbacks, tick_rate);
-	Head   *head   = Head_new(
-			0, 
-			(Region){0,0,SCREEN_WIDTH, SCREEN_HEIGHT}, 
-			&head_Callbacks, 
-			engine
-		);
-	
-	RendererSettings *settings = Head_getRendererSettings(head);
-//	settings->frustum_culling = false;
-	Camera3D *cam = Head_getCamera(head);
-	cam->fovy     = 45.0f;
-	cam->up       = V3_UP;
-	cam->position = (Vector3){0.0f, 1.75f, 0.0f};
-	cam->target   = (Vector3){10.0f, 0.0f, 10.0f};
 
-	Scene_new(&scene_Callbacks, NULL, engine);
-	
-	Entity *ents[21][21][21];
-	int z = 0; 
- 
-	for (int x = 0; x < 21; x++) {
-		for (int y = 0; y < 21; y++) {
-			for (int z = 0; z < 1; z++) {
-				Vector3 position       = (Vector3){
-						(x * 5.0f) - 50.0f,
-						(z * 5.0f),
-						(y * 5.0f) - 50.0
-					};
-				if (Vector3Equals(position, V3_ZERO)) continue;
-				ents[x][y][z]           = Entity_new(&entityTemplate, engine);
-				ents[x][y][z]->visible  = true;
-				ents[x][y][z]->active   = true;
-				ents[x][y][z]->position = position;
-			}
-		}
-	}
-
-	player    = Entity_new(&playerTemplate, engine);
-	player->position = (Vector3){0.0f, 0.0f, 0.0f};
-	head_data = (TestHeadData*)Head_getUserData(head);
-
-	head_data->target      = player;
-	head_data->target_data = player->user_data;
-	head_data->eye_height  = 1.75f;
 
 	mainMenu = Menu( "Main Menu",
 			MENU_WIDTH,

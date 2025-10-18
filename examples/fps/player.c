@@ -85,6 +85,7 @@ playerFree(Entity *self)
 void
 playerUpdate(Entity *self, float delta)
 {
+	//DBG_OUT("Entering playerUpdate()");
 	PlayerData *data     = self->user_data;
 	data->prev_velocity       = self->velocity;
 	Vector3    

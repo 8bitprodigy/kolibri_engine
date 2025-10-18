@@ -107,8 +107,8 @@ testHeadSetup(Head *head)
 		Handle HUD Weapons
 	*/
 	Model *weapons = &user_data->weapons[0];
-	weapons[0] = LoadModel("resources/models/weapons/weapon2.obj");
-	Texture2D weaponTexture = LoadTexture("resources/models/weapons/weapon2.png");
+	weapons[0] = LoadModel("resources/models/weapons/weapon5.obj");
+	Texture2D weaponTexture = LoadTexture("resources/models/weapons/weapon5.png");
 	SetMaterialTexture(&weapons->materials[0], MATERIAL_MAP_ALBEDO, weaponTexture);
 	SetTextureFilter(weaponTexture, TEXTURE_FILTER_BILINEAR);
 
@@ -133,6 +133,9 @@ testHeadPreRender(Head *head)
 void
 testHeadPostRender(Head *head)
 {
+	/*
+		Draw viewmodel
+	*/
 	TestHeadData *data        = Head_getUserData(head);
 	PlayerData   *target_data = data->target_data;
 	Camera3D     *cam  = Head_getCamera(head);
@@ -149,10 +152,11 @@ testHeadPostRender(Head *head)
 				yaw_angle   = RAD2DEG * atan2f(look_dir.x, look_dir.z),
 				pitch_angle = RAD2DEG * asinf(-look_dir.y);
 			
-			rlTranslatef(cam_pos.x, cam_pos.y - 0.5f, cam_pos.z);
+			rlTranslatef(cam_pos.x, cam_pos.y , cam_pos.z);
 			rlRotatef(yaw_angle,   0.0f, 1.0f, 0.0f);
+			rlTranslatef(0.0f, 0.0f, 0.25f);
 			rlRotatef(pitch_angle, 1.0f, 0.0f, 0.0f);
-			rlTranslatef(-0.25f, 0.0f, 1.0f);
+			rlTranslatef(-0.5f, -0.5f, 1.25f);
 			
 			DrawModel(
 					data->weapons[0], 
@@ -162,7 +166,10 @@ testHeadPostRender(Head *head)
 				);
 		rlPopMatrix();
 	EndMode3D();
-	
+
+	/*
+		Draw Reticle
+	*/
 	int
 		screen_width  = region.width,
 		screen_height = region.height,
