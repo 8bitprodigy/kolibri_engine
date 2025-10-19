@@ -1,6 +1,7 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <math.h>
 #include <raylib.h>
 #include <raymath.h>
 #include <rlgl.h>
@@ -32,7 +33,7 @@
 	#define MAX_NUM_HEADS 4
 #endif
 #ifndef MAX_NUM_ENTITIES
-	#define MAX_NUM_ENTITIES 1024
+	#define MAX_NUM_ENTITIES 4096
 #endif
 #ifdef ENGINE_SINGLE_HEAD_ONLY
 	/*
@@ -71,7 +72,7 @@
 	#define ENTRY_POOL_SIZE 8192
 #endif
 #ifndef VIS_QUERY_SIZE
-	#define VIS_QUERY_SIZE 1024
+	#define VIS_QUERY_SIZE 4096
 #endif
 #ifndef COL_QUERY_SIZE
 	#define COL_QUERY_SIZE 128
@@ -141,10 +142,11 @@
 /* 
 	COMMON TYPES
 */
-typedef struct Engine Engine;
-typedef struct Entity Entity;
-typedef struct Head   Head;
-typedef struct Scene  Scene;
+typedef struct Engine      Engine;
+typedef struct Entity      Entity;
+typedef struct Head        Head;
+typedef struct Scene       Scene;
+typedef struct SpatialHash SpatialHash;
 
 
 /* Value Types */
@@ -285,6 +287,7 @@ typedef struct
 Renderable
 {
     void  *data;
+    void  *media;
     void (*Render)(struct Renderable *renderable, void *data);
 	union {
 		uint8 flags;
@@ -363,19 +366,29 @@ nextPrime(int n) {
     }
 }
 
-static float
+static inline float
 invLerp(float a, float b, float value)
 {
 	if (a==b) return 0.0f;
 	return (value - a) / (b - a);
 }
 
-static void
+static inline void
 moveCamera(Camera *cam, Vector3 new_position)
 {
 	Vector3 diff  = Vector3Subtract(cam->target, cam->position);
 	cam->position = new_position;
 	cam->target   = Vector3Add(new_position, diff);
+}
+
+static inline float
+sig(float x) {
+    return 1.0f / (1.0f + expf(-x));
+}
+
+static inline float
+sig_fast(float x) {
+	return 0.5f * (x / (1.0f + fabsf(x))) + 0.5f;;
 }
 
 

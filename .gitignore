@@ -60,3 +60,8 @@ kolibrigame
 kolibritest
 
 fps_example
+
+*.zip
+*.7z
+*.tar
+*.tar.gz

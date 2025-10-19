@@ -2,7 +2,6 @@
 #define ENGINE_PRIVATE_H
 
 
-#include "_collision_.h"
 #include "_entity_.h"
 #include "_head_.h"
 #include "_scene_.h"
@@ -21,8 +20,6 @@ void            Engine__removeEntity(     Engine *engine, EntityNode     *node);
 Scene          *Engine__getScene(         Engine *engine);
 void            Engine__insertScene(      Engine *engine, Scene          *scene);
 void            Engine__removeScene(      Engine *engine, Scene          *scene);
-void            Engine__setCollisionScene(Engine *engine, CollisionScene *scene);
-CollisionScene *Engine__getCollisionScene(Engine *engine);
 Renderer       *Engine__getRenderer(      Engine *engine);
 
 

@@ -110,8 +110,8 @@ Entity;
 /*
     Constructor/Destructor
 */
-Entity  *Entity_new(      const Entity *template_entity, Engine *engine);
-void     Entity_free(           Entity *entity);
+Entity  *Entity_new(  const Entity *template_entity, Scene *scene);
+void     Entity_free(       Entity *entity);
 
 /*
     Setters/Getters

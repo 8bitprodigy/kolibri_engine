@@ -38,9 +38,7 @@ Engine
 {
 	EngineVTable   *vtable;
 	Head           *heads;
-	EntityNode     *entities;
 	Scene          *scene;
-	CollisionScene *collision_scene;
 	Renderer       *renderer;
 	
 	uint64          
@@ -50,38 +48,34 @@ Engine
 	
 	double          
 					last_tick_time,
+					last_frame_time,
 					current_time,
-					tick_overshoot,
 					pause_time;
 	float           
 					delta, 
-					accumulator,
 					tick_length,
 					tick_elapsed;
 
 	uint       
 		            head_count,
-		            entity_count,
+		            scene_count,
 		            target_fps;
 	
 	int             tick_rate;
 	
-	EntityList      entity_list;
-	
 	union {
 		uint8 flags;
 		struct {
-			bool paused          :1;
-			bool request_exit    :1;
-			bool dirty_EntityList:1; /* Set to true whenever an entity is added/removed; false after generating a new array of entity pointers */
-			bool flag_3          :1; /* 3-7 not yet defined */
-			bool flag_4          :1;
-			bool flag_5          :1;
-			bool flag_6          :1;
-			bool flag_7          :1;
+			bool paused      :1;
+			bool request_exit:1;
+			bool flag_2      :1; /* 2-7 not yet defined */
+			bool flag_3      :1; 
+			bool flag_4      :1;
+			bool flag_5      :1;
+			bool flag_6      :1;
+			bool flag_7      :1;
 		};
 	};
-
 }
 Engine;
 
@@ -100,17 +94,13 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 	}
 
 	engine->heads            = NULL;
-	engine->entities         = NULL;
 	engine->scene            = NULL;
-	engine->collision_scene  = CollisionScene__new(engine);
 	engine->renderer         = Renderer__new(engine);
 	
 	engine->frame_num        = 0;
 	engine->tick_num         = 0;
 	engine->head_count       = 0;
-	engine->entity_count     = 0;
 	engine->delta            = 0.0f;
-	engine->accumulator      = 0.0f;
 	engine->tick_length      = 1.0f / tick_rate;
 	engine->tick_elapsed     = 1.0f;
 	engine->tick_rate        = tick_rate;
@@ -120,12 +110,7 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 
 	engine->paused           = false;
 	engine->request_exit     = false;
-	engine->dirty_EntityList = true;
-
-	engine->entity_list.entities = NULL;
-	engine->entity_list.capacity = 0;
-	engine->entity_list.count    = 0;
-
+	
 	engine->vtable           = vtable;
 
 	if (vtable && vtable->Setup) vtable->Setup(engine);
@@ -141,8 +126,6 @@ Engine_free(Engine *self)
 {
 	Head__freeAll(self->heads);
 	Scene__freeAll(self->scene);
-	EntityNode__freeAll(self->entities);
-	CollisionScene__free(self->collision_scene);
 	free(self);
 }
 
@@ -177,49 +160,17 @@ Engine_setTickRate(Engine *self, int tick_rate)
 	self->tick_length = 1.0f / tick_rate;
 }
 
-EntityList *
-Engine_getEntityList(Engine *self)
+int
+Engine_getTickRate(Engine *self)
 {
-	if (!self->dirty_EntityList) {
-		return &self->entity_list;
-	}
-
-	if (!self->entities || self->entity_count == 0) {
-		self->entity_list.count    = 0;
-		self->dirty_EntityList     = false;
-		return &self->entity_list;
-	}
-
-	if (self->entity_list.capacity < self->entity_count) {
-		if (self->entity_list.entities) {
-			free(self->entity_list.entities);
-		}
-		
-		Entity **entities = malloc(sizeof(Entity*) * self->entity_count);
-		if (!entities) {
-			ERR_OUT("Failed to allocate EntityList array.");
-			self->entity_list.count    = 0;
-			self->entity_list.capacity = 0;
-			return &self->entity_list;
-		}
-
-		self->entity_list.entities = entities;
-		self->entity_list.capacity = self->entity_count;
-	}
-
-	EntityNode *current = self->entities;
-	int index = 0;
-
-	do {
-		self->entity_list.entities[index++] = NODE_TO_ENTITY(current);
-		current                             = current->next;
-	} while (current != self->entities);
-	
-	self->entity_list.count = self->entity_count;
-	self->dirty_EntityList  = false;
-	return &self->entity_list;
+	return self->tick_rate;
 }
 
+float
+Engine_getTickLength(Engine *self)
+{
+	return self->tick_length;
+}
 
 Head *
 Engine_getHeads(Engine *self)
@@ -252,6 +203,7 @@ Engine_getVTable(Engine *engine)
 void
 Engine_run(Engine *self)
 {
+	self->request_exit         = false;
 	const EngineVTable *vtable = self->vtable;
 	
 	SetExitKey(KEY_NULL);
@@ -300,40 +252,32 @@ Engine_run(Engine *self)
 void
 Engine_update(Engine *self)
 {
-	if (
-		self->paused 
-		|| self->request_exit
-	) return;
+	DBG_OUT("Engine updating...");
+	if (self->paused || self->request_exit) return;
 	const EngineVTable *vtable = self->vtable;
 	
-	float delta         = GetFrameTime();
-	self->delta         = delta;
-	self->current_time  = GetTime();
-	self->accumulator  += delta; //self->current_time - self->last_tick_time;
-	self->tick_elapsed  = self->accumulator / self->tick_length;
-
-	Head__updateAll(self->heads, delta);
+	self->current_time = GetTime();
+	float frame_time = self->current_time - self->last_frame_time;
+	self->last_frame_time = self->current_time;
 	
-	if ( 
-		self->tick_rate <= 0
-		|| self->tick_elapsed < 1.0f 
-	) return;
-
-	//DBG_OUT("Tick #%i", self->tick_num);
+	Head__updateAll(self->heads, frame_time);
 	
-	EntityNode__updateAll(self->entities, self->accumulator);
+	if (self->tick_rate <= 0) return;
 
-	CollisionScene__markRebuild(self->collision_scene);
-	CollisionScene__update(     self->collision_scene);
-
-	Scene_update(self->scene, self->accumulator);
 	
-	if (vtable && vtable->Update) vtable->Update(self, self->accumulator);
-
-	self->accumulator    -= self->tick_length;
-	self->tick_overshoot  = self->current_time - self->last_tick_time;
-	self->last_tick_time  = self->current_time;
-	self->tick_num++;
+	// Run ticks for elapsed time
+	while (self->current_time - self->last_tick_time >= self->tick_length) {
+		
+		DBG_OUT("Engine Tick #%i", self->tick_num);
+		Scene_update(self->scene, self->tick_length);
+		if (vtable && vtable->Update) vtable->Update(self, self->tick_length);
+		
+		self->last_tick_time += self->tick_length;
+		self->tick_num++;
+	}
+	
+	// For extrapolation: how far into the next tick are we?
+	self->tick_elapsed = (self->current_time - self->last_tick_time) / self->tick_length;
 }
 
 
@@ -449,50 +393,6 @@ Engine__removeHead(Engine *self, Head *head)
 	self->head_count--;
 }
 
-
-EntityNode *
-Engine__getEntities(Engine *self)
-{
-	return self->entities;
-}
-
-void
-Engine__insertEntity(Engine *self, EntityNode *node)
-{
-	if (MAX_NUM_ENTITIES <= self->entity_count) return;
-	if (!self->entities) {
-		self->entities = node;
-		self->entity_count++;
-		return;
-	}
-	EntityNode 
-		*to   = self->entities,
-		*last = to->prev;
-
-	last->next = node;
-	to->prev   = node;
-	
-	node->next = to;
-	node->prev = last;
-	
-	self->entity_count++;
-}
-
-void
-Engine__removeEntity(Engine *self, EntityNode *node)
-{
-	if (!self->entity_count) return;
-	EntityNode *node_1 = node->prev;
-	EntityNode *node_2 = node->next;
-
-	node_1->next = node_2;
-	node_2->prev = node_1;
-
-	if (self->entities == node) self->entities = node_2;
-	
-	self->entity_count--;
-}
-
 Scene *
 Engine__getScene(Engine *self)
 {
@@ -528,18 +428,6 @@ Engine__removeScene(Engine *self, Scene *scene)
 	scene_2->prev = scene_1;
 
 	if (self->scene == scene) self->scene = scene_2;
-}
-
-void
-Engine__setCollisionScene(Engine *self, CollisionScene *scene)
-{
-	self->collision_scene = scene;
-}
-
-CollisionScene *
-Engine__getCollisionScene(Engine *self)
-{
-	return self->collision_scene;
 }
 
 Renderer *

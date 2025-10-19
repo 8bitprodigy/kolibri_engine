@@ -10,7 +10,7 @@ typedef struct CollisionScene CollisionScene;
 
 
 /* Constructor/Destructor */
-CollisionScene   *CollisionScene__new(           Engine         *engine);
+CollisionScene   *CollisionScene__new(           Scene          *scene);
 void              CollisionScene__free(          CollisionScene *scene);
 
 /* Scene management */

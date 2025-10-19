@@ -34,7 +34,7 @@ EntityList
 testSceneRender(Scene *scene, Head *head)
 {
 	DrawGrid(100, 1.0f);
-	return *Engine_getEntityList(Scene_getEngine(scene));
+	return *Scene_getEntityList(scene);
 }
 
 CollisionResult /* Infinite plane at 0.0f y-position */

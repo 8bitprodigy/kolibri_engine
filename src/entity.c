@@ -18,9 +18,9 @@ static uint64 Latest_ID = 0;
 	CONSTRUCTOR
 ******************/
 Entity *
-Entity_new(const Entity *entity, Engine *engine)
+Entity_new(const Entity *entity, Scene *scene)
 {
-	if (!engine) return NULL;
+	if (!scene) return NULL;
 	
 	EntityNode *node = malloc(sizeof(EntityNode));
 
@@ -31,7 +31,8 @@ Entity_new(const Entity *entity, Engine *engine)
 
 	node->next   = node;
 	node->prev   = node;
-	node->engine = engine;
+	node->engine = scene->engine;
+	node->scene  = scene;
 
 	Entity *base = NODE_TO_ENTITY(node);
 	*base = *entity;
@@ -39,7 +40,7 @@ Entity_new(const Entity *entity, Engine *engine)
 	base->user_data = NULL;
 	node->unique_ID = Latest_ID++;
 	
-	Engine__insertEntity(engine, node);
+	Scene__insertEntity(scene, node);
 
 	EntityVTable *vtable = base->vtable;
 	if (vtable && vtable->Setup) vtable->Setup(base);
@@ -217,7 +218,7 @@ EntityNode__free(EntityNode *self)
 	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Free) vtable->Free(entity);
 	
-	Engine__removeEntity(self->engine, self);
+	Scene__removeEntity(self->scene, self);
 
 	free(self);
 }

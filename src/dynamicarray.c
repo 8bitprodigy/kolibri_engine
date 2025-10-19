@@ -10,10 +10,10 @@
 
 typedef struct
 {
-	size_t length;
-	size_t capacity;
-	size_t datum_size;
-	char   data[];
+	size_t        length;
+	size_t        capacity;
+	size_t        datum_size;
+	unsigned char data[];
 }
 DynamicArrayHeader;
 
@@ -48,19 +48,19 @@ DynamicArray_free(void *self)
 void
 DynamicArray_grow(void **self)
 {
-	DynamicArrayHeader *header = GET_HEADER(*self);
-	
-	size_t  new_len  = DYNAMIC_ARRAY_GROWTH_FACTOR * header->capacity;
-	size_t  new_size = new_len * header->datum_size + sizeof(DynamicArrayHeader);
-	void *new_arr    = realloc(header, new_size);
-	if (!new_arr) {
-		DBG_OUT("Failed to allocate new grown array.");
-		return;
-	}
-	
-	header = new_arr;
-	header->capacity = new_len;
-	*self = (void*)&header->data;
+    DynamicArrayHeader *old_header = GET_HEADER(*self);
+    
+    size_t new_capacity = DYNAMIC_ARRAY_GROWTH_FACTOR * old_header->capacity;
+    size_t new_size = sizeof(DynamicArrayHeader) + (new_capacity * old_header->datum_size);
+    
+    DynamicArrayHeader *new_header = realloc(old_header, new_size);
+    if (!new_header) {
+        DBG_OUT("Failed to allocate new grown array.");
+        return;
+    }
+    
+    new_header->capacity = new_capacity;
+    *self = (void*)&new_header->data;
 } /* DynamicArray_grow */
 
 

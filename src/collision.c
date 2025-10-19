@@ -21,6 +21,7 @@ CollisionScene
 {
 	SpatialHash *spatial_hash;
 	Engine      *engine;
+	Scene       *scene;
 	bool         needs_rebuild; /* Flag to rebuild hash next frame */
 }
 CollisionScene;
@@ -30,19 +31,20 @@ CollisionScene;
 	Constructor
 */
 CollisionScene *
-CollisionScene__new(Engine *engine)
+CollisionScene__new(Scene *scene)
 {
-	CollisionScene *scene = malloc(sizeof(CollisionScene));
+	CollisionScene *col_scene = malloc(sizeof(CollisionScene));
 	if (!scene) {
 		ERR_OUT("Failed to allocate memory for CollisionScene.");
 		return NULL;
 	}
 
-	scene->spatial_hash  = SpatialHash_new();
-	scene->engine        = engine;
-	scene->needs_rebuild = true;
+	col_scene->spatial_hash  = SpatialHash_new();
+	col_scene->engine        = scene->engine;
+	col_scene->scene         = scene;
+	col_scene->needs_rebuild = true;
 
-	return scene;
+	return col_scene;
 }
 
 /*
@@ -1119,13 +1121,13 @@ Collision__raycast(CollisionScene *scene, K_Ray ray)
 
 /* System update - called each frame */
 void
-CollisionScene__update(CollisionScene *scene)
+CollisionScene__update(CollisionScene *self)
 {
-	if (!scene->needs_rebuild) return;
+	if (!self->needs_rebuild) return;
 	
-	SpatialHash_clear(scene->spatial_hash);
+	SpatialHash_clear(self->spatial_hash);
 
-	EntityNode *first_entity = Engine__getEntities(scene->engine);
+	EntityNode *first_entity = Scene__getEntities(self->scene);
 	if (!first_entity) return;
 
 	EntityNode *current = first_entity;
@@ -1134,12 +1136,12 @@ CollisionScene__update(CollisionScene *scene)
 			Entity *entity = &current->base;
 
 			if (entity->active && entity->collision_shape) {
-				CollisionScene__insertEntity(scene, entity);
+				CollisionScene__insertEntity(self, entity);
 			}
 
 			current = current->next;
 		} while (current != first_entity);
 	}
 
-	scene->needs_rebuild = false;
+	self->needs_rebuild = false;
 }

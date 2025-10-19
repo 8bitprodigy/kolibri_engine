@@ -19,6 +19,7 @@ EntityNode
 		*next;
 
     Engine *engine;
+    Scene  *scene;
 	uint64  unique_ID;
 	int     current_lod;
     float   last_lod_distance; /* Cache to avoid recalculating every frame */

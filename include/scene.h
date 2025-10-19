@@ -42,6 +42,8 @@ void            Scene_free(Scene      *scene);
 
 /* Setters/Getters */
 Engine         *Scene_getEngine(      Scene *scene);
+uint            Scene_getEntityCount( Scene *scene);
+EntityList     *Scene_getEntityList(  Scene *scene);
 void           *Scene_getMapData(     Scene *scene);
 
 /* Public Methods */

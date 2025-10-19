@@ -45,7 +45,7 @@ OBJS_RELEASE = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/release/%.o)
 OBJS_DEBUG   = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/debug/%.o)
 
 # Compiler flags
-CFLAGS_COMMON = -I$(INCDIR) -Wall -Wextra -Wpedantic
+CFLAGS_COMMON = -I$(INCDIR) -I./examples -Wall -Wextra -Wpedantic
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O3 -DNDEBUG
 CFLAGS_DEBUG = $(CFLAGS_COMMON) -g3 -O0 -DDEBUG
 

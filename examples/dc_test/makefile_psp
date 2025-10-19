@@ -1,0 +1,67 @@
+PROJECTNAME = kolibritest
+PLATFORM    = psp
+
+SRCDIR     = src
+GAMESRCDIR = gamesrc
+OBJDIR     = obj/$(PLATFORM)
+
+TARGET = $(PROJECTNAME)
+EXTRA_TARGETS = EBOOT.PBP
+PSP_EBOOT_TITLE = Kolibri Engine Test
+
+# Source files
+ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
+GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
+
+# Don't separate engine/game objects - let PSP SDK handle it
+OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o) \
+       $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/%.o)
+
+# PSP SDK paths
+PSPSDK = $(shell psp-config --pspsdk-path)
+PSPDIR = $(shell psp-config --psp-prefix)
+
+# Compiler and flags
+INCDIR = include $(PSPDIR)/include/raylib $(PSPDIR)/include/raylib
+CFLAGS = -G0 -Wall -O3 -g3 -DSCREEN_HEIGHT=272 -DSCREEN_WIDTH=480
+CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
+ASFLAGS = $(CFLAGS)
+
+# Libraries
+LIBS = -lraylib -lpspvfpu -lpspaudio -lm \
+       -lpspgum_vfpu -lpspvram -lpspgu \
+       -lpspdisplay -lpspge -lpspctrl \
+       -lpspnet_inet -lpsppower -lpsputility \
+       -lpspuser -lpspkernel
+
+# Build system
+BUILD_PRX = 1
+
+# Include PSP build rules FIRST
+include $(PSPSDK)/lib/build.mak
+
+# Add custom rules for compiling from src/ and gamesrc/
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCDIR:%=-I%) -c $< -o $@
+
+$(OBJDIR)/%.o: $(GAMESRCDIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCDIR:%=-I%) -c $< -o $@
+
+.PHONY: prepare clean-all debug
+
+prepare:
+	@mkdir -p $(OBJDIR)
+
+clean-all:
+	rm -rf obj
+	rm -f $(TARGET).elf $(TARGET).prx EBOOT.PBP PARAM.SFO
+
+debug:
+	@echo "PLATFORM:       $(PLATFORM)"
+	@echo "ENGINE_SOURCES: $(ENGINE_SRC)"
+	@echo "GAME_SOURCES:   $(GAME_SRC)"
+	@echo "OBJS:           $(OBJS)"
+	@echo "PSPSDK:         $(PSPSDK)"
+	@echo "PSPDIR:         $(PSPDIR)"
