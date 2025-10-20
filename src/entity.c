@@ -46,12 +46,8 @@ Entity_new(const Entity *entity, Scene *scene, size_t user_data_size)
 	base->user_data = NULL;
 	node->unique_ID = Latest_ID++;
 	
-    DBG_OUT("Entity_new: before insertion, scene=%p, scene->entities=%p", 
-            scene, scene->entities);
 	Scene__insertEntity(scene, node);
 	node->scene  = scene;
-    DBG_OUT("Entity_new: added entity %p to scene, scene->entities=%p, scene->entity_count=%d", 
-            entity, scene->entities, scene->entity_count);
 
 	EntityVTable *vtable = base->vtable;
 	if (vtable && vtable->Setup) vtable->Setup(base);

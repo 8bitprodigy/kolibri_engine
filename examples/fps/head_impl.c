@@ -186,7 +186,7 @@ testHeadPostRender(Head *head)
 	drawReticle(
 			center_x,
 			center_y,
-			4,
+			3,
 			12,
 			4 + spread_offset,
 			BLACK,
@@ -197,7 +197,7 @@ testHeadPostRender(Head *head)
 	drawReticle(
 			center_x,
 			center_y,
-			2,
+			1,
 			10,
 			5 + spread_offset,
 			WHITE,

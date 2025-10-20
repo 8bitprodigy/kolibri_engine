@@ -10,6 +10,8 @@
 #include "_head_.h"
 #include "_spatialhash_.h"
 #include "common.h"
+#define RAY2D_COLLISION_IMPLEMENTATION
+#include "ray_collision_2d.h"
 
 
 #define CELL_ALIGN( value ) ((int)floorf( (value) / CELL_SIZE))
@@ -404,58 +406,6 @@ CollisionScene__checkCollision(
 /*************************************
 	CONTINUOUS COLLISION DETECTION
 *************************************/
-/* 2D swept circle collision -- needed for cylinder collision checks */
-CollisionResult
-checkContinuousCircle2D(
-	Vector2 center_a, 
-	float   radius_a,
-	Vector2 center_b,
-	float   radius_b,
-	Vector2 movement
-)
-{
-	CollisionResult result = {0};
-	result.hit             = false;
-	result.distance        = 1.0f;
-
-	/* Relative motion: Treat B as stationary, A as moving */
-	Vector2 rel_pos    = Vector2Subtract(center_a, center_b);
-	float   radius_sum = radius_a + radius_b;
-
-	/* Quadratic equation: |relpos + t * velocity|^2 = radius_sum^2 */
-	float
-		a_coeff      = Vector2DotProduct(movement, movement),
-		b_coeff      = 2.0f * Vector2DotProduct(rel_pos, movement),
-		c_coeff      = Vector2DotProduct(rel_pos, rel_pos) - radius_sum * radius_sum,
-		discriminant = b_coeff * b_coeff - 4.0f * a_coeff * c_coeff;
-
-	/* No collision */
-	if (discriminant < 0.0f || fabsf(a_coeff) < 0.0001f) return result;
-
-	float
-		sqrt_disc   = sqrtf(discriminant),
-		t1          = (-b_coeff - sqrt_disc) / (2.0f * a_coeff),
-		t2          = (-b_coeff + sqrt_disc) / (2.0f * a_coeff),
-		t_collision = (0.0f <= t1 && t1 <= 1.0f) ? t1 : t2;
-
-	if (t_collision < 0.0f || 1.0f < t_collision) return result;
-
-	/* Collision found */
-	result.hit      = true;
-	result.distance = t_collision * Vector2Length(movement);
-
-	/* Contact position (center of moving circle at collision) */
-	Vector2 contact_2d = Vector2Add(center_a, Vector2Scale(movement, t_collision));
-	result.position    = (Vector3){contact_2d.x, 0.0f, contact_2d.y};
-
-	/* Normal pointing from B toward A */
-	Vector2 normal_2d = Vector2Normalize(Vector2Subtract(contact_2d, center_b));
-	result.normal     = (Vector3){normal_2d.x, 0.0f, normal_2d.y};
-
-	return result;
-}
-	
-
 /* CCD: Cylinder-Cylinder */
 CollisionResult
 Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
@@ -479,23 +429,27 @@ Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 	Vector2
 		center_a    = {from.x, from.z},
 		center_b    = {b->position.x, b->position.z},
-		movement_2d = {movement.x, movement.z};
+		movement_2d = {movement.x, movement.z},
+		intersection;
 	float
 		radius_a = a->bounds.x * 0.5f,
 		radius_b = b->bounds.x * 0.5f;
 
-	result = checkContinuousCircle2D(
-			center_a,
-			radius_a,
+	result.hit = CheckCollisionRay2dCircle(
+			(Ray2d) {
+					center_a,
+					movement_2d
+				},
 			center_b,
-			radius_b,
-			movement_2d
+			radius_a + radius_b,
+			&intersection
 		);
 
 	if (!result.hit) return result;
 	
 	/* Check Y-axis overlap at collision time */
 	float
+		col_dist    = Vector2Length(Vector2Subtract(intersection, center_a)),
 		t_collision = result.distance / move_length,
 		collision_y = from.y + movement.y * t_collision,
 		a_bottom    = collision_y,
@@ -511,6 +465,7 @@ Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 
 	/* Collision found */
 	result.entity   = b;
+	result.distance = col_dist;
 	result.position = Vector3Add(from, Vector3Scale(movement, t_collision));
 	
 	return result;
@@ -534,9 +489,10 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
     }
 
     /* Add A and B's AABBs together */
-    Vector3 *b_pos    = &b->position;
-    Vector3 *b_bounds = &b->bounds;
-    Vector3 *a_bounds = &a->bounds;
+    Vector3 
+		*b_pos    = &b->position,
+		*b_bounds = &b->bounds,
+		*a_bounds = &a->bounds;
     
     BoundingBox expanded_box = {
         {
@@ -569,9 +525,44 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
     return result;
 }
 
+CollisionResult
+Collision__checkContinuousSphere(
+	Entity  *sphere_1,
+	Entity  *sphere_2,
+	Vector3  movement
+)
+{
+    CollisionResult result = {0};
+    result.hit             = false;
+    result.distance        = Vector3Length(movement);
+
+    float   radius   = sphere_1->radius + sphere_2->radius;
+    Vector3 position = Vector3Add(
+			sphere_2->position, 
+			sphere_2->bounds_offset
+		);
+    Ray     ray      = {sphere_1->position, Vector3Normalize(movement)};
+     
+	RayCollision collision = GetRayCollisionSphere(ray, position, radius);
+
+	/* Check if collision is within our movement distance and in forward direction */
+    if (collision.hit && 
+        collision.distance >= 0.0f && 
+        collision.distance <= result.distance) {
+        
+        result.hit      = true;
+        result.distance = collision.distance;
+        result.entity   = sphere_2;
+        result.position = collision.point;
+        result.normal   = collision.normal;
+    }
+
+    return result;
+}
+
 /* CCD: AABB - Cylinder using Minkowski sum approach */
 CollisionResult
-Collision__checkContinuousMixed(
+Collision__checkContinuousAABBCylinder(
 	Entity  *aabb, 
 	Entity  *cylinder, 
 	Vector3  movement, 
@@ -664,7 +655,8 @@ Collision__checkContinuousMixed(
 					(hit_xz.y < aabb_center.y) 
 						? aabb_pos.z - aabb->bounds.z * 0.5f 
 						: aabb_pos.z + aabb->bounds.z * 0.5f
-				};
+				},
+			intersection;
 		
 		/* Check if close enough to corner for circle collision */
 		if (Vector2Distance(hit_xz, closest_corner_expanded) <= cyl_radius) {
@@ -672,13 +664,18 @@ Collision__checkContinuousMixed(
 				movement_2d = { movement.x, movement.z },
 				cyl_center  = { cyl_pos.x, cyl_pos.z };
 			
-			CollisionResult circle_result = checkContinuousCircle2D(
-					cyl_center, 
-					cyl_radius, 
-					closest_corner_original, 
-					0.0f, 
-					movement_2d
+			CollisionResult circle_result;
+			circle_result.hit = CheckCollisionRay2dCircle(
+					(Ray2d) {
+							cyl_center,
+							movement_2d
+						},
+					closest_corner_original,
+					cyl_radius,
+					&intersection
 				);
+			
+			circle_result.distance = Vector2Length(Vector2Subtract(intersection, cyl_center));
 			
 			if (circle_result.hit && circle_result.distance <= move_length) {
 				result = circle_result;
@@ -719,7 +716,7 @@ Collision__checkContinuous(Entity *a, Entity *b, Vector3 movement)
 		return Collision__checkContinuousAABB(a, b, movement);
 		break;
 	case COLLIDERS(COLLISION_BOX,      COLLISION_CYLINDER):
-        return Collision__checkContinuousMixed(a, b, movement, true); /* AABB moving */
+        return Collision__checkContinuousAABBCylinder(a, b, movement, true); /* AABB moving */
 		break;
 	case COLLIDERS(COLLISION_BOX,      COLLISION_SPHERE):
 		break;
@@ -727,15 +724,15 @@ Collision__checkContinuous(Entity *a, Entity *b, Vector3 movement)
         return Collision__checkContinuousCylinder(a, b, movement);
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_BOX):
-        return Collision__checkContinuousMixed(a, b, movement, false); /* Cylinder moving */
+        return Collision__checkContinuousAABBCylinder(a, b, movement, false); /* Cylinder moving */
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_SPHERE):
 		break;
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_SPHERE): /* FALLTHROUGH */
+        return Collision__checkContinuousSphere(a, b, movement);
+        break;
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_BOX):
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_CYLINDER):
-	default:
-		break;
 	}
 	
 	return NO_COLLISION;

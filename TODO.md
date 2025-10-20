@@ -6,7 +6,6 @@
 
 ## General/Unknown:
 - [ ] (engine/head) Fix RenderTexture viewports 
-- [ ] (unknown) Fix whatever is causing a segfault on exit
 - [x] (`common.h`) Fix not all entities being updated/rendered
 	- Forgot to update `MAX_NUM_ENTITIES` in `common.h`
 
@@ -14,8 +13,10 @@
 - [ ] Fix the is-on-floor check not working when standing on top of another entity
 - [ ] Fix whatever is causing catching when sliding against another collider
 - [ ] Fix cylinder-AABB collision
-- [ ] Fix tunneling when moving at low tick rates.
+- [ ] Fix tunneling when moving at low tick rates
+- [ ] Make collision check functions public
 - [ ] Finish implementing all collision shape interactions
+- [ ] Leverage `ray_collision_2d.h` where needed
 
 ## Engine:
 - [x] Fix whatever prevents being able to re-run the game after quitting to main menu

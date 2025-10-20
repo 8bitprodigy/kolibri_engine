@@ -65,7 +65,6 @@ runEngine(void *data, void *value)
 	
 	player    = Entity_new(&playerTemplate, scene, 0);
 	player->position = (Vector3){0.0f, 0.0f, 0.0f};
-	DBG_OUT("Player @%p", player);
 	
 	head_data = (TestHeadData*)Head_getUserData(head);
 	head_data->target      = player;
@@ -77,7 +76,7 @@ runEngine(void *data, void *value)
  
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
-			for (int z = 0; z < 7; z++) {
+			for (int z = 0; z < 1; z++) {
 				Vector3 position       = (Vector3){
 						(x * 5.0f) - 50.0f,
 						(z * 5.0f),
@@ -114,6 +113,7 @@ handleArgs(int argc, char **argv)
 				break;
 			case 'f':
 				frame_rate = atoi(c);
+				if (0 < frame_rate) SetTargetFPS(frame_rate);
 				break;
 			case 'w':
 				screen_width = atoi(c);
@@ -145,7 +145,7 @@ main(int argc, char **argv)
 #ifndef ON_CONSOLE
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
 #endif /* ON_CONSOLE */
-	SetTargetFPS(frame_rate);
+	//SetTargetFPS(frame_rate);
 	InitWindow(screen_width, screen_height, "Kolibri Engine Test");
 	
 	initMouse();
