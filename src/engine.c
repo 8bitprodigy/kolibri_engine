@@ -252,7 +252,7 @@ Engine_run(Engine *self)
 void
 Engine_update(Engine *self)
 {
-	DBG_OUT("Engine updating...");
+	//DBG_OUT("Engine updating...");
 	if (self->paused || self->request_exit) return;
 	const EngineVTable *vtable = self->vtable;
 	
@@ -268,7 +268,7 @@ Engine_update(Engine *self)
 	// Run ticks for elapsed time
 	while (self->current_time - self->last_tick_time >= self->tick_length) {
 		
-		DBG_OUT("Engine Tick #%i", self->tick_num);
+		//DBG_OUT("Engine Tick #%i", self->tick_num);
 		Scene_update(self->scene, self->tick_length);
 		if (vtable && vtable->Update) vtable->Update(self, self->tick_length);
 		

@@ -38,6 +38,7 @@ Scene_new(
     
     scene->engine           = engine;
     scene->entities         = NULL;
+    scene->entity_count     = 0;
 	scene->collision_scene  = CollisionScene__new(scene);
     scene->map_data         = data;
     scene->vtable           = map_type;
@@ -258,6 +259,7 @@ Scene_render(Scene *self, Head *head)
             entity_list = *all_entities;
         }
     }
+    
     Renderer__render(Engine__getRenderer(self->engine), &entity_list, head);
 }
 

@@ -32,7 +32,6 @@ Entity_new(const Entity *entity, Scene *scene)
 	node->next   = node;
 	node->prev   = node;
 	node->engine = scene->engine;
-	node->scene  = scene;
 
 	Entity *base = NODE_TO_ENTITY(node);
 	*base = *entity;
@@ -40,7 +39,12 @@ Entity_new(const Entity *entity, Scene *scene)
 	base->user_data = NULL;
 	node->unique_ID = Latest_ID++;
 	
+    DBG_OUT("Entity_new: before insertion, scene=%p, scene->entities=%p", 
+            scene, scene->entities);
 	Scene__insertEntity(scene, node);
+	node->scene  = scene;
+    DBG_OUT("Entity_new: added entity %p to scene, scene->entities=%p, scene->entity_count=%d", 
+            entity, scene->entities, scene->entity_count);
 
 	EntityVTable *vtable = base->vtable;
 	if (vtable && vtable->Setup) vtable->Setup(base);
@@ -182,6 +186,8 @@ Entity_render(Entity *entity, Head *head)
 {
 	if (!entity->visible) return;
 
+	DBG_OUT("Rendering Entity@%p", entity);
+	
 	Camera3D *camera   = &head->camera;
 	float     distance = Vector3Distance(entity->position, camera->position);
 
@@ -239,14 +245,18 @@ EntityNode__freeAll(EntityNode *self)
 void
 EntityNode__updateAll(EntityNode *node, float delta)
 {
-	if (!node) return;
+    //DBG_OUT("EntityNode__updateAll called with node=%p", node);
+	if (!node) {
+        //DBG_OUT("Node is NULL, returning");
+		return;
+	}
 	EntityNode *starting_node = node;
 	
 	do {
 		Entity *entity = NODE_TO_ENTITY(node);
 		EntityVTable *vtable = entity->vtable;
 		if (vtable && vtable->Update) vtable->Update(entity, delta);
-
+		//DBG_OUT("Updating Entity @%p", entity);
 		node = node->next;
 	} while (node != starting_node);
 }

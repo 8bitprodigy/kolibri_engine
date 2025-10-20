@@ -65,8 +65,9 @@ runEngine(void *data, void *value)
 	
 	player    = Entity_new(&playerTemplate, scene);
 	player->position = (Vector3){0.0f, 0.0f, 0.0f};
+	DBG_OUT("Player @%p", player);
+	
 	head_data = (TestHeadData*)Head_getUserData(head);
-
 	head_data->target      = player;
 	head_data->target_data = player->user_data;
 	head_data->eye_height  = 1.75f;
@@ -84,7 +85,6 @@ runEngine(void *data, void *value)
 					};
 				if (Vector3Equals(position, V3_ZERO)) continue;
 				ents[x][y][z]           = Entity_new(&entityTemplate, scene);
-				DBG_OUT("Spawning Entitiy");
 				ents[x][y][z]->visible  = true;
 				ents[x][y][z]->active   = true;
 				ents[x][y][z]->position = position;
