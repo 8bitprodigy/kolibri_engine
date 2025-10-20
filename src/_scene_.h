@@ -4,6 +4,7 @@
 
 #include "_collision_.h"
 #include "_entity_.h"
+#include "rmem.h"
 #include "scene.h"
 
 
@@ -15,6 +16,7 @@ Scene
         *next;
     
     Engine         *engine;
+    MemPool         entity_pool;
 	EntityNode     *entities;
 	CollisionScene *collision_scene;
     SceneVTable    *vtable;

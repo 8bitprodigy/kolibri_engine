@@ -63,7 +63,7 @@ runEngine(void *data, void *value)
 
 	scene = Scene_new(&scene_Callbacks, NULL, engine);
 	
-	player    = Entity_new(&playerTemplate, scene);
+	player    = Entity_new(&playerTemplate, scene, 0);
 	player->position = (Vector3){0.0f, 0.0f, 0.0f};
 	DBG_OUT("Player @%p", player);
 	
@@ -84,7 +84,7 @@ runEngine(void *data, void *value)
 						(y * 5.0f) - 50.0
 					};
 				if (Vector3Equals(position, V3_ZERO)) continue;
-				ents[x][y][z]           = Entity_new(&entityTemplate, scene);
+				ents[x][y][z]           = Entity_new(&entityTemplate, scene, 0);
 				ents[x][y][z]->visible  = true;
 				ents[x][y][z]->active   = true;
 				ents[x][y][z]->position = position;

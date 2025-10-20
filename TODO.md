@@ -24,8 +24,8 @@
 	- It was caused by an unititialized `Engine.tick_rate` value, which would hold a random garbage value
 
 ## Entities:
-- [ ] Make use of `rmem.h`'s `MemoryPool` arena to allocate all entities to.
-- [ ] Re-subordinate `Entity`s to `Scene`s
+- [x] Make use of `rmem.h`'s `MemoryPool` arena to allocate all entities to.
+- [x] Re-subordinate `Entity`s to `Scene`s
 
 ## Renderer:
 - [ ] Implement 2-pass rendering to support transparency.

@@ -32,9 +32,6 @@
 #ifndef MAX_NUM_HEADS
 	#define MAX_NUM_HEADS 4
 #endif
-#ifndef MAX_NUM_ENTITIES
-	#define MAX_NUM_ENTITIES 4096
-#endif
 #ifdef ENGINE_SINGLE_HEAD_ONLY
 	/*
 		If defined, only the first head can and will be used for rendering, and
@@ -56,6 +53,10 @@
 #endif
 #ifndef MAX_RENDERABLES_PER_ENTITY  
 	#define MAX_RENDERABLES_PER_ENTITY 4
+#endif
+/* Scene-related constatns */
+#ifndef MAX_NUM_ENTITIES
+	#define MAX_NUM_ENTITIES 4096
 #endif
 /* Collision system-related constants */
 #ifndef SPATIAL_HASH_SIZE

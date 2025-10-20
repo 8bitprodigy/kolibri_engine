@@ -38,6 +38,7 @@ Scene_new(
     
     scene->engine           = engine;
     scene->entities         = NULL;
+    scene->entity_pool      = CreateMemPool(sizeof(EntityNode) * MAX_NUM_ENTITIES);
     scene->entity_count     = 0;
 	scene->collision_scene  = CollisionScene__new(scene);
     scene->map_data         = data;
@@ -63,9 +64,9 @@ Scene_free(Scene *scene)
     SceneVTable *vtable = scene->vtable; 
     if (vtable && vtable->Free) vtable->Free(scene, scene->map_data);
     
-    Engine__removeScene( scene->engine, scene);
-    EntityNode__freeAll( scene->entities);
-	CollisionScene__free(scene->collision_scene);
+    Engine__removeScene(  scene->engine, scene);
+	DestroyMemPool(      &scene->entity_pool);
+	CollisionScene__free( scene->collision_scene);
     
     free(scene);
 } /* Scene_free */

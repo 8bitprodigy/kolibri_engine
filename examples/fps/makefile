@@ -1,7 +1,7 @@
 CC      = gcc-14
 CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0 -DDEBUG #-DHEAD_USE_RENDER_TEXTURE
 LIBS    = -lraylib -lGL -lm
-INCLUDE = -I../../include -I/usr/local/include
+INCLUDE = -I../../include -I/usr/local/include -I../
 LIBDIR  = -L/usr/local/lib
 
 PROJECTNAME = fps_example

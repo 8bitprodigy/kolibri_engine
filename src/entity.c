@@ -1,10 +1,13 @@
+#include <raylib.h>
+#include <raymath.h>
+
 #include "_engine_.h"
 #include "_entity_.h"
 #include "_head_.h"
 #include "_scene_.h"
 #include "common.h"
-#include <raylib.h>
-#include <raymath.h>
+#define RMEM_IMPLEMENTATION
+#include "rmem.h"
 
 
 #define PUSH_OUT_DISTANCE  0.1f
@@ -18,11 +21,15 @@ static uint64 Latest_ID = 0;
 	CONSTRUCTOR
 ******************/
 Entity *
-Entity_new(const Entity *entity, Scene *scene)
+Entity_new(const Entity *entity, Scene *scene, size_t user_data_size)
 {
 	if (!scene) return NULL;
 	
-	EntityNode *node = malloc(sizeof(EntityNode));
+	EntityNode *node = MemPoolAlloc(
+			&scene->entity_pool,
+			sizeof(EntityNode) 
+				+ user_data_size
+		);
 
 	if (!node) {
 		ERR_OUT("Failed to allocate memory for EntityNode.");
@@ -185,8 +192,6 @@ void
 Entity_render(Entity *entity, Head *head)
 {
 	if (!entity->visible) return;
-
-	DBG_OUT("Rendering Entity@%p", entity);
 	
 	Camera3D *camera   = &head->camera;
 	float     distance = Vector3Distance(entity->position, camera->position);
@@ -219,14 +224,15 @@ Entity_isOnFloor(Entity *self)
 void
 EntityNode__free(EntityNode *self)
 {
-	Entity       *entity = NODE_TO_ENTITY(self);
+	Entity *entity = NODE_TO_ENTITY(self);
+	Scene  *scene  = self->scene;
 	
 	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Free) vtable->Free(entity);
 	
-	Scene__removeEntity(self->scene, self);
+	Scene__removeEntity(scene, self);
 
-	free(self);
+	MemPoolFree(&scene->entity_pool, self);
 }
 
 void
@@ -245,9 +251,7 @@ EntityNode__freeAll(EntityNode *self)
 void
 EntityNode__updateAll(EntityNode *node, float delta)
 {
-    //DBG_OUT("EntityNode__updateAll called with node=%p", node);
 	if (!node) {
-        //DBG_OUT("Node is NULL, returning");
 		return;
 	}
 	EntityNode *starting_node = node;
@@ -256,7 +260,6 @@ EntityNode__updateAll(EntityNode *node, float delta)
 		Entity *entity = NODE_TO_ENTITY(node);
 		EntityVTable *vtable = entity->vtable;
 		if (vtable && vtable->Update) vtable->Update(entity, delta);
-		//DBG_OUT("Updating Entity @%p", entity);
 		node = node->next;
 	} while (node != starting_node);
 }
