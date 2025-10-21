@@ -90,17 +90,16 @@ extern HeadVTable head_Callbacks;
 typedef struct
 TestHeadData
 {
-	Model   
-			skysphere,
-			weapons[NUM_WEAPONS];
+	Model      weapons[NUM_WEAPONS];
+	Vector2    look;
+	Texture2D  skybox_textures[6];
+	Entity    *target;
+	void      *target_data;
+	float      eye_height;
 	int     
-			current_weapon,
-			viewport_scale,
-			controller;
-	float   eye_height;
-	Vector2 look;
-	Entity *target;
-	void   *target_data;
+			   current_weapon,
+			   viewport_scale,
+			   controller;
 }
 TestHeadData;
 

@@ -4,6 +4,7 @@
 
 #include "../reticle.h"
 #include "game.h"
+#include "../skybox.h"
 
 
 #define MOUSE_SENSITIVITY   0.05f
@@ -11,7 +12,7 @@
 #define VIEWPORT_INCREMENT 48
 
 #ifndef SKY_PATH
-	#define SKY_PATH "resources/sky/SBS_sky_panorama_full.png"
+	#define SKY_PATH "resources/sky/SBS_SKY_panorama_%s.png"
 #endif
 
 
@@ -57,51 +58,14 @@ testHeadSetup(Head *head)
 
 	user_data->current_weapon = 0;
 
-	/*
-		Handle Sky Sphere
-	*/
-	Model *skysphere = &user_data->skysphere;
-	
-	Mesh mesh = GenMeshSphere(1.0f, 13, 16);
-	*skysphere = LoadModelFromMesh(mesh);
-
-	Mesh *skyMesh = &skysphere->meshes[0];
-	Matrix rotMatrix = MatrixRotateX(DEG2RAD * -90.0f); /* Adjust angle as needed */
-
-	for (int i = 0; i < skyMesh->vertexCount; i++) {
-		/* Fix UV coordinates */
-		float u = skyMesh->texcoords[i*2];
-		float v = skyMesh->texcoords[i*2+1];
-		skyMesh->texcoords[i*2] = 1.0f - v;
-		skyMesh->texcoords[i*2+1] = u;
-		
-		/* Rotate vertex positions */
-		Vector3 vertex = {
-			skyMesh->vertices[i*3],     /* x */
-			skyMesh->vertices[i*3+1],   /* y */
-			skyMesh->vertices[i*3+2]    /* z */
-		};
-		
-		Vector3 rotatedVertex = Vector3Transform(vertex, rotMatrix);
-		
-		skyMesh->vertices[i*3]     = rotatedVertex.x;
-		skyMesh->vertices[i*3+1]   = rotatedVertex.y;
-		skyMesh->vertices[i*3+2]   = rotatedVertex.z;
+	for (int i = 0; i < 6; i++) {
+		char filename[256];
+		snprintf(filename, sizeof(filename), SKY_PATH, SkyBox_names[i]);
+		DBG_OUT("Sky Texture loaded: %s", filename);
+		user_data->skybox_textures[i] = LoadTexture(filename);
+		SetTextureFilter(user_data->skybox_textures[i], TEXTURE_FILTER_BILINEAR);
+		SetTextureWrap(   user_data->skybox_textures[i], TEXTURE_WRAP_MIRROR_REPEAT);
 	}
-
-	/* Update both vertex and UV buffers */
-	UpdateMeshBuffer(*skyMesh, 0, skyMesh->vertices, skyMesh->vertexCount*3*sizeof(float), 0);
-	UpdateMeshBuffer(*skyMesh, 1, skyMesh->texcoords, skyMesh->vertexCount*2*sizeof(float), 0);
-
-	Texture2D skyTexture = LoadTexture(SKY_PATH);
-	if (skyTexture.id == 0) {
-		ERR_OUT("Failed to load sky texture!");
-		skyTexture = LoadTexture("");
-	}
-	
-	SetMaterialTexture(&skysphere->materials[0], MATERIAL_MAP_ALBEDO, skyTexture);
-	SetTextureFilter(skyTexture, TEXTURE_FILTER_BILINEAR);
-	/* End Handle Sky Sphere */
 
 	/*
 		Handle HUD Weapons
@@ -120,14 +84,11 @@ testHeadPreRender(Head *head)
 {
 	TestHeadData *data = Head_getUserData(head);
 	Camera3D     *cam  = Head_getCamera(head);
-	//ClearBackground(WHITE);
+	rlClearScreenBuffers();
 	BeginMode3D(*cam);
-		rlDisableDepthMask();
-		rlDisableBackfaceCulling();
-			DrawModel(data->skysphere, cam->position, 1.0, WHITE);
-		rlEnableBackfaceCulling();
-		rlEnableDepthMask();
+		SkyBox_draw(cam, data->skybox_textures, V4_ZERO);  
 	EndMode3D();
+	glClear(GL_DEPTH_BUFFER_BIT);   
 }
 
 void
