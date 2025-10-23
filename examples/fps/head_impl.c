@@ -247,6 +247,7 @@ PLAYER_INPUT:
     {
 		Engine_pause(engine, true);
 	}
+
 	
     Vector2 
         mouse_look = GetMouseDelta(),
@@ -314,4 +315,18 @@ PLAYER_INPUT:
 		camera, 
 		current_camera_pos
 	);
+
+	
+	if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+		Entity *projectile = Entity_new(
+				&Blast_Template, 
+				Engine_getScene(engine),
+				0
+			);
+			
+		projectile->position = camera->target;
+		projectile->visible  = true;
+		projectile->active   = true;
+		DBG_OUT("Projectile@%p created at ( %f, %f, %f ).", projectile, camera->target.x, camera->target.y, camera->target.z);
+	}
 }

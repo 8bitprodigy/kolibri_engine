@@ -150,7 +150,7 @@ main(int argc, char **argv)
 	
 	initMouse();
 	
-
+	Projectile_MediaInit();
 
 	mainMenu = Menu( "Main Menu",
 			MENU_WIDTH,

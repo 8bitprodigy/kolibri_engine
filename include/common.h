@@ -377,7 +377,7 @@ invLerp(float a, float b, float value)
 static inline void
 moveCamera(Camera *cam, Vector3 new_position)
 {
-	Vector3 diff  = Vector3Subtract(cam->target, cam->position);
+	Vector3 diff  = Vector3Normalize(Vector3Subtract(cam->target, cam->position));
 	cam->position = new_position;
 	cam->target   = Vector3Add(new_position, diff);
 }

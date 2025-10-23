@@ -29,4 +29,4 @@
 - [x] Re-subordinate `Entity`s to `Scene`s
 
 ## Renderer:
-- [ ] Implement 2-pass rendering to support transparency.
+- [ ] Implement 2-pass rendering to support renderables with transparency.

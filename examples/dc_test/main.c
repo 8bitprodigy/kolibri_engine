@@ -18,42 +18,20 @@ int
 	screen_height;
 
 
-int
+int 
 main(int argc, char **argv)
 {
-	readyToClose = false;
-	
-	tick_rate     = DEFAULT_TICK_RATE,
-	frame_rate    = DEFAULT_FRAME_RATE;
-	screen_width  = SCREEN_WIDTH;
-	screen_height = SCREEN_HEIGHT;
-
-	SetTargetFPS(frame_rate);
-	InitWindow(screen_width, screen_height, "Kolibri Engine Test");
-	
-	initMouse();
-	
-	while (!readyToClose) {
-		readyToClose = WindowShouldClose();
-		BeginDrawing();
-			ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
-			DrawRectangle( 50, 50, 300, 200, RED);
-			if (GuiButton(
-					(Rectangle) {
-							20,
-							20,
-							MENU_WIDTH,
-							MENU_ITEM_HEIGHT
-						},
-					"test"
-				)
-			) {
-				
-			}
-		EndDrawing();
-	}
-
-	
-	CloseWindow();
-	return 0;
+    InitWindow(640, 480, "Test");
+    SetTargetFPS(60);
+    
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+            ClearBackground(BLACK);
+            DrawRectangle(50, 50, 300, 200, RED);
+            DrawCircle(400, 300, 50, GREEN);
+        EndDrawing();
+    }
+    
+    CloseWindow();
+    return 0;
 }

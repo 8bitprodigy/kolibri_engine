@@ -10,15 +10,15 @@ void playerUpdate(Entity *self, float delta);
 /*
 	Template Declarations
 */
-TestRenderableData rd_player = (TestRenderableData){.color = MAGENTA};
 	
 Renderable         
 	r_player = (Renderable){
-			.data   = &rd_player,
+			.data   = &MAGENTA,
 			.Render = testRenderableBoxWiresCallback
 		};
 
-EntityVTable player_Callbacks = (EntityVTable){
+EntityVTable 
+player_Callbacks = (EntityVTable){
 	.Setup       = playerSetup,
 	.Enter       = NULL,
 	.Update      = playerUpdate,
@@ -29,9 +29,10 @@ EntityVTable player_Callbacks = (EntityVTable){
 	.Free        = NULL
 };
 
-Entity playerTemplate = (Entity){
+Entity
+playerTemplate = (Entity){
 	.renderables       = {&r_player},
-	.lod_distances     = {48.0f},
+	.lod_distances     = {1024.0f},
 	.lod_count         = 1,
 	.visibility_radius = 4.5f,
 	.bounds            = {1.0f, 2.0f, 1.0f},

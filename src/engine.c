@@ -265,7 +265,7 @@ Engine_update(Engine *self)
 	if (self->tick_rate <= 0) return;
 
 	
-	// Run ticks for elapsed time
+	/* Run ticks for elapsed time */
 	while (self->current_time - self->last_tick_time >= self->tick_length) {
 		
 		//DBG_OUT("Engine Tick #%i", self->tick_num);
@@ -276,7 +276,7 @@ Engine_update(Engine *self)
 		self->tick_num++;
 	}
 	
-	// For extrapolation: how far into the next tick are we?
+	/* For extrapolation: how far into the next tick are we? */
 	self->tick_elapsed = (self->current_time - self->last_tick_time) / self->tick_length;
 }
 

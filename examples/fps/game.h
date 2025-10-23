@@ -5,6 +5,7 @@
 #include <math.h>
 #include <raylib.h>
 #include <raymath.h>
+#include <string.h>
 
 #include "kolibri.h"
 
@@ -62,33 +63,27 @@
 #define MAX_SLIDES  3
 
 
-/* Player data */
+/* 
+	engine_impl.c
+*/
+extern EngineVTable engine_Callbacks;
+
+void engineRun(      Engine *engine);
+void engineExit(     Engine *engine);
+void engineComposite(Engine *engine);
+
+/* 
+	entity_impl.c
+*/
+extern Renderable         r_1,  r_2,  r_3;
+
+extern EntityVTable entity_Callbacks;
+extern Entity       entityTemplate;
+
+/* 
+	head_impl.c
+*/
 typedef struct
-PlayerData
-{
-	Vector3
-		prev_position,
-		prev_velocity,
-		move_dir,
-		direction;
-	bool    request_jump;
-}
-PlayerData;
-
-
-typedef struct
-TestRenderableData
-{
-	Color color;
-}
-TestRenderableData;
-
-
-/* Head Implementation */
-extern HeadVTable head_Callbacks;
-
-typedef struct
-TestHeadData
 {
 	Model      weapons[NUM_WEAPONS];
 	Vector2    look;
@@ -103,35 +98,40 @@ TestHeadData
 }
 TestHeadData;
 
-
-/* 
-	engine_impl.c
-*/
-extern EngineVTable engine_Callbacks;
-
-void engineRun(      Engine *engine);
-void engineExit(     Engine *engine);
-void engineComposite(Engine *engine);
-
-/* 
-	entity_impl.c
-*/
-extern TestRenderableData rd_1, rd_2, rd_3;
-extern Renderable         r_1,  r_2,  r_3;
-
-extern EntityVTable entity_Callbacks;
-extern Entity       entityTemplate;
-
-/* 
-	head_impl.c
-*/
 extern HeadVTable head_Callbacks;
 
 /* 
 	player.c
 */
+/* Player data */
+typedef struct
+{
+	Vector3
+		prev_position,
+		prev_velocity,
+		move_dir,
+		direction;
+	bool    request_jump;
+}
+PlayerData;
+
 extern EntityVTable player_Callbacks;
 extern Entity       playerTemplate;
+
+/*
+	projectile.c
+*/
+typedef struct
+{
+	float 
+		damage,
+		speed;
+}
+ProjectileInfo;
+
+void   Projectile_MediaInit(void);
+extern EntityVTable projectile_Callbacks;
+extern Entity       Blast_Template;
 
 /* 
 	scene_impl.c
@@ -147,18 +147,45 @@ CollisionResult testSceneCollision(Scene *scene, Entity *entity, Vector3 to);
 
 /* Renderable Callback */
 static void
+RenderModel(
+	Renderable *renderable,
+	void       *render_data
+)
+{
+	Model  *model  = (Model*)renderable->data;
+	Entity *entity = (Entity*)render_data;
+	Vector3          
+		    pos    = entity->position,
+		    scale  = entity->scale;
+	Matrix  matrix = QuaternionToMatrix(entity->orientation);
+	
+	rlPushMatrix();
+		rlTranslatef(pos.x, pos.y, pos.z);
+		rlMultMatrixf(MatrixToFloat(matrix));
+		rlScalef(scale.x, scale.y, scale.z);
+		
+		DrawModel(
+				*model,
+				V3_ZERO, 
+				1.0f, 
+				WHITE
+			);
+	rlPopMatrix();
+}
+
+static void
 testRenderableBoxCallback(
 	Renderable *renderable,
 	void       *render_data
 )
 {
-	Entity             *entity = render_data;
-	TestRenderableData *data   = (TestRenderableData*)renderable->data;
-	if (!data) return;
+	Entity *entity = render_data;
+	Color  *color  = (Color*)renderable->data;
+	if (!color) return;
 	DrawCubeV(
 		Vector3Add(entity->position, entity->renderable_offset),
 		entity->bounds,
-		data->color
+		*color
 	);
 		
 }
@@ -169,13 +196,13 @@ testRenderableBoxWiresCallback(
 	void       *render_data
 )
 {
-	Entity             *entity = render_data;
-	TestRenderableData *data   = (TestRenderableData*)renderable->data;
-	if (!data) return; 
+	Entity *entity = render_data;
+	Color  *color  = (Color*)renderable->data;
+	if (!color) return;
 	DrawCubeWiresV(
 		Vector3Add(entity->position, entity->renderable_offset),
 		entity->bounds,
-		data->color
+		*color
 	);
 		
 }
@@ -186,17 +213,17 @@ testRenderableCylinderWiresCallback(
 	void       *render_data
 )
 {
-	Entity             *entity = render_data;
-	TestRenderableData *data   = (TestRenderableData*)renderable->data;
+	Entity *entity = renderable->data;
+	Color  *color  = (Color*)renderable->data;
 	float               radius = entity->bounds.x;
-	if (!data) return;
+	if (!color) return;
 	DrawCylinderWires(
 		entity->position,
 		radius,
 		radius,
 		entity->bounds.y,
 		8,
-		data->color
+		*color
 	);
 }
 

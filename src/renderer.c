@@ -8,6 +8,7 @@ typedef struct
 Renderer
 {
 	SpatialHash *visibility_hash;
+	SpatialHash *transparency_hash;
 	Engine      *engine;
 	bool         dirty;
 }
@@ -27,9 +28,9 @@ Renderer__new(Engine *engine)
 		return NULL;
 	}
 
-	renderer->engine          = engine;
-	renderer->visibility_hash = SpatialHash_new();
-	renderer->dirty           = true;
+	renderer->engine            = engine;
+	renderer->visibility_hash   = SpatialHash_new();
+	renderer->dirty             = true;
 
 	return renderer;
 }
@@ -194,43 +195,4 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 	for (int i = 0; i < visible_count; i++) {
 		Entity_render(visible_entities[i], head);
 	}
-}
-
-void 
-Renderer__renderBruteForceFrustum(Renderer *renderer, EntityList *entities, Head *head) 
-{
-    if (!entities || entities->count < 1) return;
-    
-    RendererSettings *settings = &head->settings;
-    Frustum *frustum = Head_getFrustum(head);
-    Camera3D *camera = Head_getCamera(head);
-    float max_dist_sq = settings->max_render_distance * settings->max_render_distance;
-    int rendered = 0;
-    
-    // Direct frustum culling on all entities - no spatial hash at all
-    for (int i = 0; i < entities->count && rendered < VIS_QUERY_SIZE; i++) {
-        Entity *entity = entities->entities[i];
-        
-        if (!entity->active || !entity->visible) continue;
-        
-        // Distance cull first (cheapest test)
-        float dist_sq = Vector3DistanceSqr(entity->position, camera->position);
-        if (dist_sq > max_dist_sq) continue;
-        
-        // Frustum cull
-        bool in_frustum = true;
-        for (int p = FRUSTUM_LEFT; p <= FRUSTUM_FAR; p++) {
-            if (p == FRUSTUM_NEAR) continue; // Skip near plane for outdoor scenes
-            float distance = Vector3DotProduct(frustum->planes[p].normal, entity->position) + frustum->planes[p].distance;
-            if (distance < -entity->visibility_radius) {
-                in_frustum = false;
-                break;
-            }
-        }
-        
-        if (in_frustum) {
-            Entity_render(entity, head);
-            rendered++;
-        }
-    }
 }

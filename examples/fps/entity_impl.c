@@ -9,22 +9,17 @@
 /*
 	Template Declarations
 */
-TestRenderableData 
-	rd_1 = (TestRenderableData){.color = RED}, 
-	rd_2 = (TestRenderableData){.color = GREEN}, 
-	rd_3 = (TestRenderableData){.color = BLUE};
-	
 Renderable         
 	r_1 = (Renderable){
-			.data   = &rd_1,
+			.data   = &RED,
 			.Render = testRenderableBoxCallback
 		},  
 	r_2 = (Renderable){
-			.data   = &rd_2,
+			.data   = &GREEN,
 			.Render = testRenderableBoxCallback
 		},  
 	r_3 = (Renderable){
-			.data   = &rd_3,
+			.data   = &BLUE,
 			.Render = testRenderableBoxCallback
 		};
 

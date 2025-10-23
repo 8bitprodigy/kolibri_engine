@@ -15,7 +15,7 @@ EntityVTable
     EntityCallback          Setup;       /* Called on initialization of a new Entity */
     EntityCallback          Enter;       /* Called upon Entity entering the scene */
     EntityUpdateCallback    Update;      /* Called once every frame prior to rendering */
-    EntityCallback          Render;      /* Called once every frame during the render portion to render the Entity */
+    EntityUpdateCallback    Render;      /* Called once every frame during the render portion to render the Entity */
     EntityCollisionCallback OnCollision; /* Called when the Entity collides with something while moving */
     EntityCollisionCallback OnCollided;  /* Called when another Entity collides with this Entity */
     EntityCallback          Exit;        /* Called upon Entity exiting the scene */
@@ -27,11 +27,11 @@ EntityVTable;
 typedef struct 
 Entity 
 {
-    
     Renderable     *renderables[  MAX_LOD_LEVELS];
     float           lod_distances[MAX_LOD_LEVELS];
     uint8           lod_count;
     float           visibility_radius;
+    double          creation_time;
     union {
         Vector3 bounds;
         struct {
