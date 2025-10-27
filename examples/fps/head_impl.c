@@ -318,24 +318,11 @@ PLAYER_INPUT:
 
 	
 	if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-		Entity *projectile = Entity_new(
-				&Blast_Template, 
-				Engine_getScene(engine),
-				0
+		Projectile_new(
+				camera->target,
+				Vector3Subtract(camera->target, camera->position),
+				&Blast_Template,
+				Engine_getScene(engine)
 			);
-			
-		projectile->position = camera->target;
-		projectile->visible  = true;
-		projectile->active   = true;
-		projectile->orientation = QuaternionFromVector3ToVector3(
-				V3_FORWARD,
-				Vector3Normalize(
-						Vector3Subtract(
-								camera->target, 
-								camera->position
-							)
-					)
-			);
-		DBG_OUT("Projectile@%p created at ( %f, %f, %f ).", projectile, camera->target.x, camera->target.y, camera->target.z);
 	}
 }

@@ -1,5 +1,6 @@
 #include "game.h"
 #include <raylib.h>
+#include <raymath.h>
 
 
 /*
@@ -16,6 +17,7 @@ Texture2D
 */
 void projectileSetup(    Entity *self);
 void projectileUpdate(   Entity *self, float           delta);
+void projectileRender(   Entity *self, float           delta);
 void projectileCollision(Entity *self, CollisionResult collision);
 
 /*
@@ -39,7 +41,7 @@ projectile_Callbacks = (EntityVTable){
 	.Setup       = projectileSetup,
 	.Enter       = NULL,
 	.Update      = projectileUpdate,
-	.Render      = NULL,
+	.Render      = projectileRender,
 	.OnCollision = projectileCollision,
 	.OnCollided  = projectileCollision,
 	.Exit        = NULL,
@@ -79,6 +81,31 @@ Projectile_MediaInit(void)
 	DBG_OUT("Projectile_MediaInit() ran.");
 }
 
+void
+Projectile_new(Vector3 position, Vector3 direction, Entity *template, Scene *scene)
+{
+	Entity *projectile = Entity_new(
+			template, 
+			scene,
+			sizeof(Vector3)
+		);
+		
+	*(Vector3*)projectile->local_data = V3_ZERO;
+	projectile->position              = position;
+	projectile->visible               = true;
+	projectile->active                = true;
+	projectile->orientation           = QuaternionFromVector3ToVector3(
+			V3_FORWARD,
+			Vector3Normalize(direction)
+		);
+	projectile->velocity              = Vector3Scale(
+			direction,
+			((ProjectileInfo*)template->user_data)->speed
+		);
+	
+	DBG_OUT("Projectile@%p created at ( %f, %f, %f ).", projectile, position.x, position.y, position.z);
+}
+
 void 
 projectileSetup(    Entity *self)
 {
@@ -92,9 +119,26 @@ projectileUpdate(   Entity *self, float delta)
 	if (data && data->timeout <= Entity_getAge(self)) {
 		self->visible = false;
 		self->active  = false;
+		
+		return;
 	}
+	Vector3 old_pos = self->position;
+	Entity_moveAndSlide(self, Vector3Scale(self->velocity, delta), 5);
+
+	self->renderable_offset     = Vector3Subtract(old_pos, self->position);
+	*(Vector3*)self->local_data = self->renderable_offset;
 }
 
+void
+projectileRender(Entity *self, float delta)
+{
+	self->renderable_offset = Vector3Lerp(
+		*(Vector3*)self->local_data,
+		V3_ZERO,
+		Engine_getTickElapsed(Entity_getEngine(self))
+	);
+	DBG_OUT("Projectile@%p renderable offset moved to ( %f, %f, %f ).", self, self->renderable_offset.x, self->renderable_offset.y, self->renderable_offset.z);
+}
 void 
 projectileCollision(Entity *self, CollisionResult collision)
 {

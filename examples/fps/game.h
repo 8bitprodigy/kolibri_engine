@@ -131,6 +131,7 @@ typedef struct
 ProjectileInfo;
 
 void   Projectile_MediaInit(void);
+void   Projectile_new(      Vector3 position, Vector3 direction, Entity *template, Scene *scene);
 extern EntityVTable projectile_Callbacks;
 extern Entity       Blast_Template;
 
@@ -156,7 +157,7 @@ RenderModel(
 	Model  *model  = (Model*)renderable->data;
 	Entity *entity = (Entity*)render_data;
 	Vector3          
-		    pos    = entity->position,
+		    pos    = Vector3Add(entity->position, entity->renderable_offset),
 		    scale  = entity->scale;
 	Matrix  matrix = QuaternionToMatrix(entity->orientation);
 	
