@@ -174,7 +174,7 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 			}
 		}
 
-		renderer->dirty = false;
+//		renderer->dirty = false;
 	}
 
 	/* Get entities visible in frustum */

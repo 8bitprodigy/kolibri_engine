@@ -18,7 +18,7 @@ GAME_OBJS   = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
 OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
 
 # KOS-specific flags and libraries
-KOSCCFLAGS += -Iinclude -I../../include -I/usr/local/include
+KOSCCFLAGS += -Iinclude -I../../include -I/usr/local/include -I../
 KOSCCFLAGS += -lraylib -lGL -lkosutils -g3 -O3 -flto 
 KOSCCFLAGS += -DSCREEN_HEIGHT=480 -DSCREEN_WIDTH=640
 KOSCCFLAGS += -DSKY_PATH='"resources/sky/SBS_sky_panorama.jpg"'

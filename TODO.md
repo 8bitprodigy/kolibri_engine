@@ -2,6 +2,7 @@
 
 ## FPS Example
 - [ ] Implement shooting
+	- Projectiles now spawn, but do not yet move.
 - [ ] Implement enemy AI
 
 ## General/Unknown:
@@ -11,6 +12,8 @@
 
 ## Collision:
 - [ ] Fix the is-on-floor check not working when standing on top of another entity
+- [ ] Fix OnCollision not notifying all entities collided with
+- [ ] Fix collisions with non-solid entities so colliding with them does not hinder movement.
 - [ ] Fix whatever is causing catching when sliding against another collider
 - [ ] Fix cylinder-AABB collision
 - [ ] Fix tunneling when moving at low tick rates

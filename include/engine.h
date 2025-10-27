@@ -39,6 +39,7 @@ float       Engine_getTickElapsed(Engine *engine);
 void        Engine_setTickRate(   Engine *engine, int tick_rate);
 int         Engine_getTickRate(   Engine *engine);
 float       Engine_getTickLength( Engine *engine);
+double      Engine_getTime(       Engine *engine); 
 uint        Engine_getEntityCount(Engine *engine);
 EntityList *Engine_getEntityList( Engine *engine);
 Head       *Engine_getHeads(      Engine *engine);

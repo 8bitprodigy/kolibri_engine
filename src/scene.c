@@ -302,17 +302,10 @@ Scene__insertEntity(Scene *self, EntityNode *node)
 		self->entity_count++;
 		return;
 	}
-	EntityNode 
-		*to   = self->entities,
-		*last = to->prev;
-
-	last->next = node;
-	to->prev   = node;
-	
-	node->next = to;
-	node->prev = last;
+	EntityNode__insert(node, self->entities);
 	
 	self->entity_count++;
+	self->dirty_EntityList = true;
 }
 
 void

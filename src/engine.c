@@ -172,6 +172,12 @@ Engine_getTickLength(Engine *self)
 	return self->tick_length;
 }
 
+double
+Engine_getTime(Engine *self)
+{
+	return self->current_time;
+}
+
 Head *
 Engine_getHeads(Engine *self)
 {

@@ -39,6 +39,7 @@ Entity_new(const Entity *entity, Scene *scene, size_t user_data_size)
 	node->next   = node;
 	node->prev   = node;
 	node->engine = scene->engine;
+	node->size   = sizeof(EntityNode) + user_data_size;
 
 	Entity *base = NODE_TO_ENTITY(node);
 	*base = *entity;
@@ -52,9 +53,10 @@ Entity_new(const Entity *entity, Scene *scene, size_t user_data_size)
 	EntityVTable *vtable = base->vtable;
 	if (vtable && vtable->Setup) vtable->Setup(base);
 
+	node->creation_time = GetTime();
+	
 	return base;
 }
-
 
 void
 Entity_free(Entity *self)
@@ -63,30 +65,11 @@ Entity_free(Entity *self)
 }
 
 
-Entity *
-Entity_getNext(Entity *self)
+double
+Entity_getAge(Entity *self)
 {
-	return &ENTITY_TO_NODE(self)->next->base;
-}
-
-
-Entity *
-Entity_getPrev(Entity *self)
-{
-	return &ENTITY_TO_NODE(self)->prev->base;
-}
-
-
-uint64
-Entity_getUniqueID(Entity *entity)
-{
-	return ENTITY_TO_NODE(entity)->unique_ID;
-}
-
-Engine *
-Entity_getEngine(Entity *entity)
-{
-	return ENTITY_TO_NODE(entity)->engine;
+	EntityNode *node = ENTITY_TO_NODE(self);
+	return Engine_getTime(node->engine) - node->creation_time;
 }
 
 BoundingBox
@@ -111,6 +94,44 @@ Entity_getBoundingBox(Entity *entity)
 			Vector3Add(     position, half_bounds)
 		};
 }
+
+Engine *
+Entity_getEngine(Entity *entity)
+{
+	return ENTITY_TO_NODE(entity)->engine;
+}
+
+Entity *
+Entity_getNext(Entity *self)
+{
+	return &ENTITY_TO_NODE(self)->next->base;
+}
+
+Entity *
+Entity_getPrev(Entity *self)
+{
+	return &ENTITY_TO_NODE(self)->prev->base;
+}
+
+Scene *
+Entity_getScene(Entity *self)
+{
+	return ENTITY_TO_NODE(self)->scene;
+}
+
+uint64
+Entity_getUniqueID(Entity *entity)
+{
+	return ENTITY_TO_NODE(entity)->unique_ID;
+}
+
+bool
+Entity_isOnFloor(Entity *self)
+{
+	Scene *scene = Engine_getScene(ENTITY_TO_NODE(self)->engine);
+	return Scene_isEntityOnFloor(scene, self);
+}
+
 
 CollisionResult
 Entity_move(Entity *self, Vector3 movement)
@@ -206,14 +227,6 @@ Entity_render(Entity *entity, Head *head)
 }
 
 
-bool
-Entity_isOnFloor(Entity *self)
-{
-	Scene *scene = Engine_getScene(ENTITY_TO_NODE(self)->engine);
-	return Scene_isEntityOnFloor(scene, self);
-}
-
-
 /*
 	Private Methods
 */
@@ -242,6 +255,20 @@ EntityNode__freeAll(EntityNode *self)
 	
 	EntityNode__free(self);
 	EntityNode__freeAll(next);
+}
+
+void
+EntityNode__insert(EntityNode *self, EntityNode *to)
+{
+	if (!to) return;
+	EntityNode 
+		*last = to->prev;
+
+	last->next = self;
+	to->prev   = self;
+	
+	self->next = to;
+	self->prev = last;
 }
 
 void

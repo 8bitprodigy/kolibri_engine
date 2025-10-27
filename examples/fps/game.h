@@ -125,7 +125,8 @@ typedef struct
 {
 	float 
 		damage,
-		speed;
+		speed,
+		timeout;
 }
 ProjectileInfo;
 
@@ -204,7 +205,6 @@ testRenderableBoxWiresCallback(
 		entity->bounds,
 		*color
 	);
-		
 }
 
 static void

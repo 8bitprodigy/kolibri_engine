@@ -327,6 +327,15 @@ PLAYER_INPUT:
 		projectile->position = camera->target;
 		projectile->visible  = true;
 		projectile->active   = true;
+		projectile->orientation = QuaternionFromVector3ToVector3(
+				V3_FORWARD,
+				Vector3Normalize(
+						Vector3Subtract(
+								camera->target, 
+								camera->position
+							)
+					)
+			);
 		DBG_OUT("Projectile@%p created at ( %f, %f, %f ).", projectile, camera->target.x, camera->target.y, camera->target.z);
 	}
 }

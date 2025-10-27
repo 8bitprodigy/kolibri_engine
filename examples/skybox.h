@@ -76,9 +76,9 @@ SkyBox_draw(Camera *camera, Texture2D textures[6], Quaternion orientation)
         rlBegin(RL_QUADS);
 			rlColor4ub(255, 255, 255, 255);
 			for (int f = 0; f < 6; ++f) {
-				/* Skip faces the camera is not facing */
+				/* Skip faces the camera is not facing 
 				Vector3 n = Vector3Transform(SkyBox_normals[f], rot);
-				if (0.0f < Vector3DotProduct(forward, n)) continue;
+				if (0.0f < Vector3DotProduct(forward, n)) continue;*/
 				
 				Texture2D t = textures[f];
 				if (t.id) rlSetTexture(t.id); /* bind texture for this face */

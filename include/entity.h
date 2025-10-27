@@ -31,7 +31,6 @@ Entity
     float           lod_distances[MAX_LOD_LEVELS];
     uint8           lod_count;
     float           visibility_radius;
-    double          creation_time;
     union {
         Vector3 bounds;
         struct {
@@ -116,10 +115,12 @@ void     Entity_free(       Entity *entity);
 /*
     Setters/Getters
 */
+double       Entity_getAge(        Entity *entity);
 BoundingBox  Entity_getBoundingBox(Entity *entity);
 Engine      *Entity_getEngine(     Entity *entity);
 Entity      *Entity_getNext(       Entity *entity);
 Entity      *Entity_getPrev(       Entity *entity);
+Scene       *Entity_getScene(      Entity *entity);
 uint64       Entity_getUniqueID(   Entity *entity);
 bool         Entity_isOnFloor(     Entity *entity);
 

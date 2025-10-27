@@ -76,7 +76,7 @@ runEngine(void *data, void *value)
  
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
-			for (int z = 0; z < 1; z++) {
+			for (int z = 0; z < 0; z++) {
 				Vector3 position       = (Vector3){
 						(x * 5.0f) - 50.0f,
 						(z * 5.0f),

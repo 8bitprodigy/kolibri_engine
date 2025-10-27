@@ -19,11 +19,11 @@ OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
 
 # KOS-specific flags and libraries
 KOSCCFLAGS += -Iinclude -I../../include -I/usr/local/include -I../
-KOSCCFLAGS += -lraylib -lGL -lkosutils  -O0 -flto 
+KOSCCFLAGS += -lraylib -lGL -lkosutils -g3 -O3 -flto 
 KOSCCFLAGS += -DSCREEN_HEIGHT=480 -DSCREEN_WIDTH=640
 KOSCCFLAGS += -DSKY_PATH='"resources/sky/SBS_sky_panorama.jpg"'
 KOSCCFLAGS += -DNO_MOUSE -DON_CONSOLE -DENGINE_SINGLE_HEAD_ONLY
-KOS_CFLAGS += -I${KOS_PORTS}/include/raylib
+KOS_CFLAGS += -I${KOS_PORTS}/include/raylib -I../
 
 # Include KOS build system
 include $(KOS_BASE)/Makefile.rules
@@ -49,7 +49,7 @@ prepare:
 	mkdir -p $(OBJDIR)/game
 
 $(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
-	kos-cc $(KOSCCFLAGS) -c -o $@ $<
+	kos-cc -v $(KOSCCFLAGS) -c -o $@ $<
 
 $(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c
 	kos-cc $(KOSCCFLAGS) -c -o $@ $<

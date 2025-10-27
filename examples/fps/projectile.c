@@ -25,6 +25,7 @@ ProjectileInfo
 	blast_Info = {
 			.damage = 0.0f,
 			.speed  = 10.0f,
+			.timeout = 3.0f,
 		};
 
 Renderable
@@ -35,7 +36,7 @@ Renderable
 
 EntityVTable 
 projectile_Callbacks = (EntityVTable){
-	.Setup       = NULL,
+	.Setup       = projectileSetup,
 	.Enter       = NULL,
 	.Update      = projectileUpdate,
 	.Render      = NULL,
@@ -75,18 +76,23 @@ Projectile_MediaInit(void)
 	blast_texture = LoadTexture("./resources/models/projectiles/blast.png");
 	SetMaterialTexture(&blast_model.materials[0], MATERIAL_MAP_ALBEDO, blast_texture);
 	SetTextureFilter(blast_texture, TEXTURE_FILTER_BILINEAR);
+	DBG_OUT("Projectile_MediaInit() ran.");
 }
 
 void 
 projectileSetup(    Entity *self)
 {
-	
 }
 
 void 
-projectileUpdate(   Entity *self, float           delta)
+projectileUpdate(   Entity *self, float delta)
 {
-	
+	ProjectileInfo *data = self->user_data;
+	DBG_OUT("Projectile user data@%p", data);
+	if (data && data->timeout <= Entity_getAge(self)) {
+		self->visible = false;
+		self->active  = false;
+	}
 }
 
 void 
@@ -94,5 +100,4 @@ projectileCollision(Entity *self, CollisionResult collision)
 {
 	self->visible = false;
 	self->active  = false;
-	DBG_OUT("Projectile collided with Entity@%p", collision.entity);
 }
