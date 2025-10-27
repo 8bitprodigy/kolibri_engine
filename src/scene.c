@@ -2,6 +2,7 @@
 #include <stdbool.h>
 
 #include "_engine_.h"
+#include "_entity_.h"
 #include "_scene_.h"
 #include "_renderer_.h"
 #include "common.h"

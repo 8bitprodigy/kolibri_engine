@@ -290,6 +290,7 @@ Engine_update(Engine *self)
 void
 Engine_render(Engine *self)
 {
+	EntityNode__renderAll(self->scene->entities, self->delta);
 	const EngineVTable *vtable = self->vtable;
 	ClearBackground(BLACK);
 	/* Loop through Heads */

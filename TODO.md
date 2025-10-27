@@ -1,8 +1,10 @@
 # TODO...
 
 ## FPS Example
-- [ ] Implement shooting
+- [X] Implement shooting
 	- Projectiles now spawn, but do not yet move.
+	- Projectiles now move and disappear after a set amount of time.
+	- Needs to have them either despawn or be part of a pool that recycles them.
 - [ ] Implement enemy AI
 
 ## General/Unknown:

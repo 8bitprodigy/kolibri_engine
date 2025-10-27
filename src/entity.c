@@ -21,7 +21,7 @@ static uint64 Latest_ID = 0;
 	CONSTRUCTOR
 ******************/
 Entity *
-Entity_new(const Entity *entity, Scene *scene, size_t user_data_size)
+Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
 {
 	if (!scene) return NULL;
 	
@@ -41,21 +41,21 @@ Entity_new(const Entity *entity, Scene *scene, size_t user_data_size)
 	node->engine = scene->engine;
 	node->size   = sizeof(EntityNode) + user_data_size;
 
-	Entity *base = NODE_TO_ENTITY(node);
-	*base = *entity;
+	Entity *entity = NODE_TO_ENTITY(node);
+	entity->user_data =  NULL;
+	*entity           = *template;
 
-	base->user_data = NULL;
 	node->unique_ID = Latest_ID++;
 	
 	Scene__insertEntity(scene, node);
 	node->scene  = scene;
 
-	EntityVTable *vtable = base->vtable;
-	if (vtable && vtable->Setup) vtable->Setup(base);
+	EntityVTable *vtable = entity->vtable;
+	if (vtable && vtable->Setup) vtable->Setup(entity);
 
 	node->creation_time = GetTime();
 	
-	return base;
+	return entity;
 }
 
 void
@@ -281,8 +281,28 @@ EntityNode__updateAll(EntityNode *node, float delta)
 	
 	do {
 		Entity *entity = NODE_TO_ENTITY(node);
-		EntityVTable *vtable = entity->vtable;
-		if (vtable && vtable->Update) vtable->Update(entity, delta);
+		if (entity->active) {
+			EntityVTable *vtable = entity->vtable;
+			if (vtable && vtable->Update) vtable->Update(entity, delta);
+		}
+		node = node->next;
+	} while (node != starting_node);
+}
+
+void
+EntityNode__renderAll(EntityNode *node, float delta)
+{
+	if (!node) {
+		return;
+	}
+	EntityNode *starting_node = node;
+	
+	do {
+		Entity *entity = NODE_TO_ENTITY(node);
+		if (entity->active) {
+			EntityVTable *vtable = entity->vtable;
+			if (vtable && vtable->Render) vtable->Render(entity, delta);
+		}
 		node = node->next;
 	} while (node != starting_node);
 }

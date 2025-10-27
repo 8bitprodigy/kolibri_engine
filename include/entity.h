@@ -103,6 +103,8 @@ Entity
                 _flag_7        :1;
         };
     };
+
+    char *local_data[];
 } 
 Entity;
 

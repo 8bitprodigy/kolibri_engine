@@ -39,6 +39,7 @@ void EntityNode__insert(   EntityNode *self,         EntityNode *to);
 
 /* Methods */
 void EntityNode__updateAll(EntityNode *entity_node, float delta);
+void EntityNode__renderAll(EntityNode *entity_node, float delta);
 
 
 #endif /* ENTITY_PRIVATE_H */
