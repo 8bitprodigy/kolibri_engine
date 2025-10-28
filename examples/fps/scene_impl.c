@@ -8,7 +8,9 @@
 */
 EntityList      testSceneRender(         Scene *scene, Head   *head);
 CollisionResult testSceneCollision(      Scene *scene, Entity *entity, Vector3 to);
+CollisionResult testSceneRaycast(        Scene *scene, Vector3 from,   Vector3 to);
 bool            testSceneEntityIsOnFloor(Scene *scene, Entity *entity);
+
 
 
 /*
@@ -23,7 +25,7 @@ SceneVTable scene_Callbacks = {
 	.CheckCollision = testSceneCollision, 
 	.MoveEntity     = NULL, 
 	.EntityOnFloor  = testSceneEntityIsOnFloor,
-	.Raycast        = NULL,
+	.Raycast        = testSceneRaycast,
 	.Render         = testSceneRender, 
 	.Exit           = NULL, 
 	.Free           = NULL
@@ -69,6 +71,36 @@ testSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 		NULL,
 		NULL
 	};
+}
+
+CollisionResult
+testSceneRaycast(Scene *self, Vector3 from, Vector3 to)
+{
+	CollisionResult result = {0};
+
+	if (from.y <= 0.0f) {
+		result.hit      = true;
+		result.distance = 0.0f;
+		result.position = (Vector3){from.x, 0.0f, from.z};
+		result.normal   = V3_UP;
+
+		return result;
+	}
+
+	if (0.0f < to.y) return NO_COLLISION;
+
+	float t         = -from.y / (to.y - from.y);
+	t               = CLAMP(t, 0.0f, 1.0f);
+	Vector3 hit_pos = Vector3Lerp(from, to, t);
+	hit_pos.y       = 0.0f;
+
+	result.hit      = true;
+	result.distance = Vector3Distance(from, hit_pos);
+	result.position = hit_pos;
+	result.normal   = V3_UP;
+	result.entity   = NULL;
+
+	return result;
 }
 
 

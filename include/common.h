@@ -328,23 +328,6 @@ Vector2i
 Vector2i;
 
 
-typedef struct
-Xform
-{
-	union {
-		Vector3 xf[4];
-		struct {
-			Vector3 
-				position, 
-				rotation,
-				scale,
-				skew;
-		};
-	};
-}
-Xform;
-
-
 /*
 	Utility Functions
 */

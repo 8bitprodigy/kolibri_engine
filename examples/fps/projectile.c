@@ -66,7 +66,7 @@ Blast_Template = (Entity){
 	.collision         = {.layers = 1, .masks = 1},
 	.active            = true,
 	.visible           = true,
-	.collision_shape   = COLLISION_BOX, 
+	.collision_shape   = COLLISION_NONE, 
 	.solid             = false
 };
 
@@ -102,8 +102,6 @@ Projectile_new(Vector3 position, Vector3 direction, Entity *template, Scene *sce
 			direction,
 			((ProjectileInfo*)template->user_data)->speed
 		);
-	
-	DBG_OUT("Projectile@%p created at ( %f, %f, %f ).", projectile, position.x, position.y, position.z);
 }
 
 void 
@@ -115,7 +113,7 @@ void
 projectileUpdate(   Entity *self, float delta)
 {
 	ProjectileInfo *data = self->user_data;
-	DBG_OUT("Projectile user data@%p", data);
+	
 	if (data && data->timeout <= Entity_getAge(self)) {
 		self->visible = false;
 		self->active  = false;
@@ -127,6 +125,18 @@ projectileUpdate(   Entity *self, float delta)
 
 	self->renderable_offset     = Vector3Subtract(old_pos, self->position);
 	*(Vector3*)self->local_data = self->renderable_offset;
+	
+	CollisionResult collision = Scene_raycast(
+			Entity_getScene(self), 
+			old_pos, 
+			self->position
+		);
+
+	if (collision.hit) {
+		self->visible = false;
+		self->active = false;
+		DBG_OUT("Projectile@%p collided with %p", self, collision.entity);
+	}
 }
 
 void
@@ -137,7 +147,6 @@ projectileRender(Entity *self, float delta)
 		V3_ZERO,
 		Engine_getTickElapsed(Entity_getEngine(self))
 	);
-	DBG_OUT("Projectile@%p renderable offset moved to ( %f, %f, %f ).", self, self->renderable_offset.x, self->renderable_offset.y, self->renderable_offset.z);
 }
 void 
 projectileCollision(Entity *self, CollisionResult collision)

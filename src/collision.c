@@ -1062,7 +1062,7 @@ Collision__checkRayCylinder(K_Ray ray, Entity *entity)
 
 /* Simple raycast */
 CollisionResult
-Collision__raycast(CollisionScene *scene, K_Ray ray)
+CollisionScene__raycast(CollisionScene *scene, K_Ray ray)
 {
 	CollisionResult closest_result = {0};
 	closest_result.hit      = false;

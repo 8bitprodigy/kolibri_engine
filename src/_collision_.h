@@ -27,7 +27,7 @@ CollisionResult   Collision__checkContinuous(    Entity         *a,     Entity  
 Entity          **CollisionScene__queryRegion(   CollisionScene *scene, BoundingBox  bbox,   int     *count);
 CollisionResult   CollisionScene__checkCollision(CollisionScene *scene, Entity      *entity, Vector3  to);
 CollisionResult   CollisionScene__moveEntity(    CollisionScene *scene, Entity      *entity, Vector3  movement);
-CollisionResult   CollisionScene__raycast(       CollisionScene *scene, Vector3      from,   Vector3  to);
+CollisionResult   CollisionScene__raycast(       CollisionScene *scene, K_Ray        ray);
 
 
 /* System updates */

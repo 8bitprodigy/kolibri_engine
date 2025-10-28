@@ -242,7 +242,7 @@ PLAYER_INPUT:
     Engine     *engine      = Head_getEngine(head);
 
 	if (
-		GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_MIDDLE, KEY_ESCAPE)
+		GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_MIDDLE_RIGHT, KEY_ESCAPE)
     )
     {
 		Engine_pause(engine, true);
@@ -317,7 +317,11 @@ PLAYER_INPUT:
 	);
 
 	
-	if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+	if (
+		IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
+		|| IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_1)
+		|| IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_2)
+	) {
 		Projectile_new(
 				camera->target,
 				Vector3Subtract(camera->target, camera->position),

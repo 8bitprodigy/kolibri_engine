@@ -2,7 +2,6 @@
 #include <stdbool.h>
 
 #include "_engine_.h"
-#include "_entity_.h"
 #include "_scene_.h"
 #include "_renderer_.h"
 #include "common.h"
@@ -245,8 +244,27 @@ Scene_isEntityOnFloor(Scene *self, Entity  *entity)
 CollisionResult
 Scene_raycast(Scene *self, Vector3 from, Vector3 to)
 {
-    HANDLE_SCENE_CALLBACK(self, Raycast, from, to);
-    return NO_COLLISION;
+    SceneVTable     *vtable = self->vtable;
+    CollisionResult  scene_result;
+    if (vtable && vtable->Raycast) scene_result = vtable->Raycast(self, from, to);
+    
+    Vector3 diff = Vector3Subtract(to, from);
+    CollisionResult  entity_result = CollisionScene__raycast(
+            self->collision_scene, 
+            (K_Ray){
+                    .position  = from,
+                    .direction = Vector3Normalize(diff),
+                    .length    = Vector3Length(diff)
+                }
+        );
+        
+    if ( scene_result.hit && !entity_result.hit) return scene_result;
+    if (!scene_result.hit &&  entity_result.hit) return entity_result;
+    if (!scene_result.hit && !entity_result.hit) return NO_COLLISION;
+
+    if (entity_result.distance <= scene_result.distance) return entity_result;
+    
+    return scene_result;
 }
 
 void
