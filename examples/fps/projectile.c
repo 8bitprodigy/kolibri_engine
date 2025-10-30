@@ -25,9 +25,9 @@ void projectileCollision(Entity *self, CollisionResult collision);
 */
 ProjectileInfo
 	blast_Info = {
-			.damage = 0.0f,
-			.speed  = 10.0f,
-			.timeout = 3.0f,
+			.damage  =  0.0f,
+			.speed   = 25.0f,
+			.timeout =  5.0f,
 		};
 
 Renderable
@@ -74,7 +74,7 @@ Blast_Template = (Entity){
 void
 Projectile_MediaInit(void)
 {
-	blast_model   = LoadModel(  "./resources/models/projectiles/projectile.obj");
+	blast_model   = LoadModel(  "./resources/models/projectiles/blast.obj");
 	blast_texture = LoadTexture("./resources/models/projectiles/blast.png");
 	SetMaterialTexture(&blast_model.materials[0], MATERIAL_MAP_ALBEDO, blast_texture);
 	SetTextureFilter(blast_texture, TEXTURE_FILTER_BILINEAR);
@@ -87,14 +87,16 @@ Projectile_new(Vector3 position, Vector3 direction, Entity *template, Scene *sce
 	Entity *projectile = Entity_new(
 			template, 
 			scene,
-			sizeof(Vector3)
+			sizeof(ProjectileData)
 		);
-		
-	*(Vector3*)projectile->local_data = V3_ZERO;
-	projectile->position              = position;
-	projectile->visible               = true;
-	projectile->active                = true;
-	projectile->orientation           = QuaternionFromVector3ToVector3(
+
+	ProjectileData *data = (ProjectileData*)&projectile->local_data;
+	
+	data->prev_offset       = V3_ZERO;
+	projectile->position    = position;
+	projectile->visible     = true;
+	projectile->active      = true;
+	projectile->orientation = QuaternionFromVector3ToVector3(
 			V3_FORWARD,
 			Vector3Normalize(direction)
 		);
@@ -112,19 +114,20 @@ projectileSetup(    Entity *self)
 void 
 projectileUpdate(   Entity *self, float delta)
 {
-	ProjectileInfo *data = self->user_data;
+	ProjectileInfo *info = self->user_data;
+	ProjectileData *data = (ProjectileData*)&self->local_data;
 	
-	if (data && data->timeout <= Entity_getAge(self)) {
+	if (info && info->timeout <= Entity_getAge(self)) {
 		self->visible = false;
 		self->active  = false;
 		
 		return;
 	}
 	Vector3 old_pos = self->position;
-	Entity_moveAndSlide(self, Vector3Scale(self->velocity, delta), 5);
+	Entity_move(self, Vector3Scale(self->velocity, delta));
 
-	self->renderable_offset     = Vector3Subtract(old_pos, self->position);
-	*(Vector3*)self->local_data = self->renderable_offset;
+	self->renderable_offset = Vector3Subtract(old_pos, self->position);
+	data->prev_offset       = self->renderable_offset;
 	
 	CollisionResult collision = Scene_raycast(
 			Entity_getScene(self), 
@@ -135,19 +138,29 @@ projectileUpdate(   Entity *self, float delta)
 	if (collision.hit) {
 		self->visible = false;
 		self->active = false;
-		DBG_OUT("Projectile@%p collided with %p", self, collision.entity);
 	}
 }
 
 void
 projectileRender(Entity *self, float delta)
 {
+	ProjectileData *data = (ProjectileData*)&self->local_data;
 	self->renderable_offset = Vector3Lerp(
-		*(Vector3*)self->local_data,
+		data->prev_offset,
 		V3_ZERO,
 		Engine_getTickElapsed(Entity_getEngine(self))
 	);
+	
+	Vector3 velocityDir = Vector3Normalize(self->velocity);
+	float spinAngle     = Entity_getAge(self) * 10.0f; 
+	// Rotate +Z to velocity direction
+	Quaternion align    = QuaternionFromVector3ToVector3(V3_FORWARD, velocityDir);
+	// Spin around velocity axis
+	Quaternion spin     = QuaternionFromAxisAngle(velocityDir, spinAngle);
+	// Combine: first align, then spin around that new forward axis
+	self->orientation   = QuaternionMultiply(spin, align);
 }
+
 void 
 projectileCollision(Entity *self, CollisionResult collision)
 {

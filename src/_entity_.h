@@ -21,11 +21,24 @@ EntityNode
     Engine *engine;
     Scene  *scene;
 	uint64  unique_ID;
-	int     current_lod;
-    float   last_lod_distance; /* Cache to avoid recalculating every frame */
     double  creation_time;
     size_t  size;
-    bool    visible_last_frame; /* For frustum culling optimizations */
+	int     current_lod;
+    float   last_lod_distance; /* Cache to avoid recalculating every frame */
+    union {
+        uint8 flags;
+        struct {
+            bool
+                visible_last_frame:1, /* For frustum culling optimizations */
+                on_floor          :1, /* Collision States */
+                on_wall           :1,
+                on_ceiling        :1,
+                _flag_4           :1, /* Not yet defined */
+                _flag_5           :1,
+                _flag_6           :1,
+                _flag_7           :1;
+        };
+    };
 	
 	Entity  base;
 }

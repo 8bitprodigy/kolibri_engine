@@ -8,14 +8,13 @@
 typedef struct Scene Scene;
 
 
-typedef void            (*SceneCallback)(               Scene *scene);
-typedef void            (*SceneDataCallback)(           Scene *scene, void    *map_data);
-typedef void            (*SceneUpdateCallback)(         Scene *scene, float    delta);
-typedef void            (*SceneEntityCallback)(         Scene *scene, Entity  *entity);
-typedef CollisionResult (*SceneCollisionCallback)(      Scene *scene, Entity  *entity, Vector3 to);
-typedef CollisionResult (*SceneRaycastCallback)(        Scene *scene, Vector3  from,   Vector3 to);
-typedef bool            (*SceneIsEntityOnFloorCallback)(Scene *scene, Entity  *entity);
-typedef EntityList      (*SceneRenderCallback)(         Scene *scene, Head    *head);
+typedef void            (*SceneCallback)(         Scene *scene);
+typedef void            (*SceneDataCallback)(     Scene *scene, void    *map_data);
+typedef void            (*SceneUpdateCallback)(   Scene *scene, float    delta);
+typedef void            (*SceneEntityCallback)(   Scene *scene, Entity  *entity);
+typedef CollisionResult (*SceneCollisionCallback)(Scene *scene, Entity  *entity, Vector3 to);
+typedef CollisionResult (*SceneRaycastCallback)(  Scene *scene, Vector3  from,   Vector3 to);
+typedef EntityList      (*SceneRenderCallback)(   Scene *scene, Head    *head);
 
 
 typedef struct
@@ -28,7 +27,6 @@ SceneVTable
     SceneEntityCallback          EntityExit;     /* Called every time an Entity exits the scene */
     SceneCollisionCallback       CheckCollision; /* Called when checking if an entity would collide if moved */
     SceneCollisionCallback       MoveEntity;     /* Called Every time an Entity moves in order to check if it has collided with the scene */
-    SceneIsEntityOnFloorCallback EntityOnFloor;  /* Called when Entity_isOnFloor() is called on an entity. Returns whether said entity is in contact with the floor */
     SceneRaycastCallback         Raycast;        /* Called Every time a raycast is performed in order to check if has collided with the scene */
     SceneRenderCallback          Render;         /* Called once every frame in order to render the scene */
     SceneCallback                Exit;           /* Called upon Scene exiting the engine */

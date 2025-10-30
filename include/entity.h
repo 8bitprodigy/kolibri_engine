@@ -27,10 +27,13 @@ EntityVTable;
 typedef struct 
 Entity 
 {
+    void           *user_data;
+    EntityVTable   *vtable;
     Renderable     *renderables[  MAX_LOD_LEVELS];
     float           lod_distances[MAX_LOD_LEVELS];
     uint8           lod_count;
     float           visibility_radius;
+    float           floor_max_angle;
     union {
         Vector3 bounds;
         struct {
@@ -44,9 +47,7 @@ Entity
                     bounds_offset,
                     renderable_offset,
                     velocity;
-    void           *user_data;
-    EntityVTable   *vtable;
-    
+    int            max_slides;
     union {
         Transform transform;
         struct {
@@ -130,7 +131,7 @@ bool         Entity_isOnFloor(     Entity *entity);
     Methods
 */
 CollisionResult Entity_move(        Entity *entity, Vector3 movement);
-CollisionResult Entity_moveAndSlide(Entity *entity, Vector3 movement,  int   max_slides);
+CollisionResult Entity_moveAndSlide(Entity *entity, Vector3 movement);
 void            Entity_render(      Entity *entity, Head *head);
 
 #endif /* ENTITY_H */

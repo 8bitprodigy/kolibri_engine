@@ -48,7 +48,9 @@ playerTemplate = (Entity){
 	.active            = true,
 	.visible           = true,
 	.collision_shape   = COLLISION_BOX, 
-	.solid             = true
+	.solid             = true,
+	.floor_max_angle   = 45.0f,
+	.max_slides        = MAX_SLIDES,
 };
 
 
@@ -130,5 +132,5 @@ playerUpdate(Entity *self, float delta)
 	
 	Vector3 intended_movement = Vector3Scale(*velocity, delta);
 	data->prev_position       = self->position;
-	Entity_moveAndSlide(self, intended_movement, 3);
+	Entity_moveAndSlide(self, intended_movement);
 }

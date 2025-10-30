@@ -748,9 +748,9 @@ CollisionScene__moveEntity(
 {
     CollisionResult result = {0};
     result.hit = false;
-    result.distance = 1.0f;
 
     float move_length = Vector3Length(movement);
+    result.distance = move_length;
     
     if (move_length < 0.0001f) {
         Vector3 to = Vector3Add(entity->position, movement);

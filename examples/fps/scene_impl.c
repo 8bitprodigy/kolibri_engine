@@ -23,8 +23,7 @@ SceneVTable scene_Callbacks = {
 	.EntityEnter    = NULL, 
 	.EntityExit     = NULL, 
 	.CheckCollision = testSceneCollision, 
-	.MoveEntity     = NULL, 
-	.EntityOnFloor  = testSceneEntityIsOnFloor,
+	.MoveEntity     = testSceneCollision, 
 	.Raycast        = testSceneRaycast,
 	.Render         = testSceneRender, 
 	.Exit           = NULL, 
@@ -113,7 +112,7 @@ testSceneEntityIsOnFloor(Scene *self, Entity *entity)
 		return true;
 	}
 
-	//return testSceneCollision(self, entity, ENTITY_ON_ENTITY_TEST_VECTOR).hit;
+	return Scene_checkContinuous(self, entity, (Vector3){0.0f, -0.01f,  0.0f}).hit;
 
 	return false;
 }

@@ -27,9 +27,9 @@
 	#define MENU_PADDING 10
 #endif
 #ifdef NO_MOUSE
-	#define initMouse() SetMousePosition(0, 0)
+	#define HandleMouse() SetMousePosition(0, 0)
 #else
-	#define initMouse()
+	#define HandleMouse()
 #endif
 #ifndef DEFAULT_TICK_RATE
 	#define DEFAULT_TICK_RATE 60
@@ -129,6 +129,16 @@ typedef struct
 		timeout;
 }
 ProjectileInfo;
+
+typedef struct
+{
+	Entity
+		*source,
+		*target;
+	Vector3
+		prev_offset;
+}
+ProjectileData;
 
 void   Projectile_MediaInit(void);
 void   Projectile_new(      Vector3 position, Vector3 direction, Entity *template, Scene *scene);

@@ -14,6 +14,8 @@
 
 ## Collision:
 - [ ] Fix the is-on-floor check not working when standing on top of another entity
+	- Reimplemented is-on-floor -- should be more accurate now.
+	- Unfortunately introduced some major bugs with collision, causing teleportation and application lock-up.
 - [ ] Fix OnCollision not notifying all entities collided with
 - [ ] Fix collisions with non-solid entities so colliding with them does not hinder movement.
 - [ ] Fix whatever is causing catching when sliding against another collider
@@ -21,7 +23,7 @@
 - [ ] Fix tunneling when moving at low tick rates
 - [ ] Make collision check functions public
 - [ ] Finish implementing all collision shape interactions
-- [ ] Leverage `ray_collision_2d.h` where needed
+- [x] Leverage `ray_collision_2d.h` where needed
 
 ## Engine:
 - [x] Fix whatever prevents being able to re-run the game after quitting to main menu

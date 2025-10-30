@@ -74,7 +74,7 @@ enginePause(Engine *engine)
 		);
 	
 	EnableCursor();
-	initMouse();
+	HandleMouse();
 	
 	while(paused) {
 		BeginDrawing();
@@ -119,4 +119,5 @@ engineExit(Engine *engine)
 {
 	Engine_free(engine);
 	EnableCursor();
+	HandleMouse();
 }

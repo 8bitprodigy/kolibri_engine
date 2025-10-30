@@ -64,7 +64,7 @@ runEngine(void *data, void *value)
 	scene = Scene_new(&scene_Callbacks, NULL, engine);
 	
 	player    = Entity_new(&playerTemplate, scene, 0);
-	player->position = (Vector3){0.0f, 0.0f, 0.0f};
+	player->position = (Vector3){0.0f, 10.0f, 0.0f};
 	
 	head_data = (TestHeadData*)Head_getUserData(head);
 	head_data->target      = player;
@@ -76,7 +76,7 @@ runEngine(void *data, void *value)
  
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
-			for (int z = 0; z < 0; z++) {
+			for (int z = 0; z < 1; z++) {
 				Vector3 position       = (Vector3){
 						(x * 5.0f) - 50.0f,
 						(z * 5.0f),
@@ -148,7 +148,7 @@ main(int argc, char **argv)
 	//SetTargetFPS(frame_rate);
 	InitWindow(screen_width, screen_height, "Kolibri Engine Test");
 	
-	initMouse();
+	HandleMouse();
 	
 	Projectile_MediaInit();
 
