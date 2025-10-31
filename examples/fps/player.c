@@ -97,9 +97,15 @@ playerUpdate(Entity *self, float delta)
 		 vel       = *velocity,
 		*direction = &data->direction,
 		 dir       = *direction;
+
+	DBG_OUT("Player velocity: (%.3f, %.3f, %.3f), length=%.3f, threshold=%.3f",
+        velocity->x, velocity->y, velocity->z,
+        Vector3Length(*velocity),
+        MAX_SPEED * 0.01f);
 	
 	bool is_on_floor = Entity_isOnFloor(self);
-	
+
+	if (is_on_floor) velocity->y = 0;
 	if (is_on_floor && data->request_jump) {
 		velocity->y = JUMP_VELOCITY;
 		data->request_jump = false;

@@ -13,16 +13,18 @@
 	- Forgot to update `MAX_NUM_ENTITIES` in `common.h`
 
 ## Collision:
-- [ ] Fix the is-on-floor check not working when standing on top of another entity
+- [x] Fix the is-on-floor check not working when standing on top of another entity
 	- Reimplemented is-on-floor -- should be more accurate now.
 	- Unfortunately introduced some major bugs with collision, causing teleportation and application lock-up.
+	- Working well enough for the most part, Can sometimes fall through entities when moving back into the entity after starting to fall off.
 - [ ] Fix OnCollision not notifying all entities collided with
 - [ ] Fix collisions with non-solid entities so colliding with them does not hinder movement.
 - [ ] Fix whatever is causing catching when sliding against another collider
+- [ ] Fix edge cases wherein an entity can fall into another.
 - [ ] Fix cylinder-AABB collision
-- [ ] Fix tunneling when moving at low tick rates
-- [ ] Make collision check functions public
+- [ ] Make generic collision check functions public
 - [ ] Finish implementing all collision shape interactions
+- [ ] Fix tunneling when moving at low tick rates
 - [x] Leverage `ray_collision_2d.h` where needed
 
 ## Engine:

@@ -190,7 +190,7 @@ Scene_checkCollision(Scene *self, Entity *entity, Vector3 to)
 }
 
 CollisionResult
-Scene_checkContinuous(Scene *self, Entity *entity, Vector3 to)
+Scene_checkContinuous(Scene *self, Entity *entity, Vector3 movement)
 {
     SceneVTable     *vtable = self->vtable;
     CollisionResult 
@@ -199,11 +199,13 @@ Scene_checkContinuous(Scene *self, Entity *entity, Vector3 to)
         result;
         
     if (vtable && vtable->MoveEntity) {
+        Vector3 to = Vector3Add(entity->position, movement);
         scene_result = vtable->MoveEntity(self, entity, to);
     }
+    
     CollisionScene *collision_scene = self->collision_scene;
     if(collision_scene) {
-        entity_result = CollisionScene__moveEntity(collision_scene, entity, to);
+        entity_result = CollisionScene__moveEntity(collision_scene, entity, movement);
     }
     
     if (scene_result.hit && entity_result.hit) {

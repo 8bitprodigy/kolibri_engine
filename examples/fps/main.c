@@ -64,7 +64,7 @@ runEngine(void *data, void *value)
 	scene = Scene_new(&scene_Callbacks, NULL, engine);
 	
 	player    = Entity_new(&playerTemplate, scene, 0);
-	player->position = (Vector3){0.0f, 10.0f, 0.0f};
+	player->position = (Vector3){0.0f, 1.0f, 0.0f};
 	
 	head_data = (TestHeadData*)Head_getUserData(head);
 	head_data->target      = player;

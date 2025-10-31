@@ -155,10 +155,12 @@ move(Entity *self, Vector3 movement)
 {
     if (Vector3Equals(movement, V3_ZERO)) return NO_COLLISION;
     
-    Scene   *scene  = ENTITY_TO_NODE(self)->scene;
-    Vector3  target = Vector3Add(self->position, movement);
-    CollisionResult result = Scene_checkContinuous(scene, self, target);
-    
+    Scene           *scene  = ENTITY_TO_NODE(self)->scene;
+	CollisionResult  result = Scene_checkContinuous(scene, self, movement);
+
+    DBG_OUT("move: movement=(%.3f,%.3f,%.3f), hit=%d, distance=%.3f, entity=%p",
+            movement.x, movement.y, movement.z,
+            result.hit, result.distance, result.entity);
     // Handle the movement based on collision result
     if (!result.hit) {
         // No collision - move freely
@@ -168,8 +170,11 @@ move(Entity *self, Vector3 movement)
 		float move_len = Vector3Length(movement);
 		float safe_t = fmaxf(0.0f, (result.distance - SEPARATION_EPSILON) / move_len);
 		Vector3 safe_movement = Vector3Scale(movement, safe_t);
+
+        DBG_OUT("  safe_t=%.3f, safe_movement=(%.3f,%.3f,%.3f)",
+                safe_t, safe_movement.x, safe_movement.y, safe_movement.z);
+		
         self->position = Vector3Add(self->position, safe_movement);
-        
         // Trigger collision callbacks
         EntityVTable *vtable = self->vtable;
         if (vtable && vtable->OnCollision) {
@@ -191,6 +196,7 @@ move(Entity *self, Vector3 movement)
 CollisionResult
 Entity_move(Entity *self, Vector3 movement)
 {
+	if (Vector3Length(movement) <= EPSILON) return NO_COLLISION;
     EntityNode *node = ENTITY_TO_NODE(self);
 	node->on_floor   = false;
 	node->on_wall    = false;
@@ -207,6 +213,7 @@ Entity_move(Entity *self, Vector3 movement)
 CollisionResult
 Entity_moveAndSlide(Entity *self, Vector3 movement)
 {
+	if (Vector3Length(movement) <= EPSILON) return NO_COLLISION;
     if (!self->max_slides) return move(self, movement);
     if (self->max_slides < 0) self->max_slides = 3;
     
@@ -221,7 +228,7 @@ Entity_moveAndSlide(Entity *self, Vector3 movement)
     Vector3 remaining = movement;
     
     for (int i = 0; i < self->max_slides; i++) {
-        if (Vector3Length(remaining) <= 0.001f) break;
+        if (Vector3Length(remaining) <= EPSILON) break;
         
         CollisionResult test = move(self, remaining);
         
