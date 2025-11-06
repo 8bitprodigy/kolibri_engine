@@ -481,11 +481,6 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
 
     Vector3 from = a->position;
     float move_length = Vector3Length(movement);
-    
-    DBG_OUT("  CCD AABB: from=(%.2f,%.2f,%.2f), movement=(%.2f,%.2f,%.2f), move_length=%.3f",
-            from.x, from.y, from.z, 
-            movement.x, movement.y, movement.z, 
-            move_length);
 
     if (move_length < 0.0001f) {
         Entity temp_a   = *a;
@@ -519,9 +514,6 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
     if (collision.hit && 
         collision.distance >= 0.0f && 
         collision.distance <= move_length) {
-        
-        DBG_OUT("  CCD AABB HIT: collision.distance=%.3f, move_length=%.3f", 
-                collision.distance, move_length);
         
         result.hit      = true;
         result.distance = collision.distance;

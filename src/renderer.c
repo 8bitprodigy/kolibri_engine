@@ -8,9 +8,11 @@ typedef struct
 Renderer
 {
 	SpatialHash *visibility_hash;
-	SpatialHash *transparency_hash;
 	Engine      *engine;
 	bool         dirty;
+
+	Renderable **transparent_renderables;
+	float      **transaprent_distances;
 }
 Renderer;
 

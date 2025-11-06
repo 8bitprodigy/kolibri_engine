@@ -17,10 +17,10 @@
 	- Reimplemented is-on-floor -- should be more accurate now.
 	- Unfortunately introduced some major bugs with collision, causing teleportation and application lock-up.
 	- Working well enough for the most part, Can sometimes fall through entities when moving back into the entity after starting to fall off.
-- [ ] Fix OnCollision not notifying all entities collided with
 - [ ] Fix collisions with non-solid entities so colliding with them does not hinder movement.
-- [ ] Fix whatever is causing catching when sliding against another collider
 - [ ] Fix edge cases wherein an entity can fall into another.
+- [ ] Fix whatever is causing catching when sliding against another collider
+- [ ] Fix OnCollision not notifying all entities collided with
 - [ ] Fix cylinder-AABB collision
 - [ ] Make generic collision check functions public
 - [ ] Finish implementing all collision shape interactions

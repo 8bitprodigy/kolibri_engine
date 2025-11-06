@@ -27,7 +27,7 @@ ProjectileInfo
 	blast_Info = {
 			.damage  =  0.0f,
 			.speed   = 25.0f,
-			.timeout =  5.0f,
+			.timeout =  3.5f,
 		};
 
 Renderable
@@ -45,7 +45,7 @@ projectile_Callbacks = (EntityVTable){
 	.OnCollision = projectileCollision,
 	.OnCollided  = projectileCollision,
 	.Exit        = NULL,
-	.Free        = NULL
+	.Free        = NULL,
 };
 
 Entity
@@ -93,6 +93,7 @@ Projectile_new(Vector3 position, Vector3 direction, Entity *template, Scene *sce
 	ProjectileData *data = (ProjectileData*)&projectile->local_data;
 	
 	data->prev_offset       = V3_ZERO;
+	data->elapsed_time      = 0.0f;
 	projectile->position    = position;
 	projectile->visible     = true;
 	projectile->active      = true;
@@ -109,6 +110,7 @@ Projectile_new(Vector3 position, Vector3 direction, Entity *template, Scene *sce
 void 
 projectileSetup(    Entity *self)
 {
+
 }
 
 void 
@@ -117,12 +119,14 @@ projectileUpdate(   Entity *self, float delta)
 	ProjectileInfo *info = self->user_data;
 	ProjectileData *data = (ProjectileData*)&self->local_data;
 	
-	if (info && info->timeout <= Entity_getAge(self)) {
+	if (info && data && info->timeout <= data->elapsed_time) {
 		self->visible = false;
 		self->active  = false;
-		
+		Entity_free(self);
 		return;
 	}
+	data->elapsed_time += delta;
+	
 	Vector3 old_pos = self->position;
 	Entity_move(self, Vector3Scale(self->velocity, delta));
 
@@ -138,6 +142,7 @@ projectileUpdate(   Entity *self, float delta)
 	if (collision.hit) {
 		self->visible = false;
 		self->active = false;
+		Entity_free(self);
 	}
 }
 
@@ -166,4 +171,9 @@ projectileCollision(Entity *self, CollisionResult collision)
 {
 	self->visible = false;
 	self->active  = false;
+}
+
+void
+projectileFree(Entity *self)
+{
 }

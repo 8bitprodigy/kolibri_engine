@@ -27,19 +27,22 @@ ifdef PLATFORM_OVERRIDE
     PLATFORM = $(PLATFORM_OVERRIDE)
 endif
 
-SRCDIR     = ../../src
-GAMESRCDIR = .
-OBJDIR     = obj/$(PLATFORM)
+SRCDIR      = ../../src
+EXAMPLESDIR = ../
+GAMESRCDIR  = .
+OBJDIR      = obj/$(PLATFORM)
 
 TARGET       = $(PROJECTNAME)$(TARGET_EXT)
 
 ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
+EXAMPLES_SRC = $(wildcard $(EXAMPLESDIR)/*.c)
 GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
 
-ENGINE_OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
-GAME_OBJS   = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
+ENGINE_OBJS   = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
+EXAMPLES_OBJS = $(EXAMPLES_SRC:$(EXAMPLESDIR)/%.c=$(OBJDIR)/game/%.o)
+GAME_OBJS     = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
 
-OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
+OBJS = $(ENGINE_OBJS) $(EXAMPLES_OBJS) $(GAME_OBJS)
 
 .PHONY: all clean rm-elf prepare
 
@@ -57,6 +60,9 @@ prepare:
 	mkdir -p $(OBJDIR)/game
 
 $(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+	
+$(OBJDIR)/game/%.o: $(EXAMPLESDIR)/%.c
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
 
 $(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c

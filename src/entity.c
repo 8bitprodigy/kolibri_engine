@@ -145,7 +145,6 @@ Entity_getUniqueID(Entity *entity)
 bool
 Entity_isOnFloor(Entity *self)
 {
-	DBG_OUT("Entity@%p is on floor: %s", self, ENTITY_TO_NODE(self)->on_floor?"true":"false");
 	return ENTITY_TO_NODE(self)->on_floor;
 }
 
@@ -157,10 +156,7 @@ move(Entity *self, Vector3 movement)
     
     Scene           *scene  = ENTITY_TO_NODE(self)->scene;
 	CollisionResult  result = Scene_checkContinuous(scene, self, movement);
-
-    DBG_OUT("move: movement=(%.3f,%.3f,%.3f), hit=%d, distance=%.3f, entity=%p",
-            movement.x, movement.y, movement.z,
-            result.hit, result.distance, result.entity);
+	
     // Handle the movement based on collision result
     if (!result.hit) {
         // No collision - move freely
@@ -170,9 +166,6 @@ move(Entity *self, Vector3 movement)
 		float move_len = Vector3Length(movement);
 		float safe_t = fmaxf(0.0f, (result.distance - SEPARATION_EPSILON) / move_len);
 		Vector3 safe_movement = Vector3Scale(movement, safe_t);
-
-        DBG_OUT("  safe_t=%.3f, safe_movement=(%.3f,%.3f,%.3f)",
-                safe_t, safe_movement.x, safe_movement.y, safe_movement.z);
 		
         self->position = Vector3Add(self->position, safe_movement);
         // Trigger collision callbacks
@@ -218,8 +211,6 @@ Entity_moveAndSlide(Entity *self, Vector3 movement)
     if (self->max_slides < 0) self->max_slides = 3;
     
     EntityNode *node = ENTITY_TO_NODE(self);
-    DBG_OUT("moveAndSlide called: movement=(%.2f, %.2f, %.2f)", 
-            movement.x, movement.y, movement.z);
 	node->on_floor   = false;
 	node->on_wall    = false;
 	node->on_ceiling = false;
@@ -232,8 +223,6 @@ Entity_moveAndSlide(Entity *self, Vector3 movement)
         
         CollisionResult test = move(self, remaining);
         
-        DBG_OUT("  Slide %d: hit=%d, normal=(%.2f, %.2f, %.2f)", 
-                i, test.hit, test.normal.x, test.normal.y, test.normal.z);
         if (!test.hit) {
             return test; /* No collision, we're done */
         }
@@ -251,7 +240,6 @@ Entity_moveAndSlide(Entity *self, Vector3 movement)
         
 		setCollisionState(node, &result);
 		
-        DBG_OUT("  After setCollisionState: on_floor=%d", node->on_floor);
         /* Scale remaining movement by how much we didn't move */
 		float move_len = Vector3Length(remaining);
 		float remaining_len = fmaxf(0.0f, move_len - test.distance);

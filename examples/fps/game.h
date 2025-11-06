@@ -7,7 +7,9 @@
 #include <raymath.h>
 #include <string.h>
 
+#include "assman.h"
 #include "kolibri.h"
+#include "utils.h"
 
 
 #ifndef SCREEN_WIDTH
@@ -133,10 +135,11 @@ ProjectileInfo;
 typedef struct
 {
 	Entity
-		*source,
-		*target;
+		    *source,
+		    *target;
 	Vector3
-		prev_offset;
+		     prev_offset;
+	float    elapsed_time;
 }
 ProjectileData;
 
@@ -156,87 +159,6 @@ CollisionResult testSceneCollision(Scene *scene, Entity *entity, Vector3 to);
 /*
 	options.c
 */
-
-/* Renderable Callback */
-static void
-RenderModel(
-	Renderable *renderable,
-	void       *render_data
-)
-{
-	Model  *model  = (Model*)renderable->data;
-	Entity *entity = (Entity*)render_data;
-	Vector3          
-		    pos    = Vector3Add(entity->position, entity->renderable_offset),
-		    scale  = entity->scale;
-	Matrix  matrix = QuaternionToMatrix(entity->orientation);
-	
-	rlPushMatrix();
-		rlTranslatef(pos.x, pos.y, pos.z);
-		rlMultMatrixf(MatrixToFloat(matrix));
-		rlScalef(scale.x, scale.y, scale.z);
-		
-		DrawModel(
-				*model,
-				V3_ZERO, 
-				1.0f, 
-				WHITE
-			);
-	rlPopMatrix();
-}
-
-static void
-testRenderableBoxCallback(
-	Renderable *renderable,
-	void       *render_data
-)
-{
-	Entity *entity = render_data;
-	Color  *color  = (Color*)renderable->data;
-	if (!color) return;
-	DrawCubeV(
-		Vector3Add(entity->position, entity->renderable_offset),
-		entity->bounds,
-		*color
-	);
-		
-}
-
-static void
-testRenderableBoxWiresCallback(
-	Renderable *renderable,
-	void       *render_data
-)
-{
-	Entity *entity = render_data;
-	Color  *color  = (Color*)renderable->data;
-	if (!color) return;
-	DrawCubeWiresV(
-		Vector3Add(entity->position, entity->renderable_offset),
-		entity->bounds,
-		*color
-	);
-}
-
-static void
-testRenderableCylinderWiresCallback(
-	Renderable *renderable,
-	void       *render_data
-)
-{
-	Entity *entity = renderable->data;
-	Color  *color  = (Color*)renderable->data;
-	float               radius = entity->bounds.x;
-	if (!color) return;
-	DrawCylinderWires(
-		entity->position,
-		radius,
-		radius,
-		entity->bounds.y,
-		8,
-		*color
-	);
-}
 
 
 #endif /* GAME_H */

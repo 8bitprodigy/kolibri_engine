@@ -178,6 +178,12 @@ Engine_getTime(Engine *self)
 	return self->current_time;
 }
 
+double
+Engine_getPauseTime(Engine *self)
+{
+	return self->pause_time;
+}
+
 Head *
 Engine_getHeads(Engine *self)
 {
