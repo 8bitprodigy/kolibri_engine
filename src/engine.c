@@ -307,7 +307,7 @@ Engine_render(Engine *self)
 		BeginRenderMode(current_head);
 			Head_preRender(current_head); /* Skyboxes, perhaps */
 			BeginMode3D(*Head_getCamera(current_head));
-				if (self->scene) Scene_render(self->scene, current_head);
+				Renderer__render(self->renderer, current_head);
 			EndMode3D();
 			Head_postRender(current_head); /* UI overlays, etc. */
 		EndRenderMode();	

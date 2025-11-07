@@ -14,7 +14,7 @@ typedef void            (*SceneUpdateCallback)(   Scene *scene, float    delta);
 typedef void            (*SceneEntityCallback)(   Scene *scene, Entity  *entity);
 typedef CollisionResult (*SceneCollisionCallback)(Scene *scene, Entity  *entity, Vector3 to);
 typedef CollisionResult (*SceneRaycastCallback)(  Scene *scene, Vector3  from,   Vector3 to);
-typedef EntityList      (*SceneRenderCallback)(   Scene *scene, Head    *head);
+typedef void            (*SceneRenderCallback)(   Scene *scene, Head    *head);
 
 
 typedef struct

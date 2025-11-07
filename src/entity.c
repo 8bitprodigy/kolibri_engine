@@ -112,6 +112,22 @@ Entity_getBoundingBox(Entity *entity)
 		};
 }
 
+Renderable *
+Entity_getLODRenderable(Entity *entity,  Vector3 camera_position)
+{
+	float distance = Vector3Distance(entity->position, camera_position);
+	
+	int lod_level  = -1;
+	for (int i = 0; i < entity->lod_count; i++) {
+		if (entity->lod_distances[i] < distance) continue;
+		lod_level = i;
+		break;
+	}
+	if (lod_level < 0) return NULL; /* Distance is greater than max renderable LOD level, so don't render it. */
+	
+	return entity->renderables[lod_level];
+}
+
 Engine *
 Entity_getEngine(Entity *entity)
 {

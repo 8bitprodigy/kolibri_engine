@@ -1,8 +1,21 @@
+#include <raymath.h>
+
 #include "_head_.h"
 #include "_renderer_.h"
 #include "_spatialhash_.h"
-#include <raymath.h>
+#include "dynamicarray.h"
 
+
+typedef struct
+{
+    union {
+        Entity     *entity;
+        Renderable *renderable;
+    };
+    Vector3 position;
+    bool    is_entity;
+}
+RenderableWrapper;
 
 typedef struct
 Renderer
@@ -11,8 +24,9 @@ Renderer
 	Engine      *engine;
 	bool         dirty;
 
-	Renderable **transparent_renderables;
-	float      **transaprent_distances;
+	RenderableWrapper **wrapper_pool;
+	Renderable        **transparent_renderables;
+	float             **transaprent_distances;
 }
 Renderer;
 
@@ -34,6 +48,20 @@ Renderer__new(Engine *engine)
 	renderer->visibility_hash   = SpatialHash_new();
 	renderer->dirty             = true;
 
+    renderer->wrapper_pool            = DynamicArray(RenderableWrapper, 512);
+	renderer->transaprent_renderables = DynamicArray(Renderable*,       256);
+	renderer->transaprent_distances   = DynamicArray(float,             256);
+
+	if (!renderer->transparent_renderables || !renderer->transparent_distances) {
+	    ERR_OUT("Failed to allocate memory for transparent rendering.");
+	    SpatialHash_free( renderer->visibility_hash);
+	    DynamicArray_free(renderer->wrapper_pool);
+	    DynamicArray_free(renderer->transparent_renderables);
+	    DynamicArray_free(renderer->transaprent_distances);
+	    free(renderer);
+	    return NULL;
+	}
+
 	return renderer;
 }
 
@@ -42,6 +70,9 @@ void
 Renderer__free(Renderer *renderer)
 {
 	SpatialHash_free(renderer->visibility_hash);
+	DynamicArray_free(renderer->wrapper_pool);
+    DynamicArray_free(renderer->transparent_renderables);
+    DynamicArray_free(renderer->transaprent_distances);
 	free(renderer);
 }
 
@@ -87,23 +118,28 @@ Renderer__queryFrustum(
 	Renderer *renderer,
 	Head     *head,
 	float     max_distance,
-	int      *visible_entity_count
+	int      *visible_count
 )
 {
     static Entity *frustum_results[VIS_QUERY_SIZE];
-    *visible_entity_count = 0;
+    *visible_count = 0;
 
     if (!head) return frustum_results;
     
     Camera3D *camera = Head_getCamera(head);
     Frustum  *frustum = Head_getFrustum(head);
     
-    // Pre-calculate values used in loop
+    /* Pre-calculate values used in loop */
     Vector3 camera_pos = camera->position;
     float max_dist_sq = max_distance * max_distance;
     
-    // Get spatial hash candidates
-    Vector3 forward = Vector3Normalize(Vector3Subtract(camera->target, camera_pos));
+    /* Get spatial hash candidates */
+    Vector3 forward = Vector3Normalize(
+            Vector3Subtract(
+                    camera->target, 
+                    camera_pos
+                )
+        );
     Vector3 frustum_center = Vector3Add(camera_pos, Vector3Scale(forward, max_distance * 0.5f));
     float query_radius = max_distance * 0.5f;
     
@@ -127,26 +163,26 @@ Renderer__queryFrustum(
         &candidate_count
     );
 
-    // Optimized culling loop
-    for (int i = 0; i < candidate_count && *visible_entity_count < VIS_QUERY_SIZE; i++) {
-        Entity *entity = candidates[i];
+    /* Optimized culling loop */
+    for (int i = 0; i < candidate_count && *visible_count < VIS_QUERY_SIZE; i++) {
+        RenderableWrapper *wrapper = candidates[i];
         
-        if (!entity->visible) continue;
-
-        // Single distance calculation
-        float dist_sq = Vector3DistanceSqr(entity->position, camera_pos);
+        if (wrapper->is_entity && !wrapper->entity->visible) continue;
+        
+        /* Single distance calculation */
+        float dist_sq = Vector3DistanceSqr(wrapper->position, camera_pos);
         if (dist_sq > max_dist_sq) continue;
         
-        // Fast frustum test with pre-calculated distance
+        /* Fast frustum test with pre-calculated distance */
         if (isSphereInFrustum(
-                entity->position,
-                entity->visibility_radius,
+                wrapper->position,
+                wrapper->visibility_radius,
                 frustum,
                 dist_sq,
                 max_distance
             )) {
-            frustum_results[*visible_entity_count] = entity;
-            (*visible_entity_count)++;
+            frustum_results[*visible_count] = wrapper;
+            (*visible_count)++;
         }
     }
 
@@ -159,42 +195,171 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 {
 	if (!entities || entities->count < 1) return;
 
-	RendererSettings *settings = &head->settings;
+	RendererSettings *settings   = &head->settings;
+	Camera3D         *camera     = Head_getCamera(head);
+	Vector3           camera_pos = camera->position;
+	Scene            *scene      = Engine_getScene(renderer->engine);
+
+    DynamicArray_clear(renderer->wrapper_pool);
+	DynamicArray_clear(renderer->visibility_hash);
+	DynamicArray_clear(renderer->transparent_distances);
+
+	SpatialHash_clear(renderer->visibility_hash);
 	
-	/* Clear and populate the Renderer's visible scene */
-	if (renderer->dirty) {
-		SpatialHash_clear(renderer->visibility_hash);
 		
-		for (int i = 0; i < entities->count; i++) {
-			Entity *entity = entities->entities[i];
-			if (entity->active && entity->visible) {
-				Vector3 render_center = entity->position;
-				if (0 < entity->lod_count) {
-					render_center = Vector3Add(entity->position, entity->renderable_offset);
-				}
-				SpatialHash_insert(renderer->visibility_hash, entity, render_center, entity->bounds);
-			}
-		}
+    for (int i = 0; i < entities->count; i++) {
+        Entity *entity = entities->entities[i];
+        if (entity->active && entity->visible) {
+            size_t index = DynamicArray_length(renderer->wrapper_pool);
 
-//		renderer->dirty = false;
+            RenderableWrapper wrapper;
+            wrapper.entity    = entity;
+            wrapper.position  = entity->position;
+            wrapper.is_enitty = true;
+
+            DynamicArray_append(&renderer->wrapper_pool, &wrapper, 1);
+            
+            Vector3 render_center = entity->position;
+            if (0 < entity->lod_count) {
+                render_center = Vector3Add(entity->position, entity->renderable_offset);
+            }
+            SpatialHash_insert(renderer->visibility_hash, entity, render_center, entity->bounds);
+        }
 	}
-
+	
+    if (scene) {
+        Scene_render(scene, head);
+    }
+    
 	/* Get entities visible in frustum */
-	int      visible_count;
-	Entity **visible_entities;
-	
-//	if (settings->frustum_culling) {
-		visible_entities = Renderer__queryFrustum(renderer, head, settings->max_render_distance, &visible_count);
-//	}
-//	else {
-		/* No culling -- render all entities */
-/*		visible_entities = entities->entities;
-		visible_count    = entities->count;
-	}
-*/
-	//DBG_OUT("Visible count after frustum culling: %d", visible_count);
-	
+	int                 visible_count;
+	RenderableWrapper **visible_wrappers = Renderer__queryFrustum(
+            renderer,
+            head, 
+            settings->max_render_distance, 
+            &visible_count
+        );
+
+    /* PASS 1: Render opaque stuff, collect transparent */
 	for (int i = 0; i < visible_count; i++) {
+	    RenderableWrapper *wrapper = visible_wrappers[i];
+
+        if (wrapper->is_entity && !wrapper->entity->visible) continue;
+
+        Renderable *renderable  = NULL;
+        void       *render_data = NULL;
+        Vector3     render_pos  = wrapper->position;
+
+        if (wrapper->is_entity) {
+            Entity *entity = wrapper->entity;
+            renderable     = Entity_getLODRenderable(entity, camera_pos);
+            render_data    = entity;
+            render_pos     = entity->position;
+        }
+        else {
+            renderable  = wrapper->renderable;
+            render_data = renderable->data;
+        }
+
+        if (!renderable) continue;
+
+        if (renderable->transparent) {
+            float dist = Vector3Distance(render_pos, camera_pos);
+            DynamicArray_add(&renderer->transparent_renderables, &renderable);
+            DynamicArray_add(&renderer->transparent_distance,    &dist);
+        }
+        else if (renderable->renderer) {
+            renderable->Render(renderable, render_data);
+        }
+	    
 		Entity_render(visible_entities[i], head);
 	}
+
+	/* PASS 2: Sort and render transparent */
+	size_t transparent_count = DynamicArray_length(renderer->transparent_renderables);
+	if (transparent_count < 0) return;
+
+    Renderer__sortTransparent(renderer);
+    
+	for (size_t i = 0; i < transparent_count; i++) {
+	    Renderable *renderable = renderer->transparent_renderables[i];
+	    if (renderable->Render) {
+	        renderable->Render(renderable, renderable->data);
+	    }
+	}
+}
+
+static void
+swap_transparent(Renderer *renderer, int i, int j)
+{
+    float temp_dist = renderer->transparent_distances[i];
+    renderer->transaprent_distances[i] = renderer->transaprent_distances[j];
+    renderer->transparent_distances[j] = temp_dist;
+
+    Renderable *temp_rend = renderer->transparent_renderables[i];
+    renderer->transparent_renderables[i] = renderer->transparent_renderables[j];
+    renderer->transparent_renderables[j] = temp_rend;
+}
+
+static int
+partition_transparent(Renderer *renderer, int low, int high)
+{
+    float pivot = renderer->transparent_distances[high];
+    int i = low - 1;
+
+    for (int j = low; j < high; j++) {
+        if (renderer->transparent_distances[j] > pivot) {
+            i++;
+            swap_transparent(renderer, i, j);
+        }
+    }
+
+    swap_transparent(renderer, ++i, high);
+    return i;
+}
+
+static void
+quicksort_transparent(Renderer *renderer, int low, int high)
+{
+    if (low < high) {
+        int pi = partition_transparent(renderer, low, high);
+        quicksort_transparent(renderer, low, pi - 1);
+        quicksort_transparent(renderer, pi + 1, high);
+    }
+}
+
+static void
+Renderer__sortTransparent(Renderer *renderer)
+{
+    size_t count = DynamicArray_length(renderer->transparent_renderables);
+    if (count <= 1) return;
+
+    quicksort_transparent(renderer, 0, count - 1);
+}
+
+void
+Renderer__submitGeometry(
+    Renderer   *renderer, 
+    Renderable *renderable, 
+    Vector3     position, 
+    Vector3     bounds,
+    bool        is_entity
+)
+{
+    if (!renderable) return;
+
+    size_t index = DynamicArray_length(renderer->wrapper_pool);
+
+    RenderableWrapper wrapper;
+    wrapper.renderable = renderable;
+    wrapper.posiiton   = position;
+    wrapper.is_entity  = is_entity;
+
+    DynamicArray(&renderer->wrapper_pool, &wrapper, 1);
+
+    SpatialHash_insert(
+            renderer->visibility_hash,  
+            &renderer->wrapper_pool[index], 
+            position, bounds
+        );
 }

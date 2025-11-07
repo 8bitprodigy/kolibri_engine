@@ -256,15 +256,11 @@ Scene_render(Scene *self, Head *head)
 {
     SceneVTable *vtable    = self->vtable;
     EntityList entity_list = {0};
-    if (vtable && vtable->Render) entity_list = vtable->Render(self, head);
-    else {
-        EntityList *all_entities = Scene_getEntityList(self);
-        if (all_entities) {
-            entity_list = *all_entities;
-        }
+    if (vtable && vtable->Render) {
+        vtable->Render(self, head);
+        return;
     }
     
-    Renderer__render(Engine__getRenderer(self->engine), &entity_list, head);
 }
 
 void
