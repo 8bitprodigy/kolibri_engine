@@ -1,9 +1,10 @@
-#include <raymath.h>
-
 #include "_head_.h"
 #include "_renderer_.h"
 #include "_spatialhash_.h"
 #include "dynamicarray.h"
+#include "scene.h"
+/* THIS MUST NECESSARILY COME AFTER ANY <raylib.h> */
+#include <raymath.h>
 
 
 typedef struct
@@ -12,7 +13,9 @@ typedef struct
         Entity     *entity;
         Renderable *renderable;
     };
-    Vector3 position;
+    Vector3 
+            position,
+            bounds;
     bool    is_entity;
 }
 RenderableWrapper;
@@ -26,9 +29,12 @@ Renderer
 
 	RenderableWrapper **wrapper_pool;
 	Renderable        **transparent_renderables;
-	float             **transaprent_distances;
+	float              *transparent_distances;
 }
 Renderer;
+
+
+static void Renderer__sortTransparent(Renderer *renderer);
 
 
 /*
@@ -49,15 +55,15 @@ Renderer__new(Engine *engine)
 	renderer->dirty             = true;
 
     renderer->wrapper_pool            = DynamicArray(RenderableWrapper, 512);
-	renderer->transaprent_renderables = DynamicArray(Renderable*,       256);
-	renderer->transaprent_distances   = DynamicArray(float,             256);
+	renderer->transparent_renderables = DynamicArray(Renderable*,       256);
+	renderer->transparent_distances   = DynamicArray(float,             256);
 
 	if (!renderer->transparent_renderables || !renderer->transparent_distances) {
 	    ERR_OUT("Failed to allocate memory for transparent rendering.");
 	    SpatialHash_free( renderer->visibility_hash);
 	    DynamicArray_free(renderer->wrapper_pool);
 	    DynamicArray_free(renderer->transparent_renderables);
-	    DynamicArray_free(renderer->transaprent_distances);
+	    DynamicArray_free(renderer->transparent_distances);
 	    free(renderer);
 	    return NULL;
 	}
@@ -72,7 +78,7 @@ Renderer__free(Renderer *renderer)
 	SpatialHash_free(renderer->visibility_hash);
 	DynamicArray_free(renderer->wrapper_pool);
     DynamicArray_free(renderer->transparent_renderables);
-    DynamicArray_free(renderer->transaprent_distances);
+    DynamicArray_free(renderer->transparent_distances);
 	free(renderer);
 }
 
@@ -113,7 +119,7 @@ isSphereInFrustum(
 
 
 /* Query for entities visible in camera frustum */
-Entity **
+RenderableWrapper **
 Renderer__queryFrustum(
 	Renderer *renderer,
 	Head     *head,
@@ -121,7 +127,7 @@ Renderer__queryFrustum(
 	int      *visible_count
 )
 {
-    static Entity *frustum_results[VIS_QUERY_SIZE];
+    static RenderableWrapper *frustum_results[VIS_QUERY_SIZE];
     *visible_count = 0;
 
     if (!head) return frustum_results;
@@ -154,8 +160,8 @@ Renderer__queryFrustum(
         frustum_center.z + query_radius
     };
 
-    int            candidate_count = VIS_QUERY_SIZE;
-    static Entity *candidates[VIS_QUERY_SIZE];
+    int                       candidate_count = VIS_QUERY_SIZE;
+    static RenderableWrapper *candidates[VIS_QUERY_SIZE];
     SpatialHash_queryRegion(
         renderer->visibility_hash,
         (BoundingBox){min_bounds, max_bounds},
@@ -176,7 +182,9 @@ Renderer__queryFrustum(
         /* Fast frustum test with pre-calculated distance */
         if (isSphereInFrustum(
                 wrapper->position,
-                wrapper->visibility_radius,
+                wrapper->is_entity 
+                    ?  wrapper->entity->visibility_radius 
+                    : wrapper->bounds.x,
                 frustum,
                 dist_sq,
                 max_distance
@@ -191,10 +199,8 @@ Renderer__queryFrustum(
 
 
 void
-Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
+Renderer__render(Renderer *renderer, Head *head)
 {
-	if (!entities || entities->count < 1) return;
-
 	RendererSettings *settings   = &head->settings;
 	Camera3D         *camera     = Head_getCamera(head);
 	Vector3           camera_pos = camera->position;
@@ -205,27 +211,6 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 	DynamicArray_clear(renderer->transparent_distances);
 
 	SpatialHash_clear(renderer->visibility_hash);
-	
-		
-    for (int i = 0; i < entities->count; i++) {
-        Entity *entity = entities->entities[i];
-        if (entity->active && entity->visible) {
-            size_t index = DynamicArray_length(renderer->wrapper_pool);
-
-            RenderableWrapper wrapper;
-            wrapper.entity    = entity;
-            wrapper.position  = entity->position;
-            wrapper.is_enitty = true;
-
-            DynamicArray_append(&renderer->wrapper_pool, &wrapper, 1);
-            
-            Vector3 render_center = entity->position;
-            if (0 < entity->lod_count) {
-                render_center = Vector3Add(entity->position, entity->renderable_offset);
-            }
-            SpatialHash_insert(renderer->visibility_hash, entity, render_center, entity->bounds);
-        }
-	}
 	
     if (scene) {
         Scene_render(scene, head);
@@ -265,14 +250,12 @@ Renderer__render(Renderer *renderer, EntityList *entities, Head *head)
 
         if (renderable->transparent) {
             float dist = Vector3Distance(render_pos, camera_pos);
-            DynamicArray_add(&renderer->transparent_renderables, &renderable);
-            DynamicArray_add(&renderer->transparent_distance,    &dist);
+            DynamicArray_add((void**)&renderer->transparent_renderables, &renderable);
+            DynamicArray_add((void**)&renderer->transparent_distances,    &dist);
         }
-        else if (renderable->renderer) {
+        else if (renderable->Render) {
             renderable->Render(renderable, render_data);
         }
-	    
-		Entity_render(visible_entities[i], head);
 	}
 
 	/* PASS 2: Sort and render transparent */
@@ -293,7 +276,7 @@ static void
 swap_transparent(Renderer *renderer, int i, int j)
 {
     float temp_dist = renderer->transparent_distances[i];
-    renderer->transaprent_distances[i] = renderer->transaprent_distances[j];
+    renderer->transparent_distances[i] = renderer->transparent_distances[j];
     renderer->transparent_distances[j] = temp_dist;
 
     Renderable *temp_rend = renderer->transparent_renderables[i];
@@ -337,29 +320,44 @@ Renderer__sortTransparent(Renderer *renderer)
     quicksort_transparent(renderer, 0, count - 1);
 }
 
-void
-Renderer__submitGeometry(
-    Renderer   *renderer, 
-    Renderable *renderable, 
-    Vector3     position, 
-    Vector3     bounds,
-    bool        is_entity
-)
-{
-    if (!renderable) return;
+
+void 
+Renderer_submitEntity(Renderer *renderer, Entity *entity) {
+    RenderableWrapper wrapper;
+    wrapper.entity    = entity;
+    wrapper.position  = entity->position;
+    wrapper.bounds    = entity->bounds;
+    wrapper.is_entity = true;
 
     size_t index = DynamicArray_length(renderer->wrapper_pool);
+    DynamicArray_add((void**)&renderer->wrapper_pool, &wrapper);
+    SpatialHash_insert(
+            renderer->visibility_hash, 
+            &renderer->wrapper_pool[index], 
+            entity->position, 
+            entity->bounds
+        );
+}
 
+void Renderer_submitGeometry(
+    Renderer *renderer, 
+    Renderable *renderable, 
+    Vector3 position, 
+    Vector3 bounds
+)
+{
     RenderableWrapper wrapper;
     wrapper.renderable = renderable;
-    wrapper.posiiton   = position;
-    wrapper.is_entity  = is_entity;
+    wrapper.position   = position;
+    wrapper.bounds     = bounds;
+    wrapper.is_entity  = false;
 
-    DynamicArray(&renderer->wrapper_pool, &wrapper, 1);
-
+    size_t index = DynamicArray_length(renderer->wrapper_pool);
+    DynamicArray_add((void**)&renderer->wrapper_pool, &wrapper);
     SpatialHash_insert(
-            renderer->visibility_hash,  
-            &renderer->wrapper_pool[index], 
-            position, bounds
+            renderer->visibility_hash,
+            &renderer->wrapper_pool[index],
+            position,
+            bounds
         );
 }

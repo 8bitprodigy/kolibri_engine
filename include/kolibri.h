@@ -7,6 +7,7 @@
 #include "engine.h"
 #include "entity.h"
 #include "head.h"
+#include "renderer.h"
 #include "scene.h"
 #include "spatialhash.h"
 

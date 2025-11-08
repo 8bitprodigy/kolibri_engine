@@ -153,7 +153,7 @@ extern Entity       Blast_Template;
 */
 extern SceneVTable scene_Callbacks;
 
-EntityList      testSceneRender(   Scene *scene, Head   *head);
+void            testSceneRender(   Scene *scene, Head   *head);
 CollisionResult testSceneCollision(Scene *scene, Entity *entity, Vector3 to);
 
 /*

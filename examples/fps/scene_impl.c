@@ -1,4 +1,5 @@
 #include "game.h"
+#include "renderer.h"
 
 
 #define ENTITY_ON_ENTITY_TEST_VECTOR ((Vector3){0.0f, -0.01f, 0.0f})
@@ -6,7 +7,7 @@
 /*
 	Callback Forward Declarations
 */
-EntityList      testSceneRender(         Scene *scene, Head   *head);
+void            testSceneRender(         Scene *scene, Head   *head);
 CollisionResult testSceneCollision(      Scene *scene, Entity *entity, Vector3 to);
 CollisionResult testSceneRaycast(        Scene *scene, Vector3 from,   Vector3 to);
 bool            testSceneEntityIsOnFloor(Scene *scene, Entity *entity);
@@ -31,11 +32,15 @@ SceneVTable scene_Callbacks = {
 };
 
 
-EntityList
+void
 testSceneRender(Scene *scene, Head *head)
 {
+	Renderer *renderer = Engine_getRenderer(Scene_getEngine(scene));
 	DrawGrid(100, 1.0f);
-	return *Scene_getEntityList(scene);
+	EntityList *ent_list = Scene_getEntityList(scene);
+	for (int i = 0; i < ent_list->count; i++) {
+		Renderer_submitEntity(renderer, ent_list->entities[i]);
+	}
 }
 
 CollisionResult /* Infinite plane at 0.0f y-position */

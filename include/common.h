@@ -146,6 +146,7 @@
 typedef struct Engine      Engine;
 typedef struct Entity      Entity;
 typedef struct Head        Head;
+typedef struct Renderer    Renderer;
 typedef struct Scene       Scene;
 typedef struct SpatialHash SpatialHash;
 

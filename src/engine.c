@@ -190,6 +190,11 @@ Engine_getHeads(Engine *self)
 	return self->heads;
 }
 
+Renderer *
+Engine_getRenderer(Engine *self)
+{
+	return self->renderer;
+}
 
 Scene *
 Engine_getScene(Engine *self)
@@ -363,7 +368,6 @@ Engine_requestExit(Engine *self)
 {
 	self->request_exit = true;
 }
-
 
 /**********************
 	PRIVATE METHODS
