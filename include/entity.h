@@ -127,6 +127,8 @@ Entity      *Entity_getPrev(         Entity *entity);
 Scene       *Entity_getScene(        Entity *entity);
 uint64       Entity_getUniqueID(     Entity *entity);
 bool         Entity_isOnFloor(       Entity *entity);
+bool         Entity_isOnWall(        Entity *entity);
+bool         Entity_isOnCeiling(     Entity *entity);
 
 /*
     Methods

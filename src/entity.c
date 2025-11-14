@@ -264,7 +264,7 @@ Entity_moveAndSlide(Entity *self, Vector3 movement)
     }
     return result;
 }
-
+/*
 void
 Entity_render(Entity *entity, Head *head)
 {
@@ -280,12 +280,12 @@ Entity_render(Entity *entity, Head *head)
 		break;
 	}
 	if (lod_level < 0) return; /* Distance is greater than max renderable LOD level, so don't render it. */
-	
+	/*
 	Renderable *renderable = entity->renderables[lod_level];
 
 	if (renderable && renderable->Render) renderable->Render(renderable, (void*)entity);
 }
-
+*/
 
 /*
 	Private Methods

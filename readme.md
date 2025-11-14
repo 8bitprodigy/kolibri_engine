@@ -35,7 +35,7 @@ It's so minimal, one could use it as a framework to build a more specific, more 
 
 - Simple renderer using sphere-frustum intersection to handle frustum culling
 
-- A dynamic array container API (used internally, but exposed publicly)
+- A dynamic array container API (used internally, but exposed publicly for convenience)
 
 This engine is so simple, it weighs in at only \~3000 lines of C.
 
@@ -48,6 +48,12 @@ These are the APIs used to make your game(s).
 ### **kolibri.h**
 
 This just imports all the other headers.
+
+## **collision.h**:
+  - `CollisionResult Collision_checkAABB( Entity *a, Entity *b)`: Checks if two entities with AABB colliders are colliding and returns a `CollisionResult`.
+  - `CollisionResult Collision_checkRayAABB( K_Ray ray, Entity *entity)`: Checks if `K_Ray`, `ray`, intersects with the AABB collider of `entity`.
+  - `CollisionResult Collision_checkDiscreet( Entity *a, Entity *b)`: Runs a discreet collision detection check and returns a `CollisionResult`.
+  - `CollisionResult Collision_checkContinuous( Entity *a, Entity *b, Vector3 movement)`: Runs a continuous collision detection check and returns a `CollisionResult` with the info.
 
 ### **common.h**:
 
@@ -116,6 +122,29 @@ Defines macros, constants, enums, and types used commonly throughout the engine 
   - `Xform` holds `position`, `rotation`, `scale`, and `skew`, internally union'd with `xf[4]` to allow for swizzling.
   
 ### **dynamicarray.h**
+- *Macro Defines*:
+  - `DYNAMIC_ARRAY_GROWTH_FACTOR`(default 2.0f): The amount to multiply the size of the array by when growing it(overridable).
+
+- *Macro Functions*:
+  - `DynamicArray(type, capacity)`: Constructs a new `DynamicArray` in a simple manner. Takes the type of the data the array will store, followed by the starting capacity for the array.
+  - `DynamicArray_add(array, datum)`: Wrapper for `DynamicArray_append()` for adding a single element to the Array.
+
+- *Constructor / Destructor*:
+  - `void *DynamicArray_new(size_t datum_size, size_t capacity)`: Constructs a new `DynamicArray` with element size of `datum_size`, containing `capacity` elements.
+  - `void DynamicArray_free(void *array)`: Frees the given `DynamicArray`, `array`, from memory.
+
+- *Methods*:
+  - `void DynamicArray_grow(void **array)`: Increases the capacity of `array` by `DYNAMIC_ARRAY_GROWTH_FACTOR` times its capacity.
+  - `void DynamicArray_shrink(void *array)`: Decreases the capacity of `array` by its capacity divided by `DYNAMIC_ARRAY_GROWTH_FACTOR`.
+  - `void DynamicArray_append(void **array, void *data, size_t length)`: Appends `length` number of elements from the given array `data` to the `DynamicArray`, `array`.
+  - `size_t DynamicArray_capacity(void *array)`: Gets the capacity of `array`.
+  - `void DynamicArray_clear(void *array)`: Clears all entries from `array`(really, it just sets its length to 0).
+  - `size_t DynamicArray_datumSize(void *array)`: Gets the size of the type of the element stored in `array`.
+  - `void DynamicArray_concat(void **array1, void *array2)`: Concatenates `array2` to `array1`.
+  - `void DynamicArray_delete(void *array, size_t index, size_t length)`: Removes the elements starting at `index` for `length` number of cells from `array`.
+  - `void DynamicArray_insert(void **array, size_t index, void *data, size_t length)`:Inserts `length` number of elements from `data` into `array` at `index`.
+  - `size_t DynamicArray_length(void *array)`: Gets the number of elements currently stored in `array`.
+  - `void DynamicArray_replace(void **array, size_t index, void *data, size_t length)`: Replaces `length` number of elements in `array` with the same number of elements from `data`, starting at `index`.
 
 ### **engine.h**:
 
@@ -179,11 +208,15 @@ Defines macros, constants, enums, and types used commonly throughout the engine 
 
       - `void Engine_requestExit(Engine *engine)`: Requests the engine to exit on the next update.
 
-### **head.h**:
-
 ### **entity.h**:
 
+### **head.h**:
+
+### **renderer.h**:
+
 ### **scene.h**:
+
+### **spatialhash.h**:
 
 ## Protected API:
 

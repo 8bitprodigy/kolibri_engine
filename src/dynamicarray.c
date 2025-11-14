@@ -4,7 +4,7 @@
 #include "dynamicarray.h"
 
 
-#define INDEX( a, i )   ((char*)&(a)->data + ((i) *(a)->datum_size))
+#define INDEX( a, i )   ((char*)(a)->data + ((i) *(a)->datum_size))
 #define GET_HEADER( a ) (((DynamicArrayHeader*)((char*)(a) - offsetof(DynamicArrayHeader, data))))
 
 
@@ -34,7 +34,7 @@ DynamicArray_new( size_t datum_size, size_t capacity )
 	array->length     = 0;
 	array->capacity   = capacity;
 
-	return (void*)&array->data;
+	return (void*)array->data;
 } /* DynamicArray_new */
 
 
@@ -49,9 +49,15 @@ void
 DynamicArray_grow(void **self)
 {
     DynamicArrayHeader *old_header = GET_HEADER(*self);
+
+	DBG_OUT("self=%p, *self=%p, old_header=%p", self, *self, old_header);
+    DBG_OUT("old_header: length=%zu, capacity=%zu, datum_size=%zu", 
+           old_header->length, old_header->capacity, old_header->datum_size);
     
     size_t new_capacity = DYNAMIC_ARRAY_GROWTH_FACTOR * old_header->capacity;
     size_t new_size = sizeof(DynamicArrayHeader) + (new_capacity * old_header->datum_size);
+    
+    DBG_OUT("Calling realloc(old_header=%p, new_size=%zu)", old_header, new_size);
     
     DynamicArrayHeader *new_header = realloc(old_header, new_size);
     if (!new_header) {
@@ -60,7 +66,7 @@ DynamicArray_grow(void **self)
     }
     
     new_header->capacity = new_capacity;
-    *self = (void*)&new_header->data;
+    *self = (void*)new_header->data;
 } /* DynamicArray_grow */
 
 
@@ -105,11 +111,17 @@ DynamicArray_capacity(void *self)
 	return GET_HEADER(self)->capacity;
 } /* DynamicArray_capacity */
 
+size_t
+DynamicArray_datumSize(void *self)
+{
+	return GET_HEADER(self)->datum_size;
+} /* DynamicArray_datumSize */
+
 void
 DynamicArray_clear(void *self)
 {
 	GET_HEADER(self)->length = 0;
-}
+} /* DynamicArray_clear */
 
 void
 DynamicArray_concat(void **self, void *array)

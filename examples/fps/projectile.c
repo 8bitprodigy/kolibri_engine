@@ -10,6 +10,7 @@ Model
 	blast_model;
 	
 Texture2D
+	blast_sprite,
 	blast_texture;
 
 /*
@@ -32,8 +33,9 @@ ProjectileInfo
 
 Renderable
 	blast_Renderable = (Renderable){
-			.data   = &blast_model,
-			.Render = RenderModel,
+			.data        = &blast_sprite,
+			.Render      = RenderBillboard,
+			.transparent = true,
 		};
 
 EntityVTable 
@@ -76,6 +78,7 @@ Projectile_MediaInit(void)
 {
 	blast_model   = LoadModel(  "./resources/models/projectiles/blast.obj");
 	blast_texture = LoadTexture("./resources/models/projectiles/blast.png");
+	blast_sprite  = LoadTexture("./resources/sprites/stool.png");
 	SetMaterialTexture(&blast_model.materials[0], MATERIAL_MAP_ALBEDO, blast_texture);
 	SetTextureFilter(blast_texture, TEXTURE_FILTER_BILINEAR);
 	DBG_OUT("Projectile_MediaInit() ran.");

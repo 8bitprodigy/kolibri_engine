@@ -24,6 +24,7 @@ void    DynamicArray_shrink(   void    *array);
 void    DynamicArray_append(   void   **array,  void    *data,  size_t  length);
 size_t  DynamicArray_capacity( void    *array);
 void    DynamicArray_clear(    void    *array);
+size_t  DynamicArray_datumSize(void    *array);
 void    DynamicArray_concat(   void   **array1, void   *array2);
 void    DynamicArray_delete(   void    *array,  size_t   index, size_t length);
 void    DynamicArray_insert(   void   **array,  size_t   index, void   *data,   size_t length);

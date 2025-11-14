@@ -110,7 +110,7 @@ CollisionScene__queryRegion(
 
 /* Cylinder Collision */
 CollisionResult
-Collision__checkCylinder(Entity *a, Entity *b)
+Collision_checkCylinder(Entity *a, Entity *b)
 {
 	CollisionResult result = {0};
 	result.hit = false;
@@ -162,7 +162,7 @@ Collision__checkCylinder(Entity *a, Entity *b)
 
 /* AABB Collision */
 CollisionResult
-Collision__checkAABB(Entity *a, Entity *b)
+Collision_checkAABB(Entity *a, Entity *b)
 {
 	CollisionResult result = {0};
 	result.hit = false;
@@ -228,7 +228,7 @@ Collision__checkAABB(Entity *a, Entity *b)
 }
 
 CollisionResult
-Collision__checkSphere(Entity *a, Entity *b)
+Collision_checkSphere(Entity *a, Entity *b)
 {
 	CollisionResult result = {0};
 	result.hit             = false;
@@ -248,7 +248,7 @@ Collision__checkSphere(Entity *a, Entity *b)
 }
 
 CollisionResult
-Collision__checkMixed(Entity *aabb_entity, Entity *cyl_entity, bool cyl_is_b)
+Collision_checkMixed(Entity *aabb_entity, Entity *cyl_entity, bool cyl_is_b)
 {
     CollisionResult result = {0};
     result.hit = false;
@@ -307,7 +307,7 @@ Collision__checkMixed(Entity *aabb_entity, Entity *cyl_entity, bool cyl_is_b)
 }
 
 CollisionResult
-Collision__checkDiscreet(Entity *a, Entity *b)
+Collision_checkDiscreet(Entity *a, Entity *b)
 {
 	if (
 		   !(a->collision.masks & b->collision.layers)
@@ -320,23 +320,23 @@ Collision__checkDiscreet(Entity *a, Entity *b)
 
 	switch (colliders) {
 	case COLLIDERS(COLLISION_BOX,      COLLISION_BOX):
-		return Collision__checkAABB(a, b);
+		return Collision_checkAABB(a, b);
 		break;
 	case COLLIDERS(COLLISION_BOX,      COLLISION_CYLINDER):
-		return Collision__checkMixed(a, b, true);
+		return Collision_checkMixed(a, b, true);
 		break;
 	case COLLIDERS(COLLISION_BOX,      COLLISION_SPHERE):
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_CYLINDER):
-		return Collision__checkCylinder(a, b);
+		return Collision_checkCylinder(a, b);
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_BOX):
-		return Collision__checkMixed(b, a, false);
+		return Collision_checkMixed(b, a, false);
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_SPHERE):
 		break;
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_SPHERE):
-		return Collision__checkSphere(a, b);
+		return Collision_checkSphere(a, b);
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_BOX): /* FALLTHROUGH */
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_CYLINDER):
 	default:
@@ -389,7 +389,7 @@ CollisionScene__checkCollision(
 		if (other == entity) continue; /* Skip self */
 		if (!other->collision_shape) continue;
 
-		CollisionResult test_result = Collision__checkDiscreet(
+		CollisionResult test_result = Collision_checkDiscreet(
 				&temp_entity, 
 				other
 			);
@@ -408,7 +408,7 @@ CollisionScene__checkCollision(
 *************************************/
 /* CCD: Cylinder-Cylinder */
 CollisionResult
-Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
+Collision_checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 {
 	CollisionResult result = {0};
 	result.hit             = false;
@@ -422,7 +422,7 @@ Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 	if (move_length < 0.0001f) {
 		Entity temp_a = *a;
 		temp_a.position = to;
-		return Collision__checkCylinder(&temp_a, b);
+		return Collision_checkCylinder(&temp_a, b);
 	}
 
 	/* 2D collision */
@@ -473,7 +473,7 @@ Collision__checkContinuousCylinder(Entity *a, Entity *b, Vector3 movement)
 
 /* CCD: AABB - AABB */
 CollisionResult
-Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
+Collision_checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
 {
     CollisionResult result = {0};
     result.hit             = false;
@@ -485,7 +485,7 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
     if (move_length < 0.0001f) {
         Entity temp_a   = *a;
         temp_a.position = Vector3Add(from, movement);
-        return Collision__checkAABB(&temp_a, b);
+        return Collision_checkAABB(&temp_a, b);
     }
 
     /* Add A and B's AABBs together */
@@ -526,7 +526,7 @@ Collision__checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
 }
 
 CollisionResult
-Collision__checkContinuousSphere(
+Collision_checkContinuousSphere(
 	Entity  *sphere_1,
 	Entity  *sphere_2,
 	Vector3  movement
@@ -562,7 +562,7 @@ Collision__checkContinuousSphere(
 
 /* CCD: AABB - Cylinder using Minkowski sum approach */
 CollisionResult
-Collision__checkContinuousAABBCylinder(
+Collision_checkContinuousAABBCylinder(
 	Entity  *aabb, 
 	Entity  *cylinder, 
 	Vector3  movement, 
@@ -589,8 +589,8 @@ Collision__checkContinuousAABBCylinder(
         Entity temp_entity = *moving_entity;
         temp_entity.position = Vector3Add(moving_entity->position, movement);
         CollisionResult temp_result = aabb_is_moving ? 
-            Collision__checkMixed(&temp_entity, cylinder, true) :
-            Collision__checkMixed(aabb, &temp_entity, true);
+            Collision_checkMixed(&temp_entity, cylinder, true) :
+            Collision_checkMixed(aabb, &temp_entity, true);
 
         
         if (temp_result.hit) {
@@ -700,7 +700,7 @@ Collision__checkContinuousAABBCylinder(
 
 /* CCD: Dispatch based on shape types */
 CollisionResult
-Collision__checkContinuous(Entity *a, Entity *b, Vector3 movement)
+Collision_checkContinuous(Entity *a, Entity *b, Vector3 movement)
 {
     if (
     	   !(a->collision.masks & b->collision.layers) 
@@ -713,23 +713,23 @@ Collision__checkContinuous(Entity *a, Entity *b, Vector3 movement)
 
 	switch (colliders) {
 	case COLLIDERS(COLLISION_BOX,      COLLISION_BOX):
-		return Collision__checkContinuousAABB(a, b, movement);
+		return Collision_checkContinuousAABB(a, b, movement);
 		break;
 	case COLLIDERS(COLLISION_BOX,      COLLISION_CYLINDER):
-        return Collision__checkContinuousAABBCylinder(a, b, movement, true); /* AABB moving */
+        return Collision_checkContinuousAABBCylinder(a, b, movement, true); /* AABB moving */
 		break;
 	case COLLIDERS(COLLISION_BOX,      COLLISION_SPHERE):
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_CYLINDER):
-        return Collision__checkContinuousCylinder(a, b, movement);
+        return Collision_checkContinuousCylinder(a, b, movement);
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_BOX):
-        return Collision__checkContinuousAABBCylinder(a, b, movement, false); /* Cylinder moving */
+        return Collision_checkContinuousAABBCylinder(a, b, movement, false); /* Cylinder moving */
 		break;
 	case COLLIDERS(COLLISION_CYLINDER, COLLISION_SPHERE):
 		break;
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_SPHERE): /* FALLTHROUGH */
-        return Collision__checkContinuousSphere(a, b, movement);
+        return Collision_checkContinuousSphere(a, b, movement);
         break;
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_BOX):
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_CYLINDER):
@@ -822,7 +822,7 @@ CollisionScene__moveEntity(
         if (dot > 0.1f) {
             /* Moving toward object - use continuous collision detection */
             Entity temp_entity = *entity;
-            CollisionResult test_result = Collision__checkContinuous(&temp_entity, other, movement);
+            CollisionResult test_result = Collision_checkContinuous(&temp_entity, other, movement);
             
             if (test_result.hit && test_result.distance < result.distance) {
                 result = test_result;
@@ -832,7 +832,7 @@ CollisionScene__moveEntity(
             Entity temp_entity = *entity;
             temp_entity.position = to;
             
-            CollisionResult final_check = Collision__checkDiscreet(&temp_entity, other);
+            CollisionResult final_check = Collision_checkDiscreet(&temp_entity, other);
             
             if (final_check.hit && other->solid) {
                 /* Would still be overlapping - this is a problem */
@@ -869,19 +869,19 @@ checkRayOrSphere(K_Ray ray, Entity *entity, bool AABB)
 }
 
 CollisionResult
-Collision__checkRayAABB(K_Ray ray, Entity *entity)
+Collision_checkRayAABB(K_Ray ray, Entity *entity)
 {
 	return checkRayOrSphere(ray, entity, true);
 }
 
 CollisionResult
-Collision__checkRaySphere(K_Ray ray, Entity *entity)
+Collision_checkRaySphere(K_Ray ray, Entity *entity)
 {
 	return checkRayOrSphere(ray, entity, false);
 }
 
 CollisionResult
-Collision__checkRayCylinder(K_Ray ray, Entity *entity)
+Collision_checkRayCylinder(K_Ray ray, Entity *entity)
 {
     CollisionResult result = {0};
     
@@ -1098,13 +1098,13 @@ CollisionScene__raycast(CollisionScene *scene, K_Ray ray)
 			continue;
 			break;
 		case COLLISION_BOX:
-			result = Collision__checkRayAABB(    ray, entity);
+			result = Collision_checkRayAABB(    ray, entity);
 			break;
 		case COLLISION_CYLINDER:
-			result = Collision__checkRayCylinder(ray, entity);
+			result = Collision_checkRayCylinder(ray, entity);
 			break;
 		case COLLISION_SPHERE:
-			result = Collision__checkRaySphere(  ray, entity);
+			result = Collision_checkRaySphere(  ray, entity);
 			break;
 		}
 		

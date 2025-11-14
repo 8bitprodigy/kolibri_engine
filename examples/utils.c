@@ -1,10 +1,11 @@
 #include "entity.h"
+#include <raylib.h>
 #include "utils.h"
 
 
 /* Texture loader/releaser */
 void *
-texture_loader(const char *path, void *data)
+texture_loader(const char *path, void *data, Camera3D *camera)
 {
     (void)data;  // Unused
     Texture2D *texture = malloc(sizeof(Texture2D));
@@ -13,7 +14,7 @@ texture_loader(const char *path, void *data)
 }
 
 void 
-texture_releaser(void *asset, void *data)
+texture_releaser(void *asset, void *data, Camera3D *camera)
 {
     (void)data;  // Unused
     Texture2D *texture = (Texture2D *)asset;
@@ -23,7 +24,7 @@ texture_releaser(void *asset, void *data)
 
 /* Model loader/releaser */
 void *
-model_loader(const char *path, void *data)
+model_loader(const char *path, void *data, Camera3D *camera)
 {
     (void)data;  // Unused
     Model *model = malloc(sizeof(Model));
@@ -32,7 +33,7 @@ model_loader(const char *path, void *data)
 }
 
 void 
-model_releaser(void *asset, void *data)
+model_releaser(void *asset, void *data, Camera3D *camera)
 {
     (void)data;  // Unused
     Model *model = (Model *)asset;
@@ -45,7 +46,8 @@ model_releaser(void *asset, void *data)
 void
 RenderModel(
 	Renderable *renderable,
-	void       *render_data
+	void       *render_data, 
+	Camera3D    *camera
 )
 {
 	Model  *model  = (Model*)renderable->data;
@@ -70,9 +72,31 @@ RenderModel(
 }
 
 void
+RenderBillboard(
+	Renderable *renderable,
+	void       *render_data, 
+	Camera3D   *camera
+)
+{
+	Texture2D *texture = (Texture2D*)renderable->data;
+	Entity    *entity  = (Entity*)render_data;
+	Vector3          
+			   pos     = Vector3Add(entity->position, entity->renderable_offset),
+			   scale   = entity->scale;
+	DrawBillboard(
+			*camera, 
+			*texture, 
+			entity->position, 
+			1.0f, 
+			WHITE
+		);
+}
+
+void
 testRenderableBoxCallback(
 	Renderable *renderable,
-	void       *render_data
+	void       *render_data, 
+	Camera3D   *camera
 )
 {
 	Entity *entity = render_data;
@@ -89,7 +113,8 @@ testRenderableBoxCallback(
 void
 testRenderableBoxWiresCallback(
 	Renderable *renderable,
-	void       *render_data
+	void       *render_data, 
+	Camera3D   *camera
 )
 {
 	Entity *entity = render_data;
@@ -105,7 +130,8 @@ testRenderableBoxWiresCallback(
 void
 testRenderableCylinderWiresCallback(
 	Renderable *renderable,
-	void       *render_data
+	void       *render_data, 
+	Camera3D   *camera
 )
 {
 	Entity *entity = renderable->data;

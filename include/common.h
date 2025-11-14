@@ -290,7 +290,7 @@ Renderable
 {
     void  *data;
     void  *media;
-    void (*Render)(struct Renderable *renderable, void *data);
+    void (*Render)(struct Renderable *renderable, void *data, Camera3D *camera);
 	union {
 		uint8 flags;
 		struct {
