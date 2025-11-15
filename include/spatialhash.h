@@ -13,7 +13,7 @@ typedef struct SpatialHash SpatialHash;
 SpatialHash *SpatialHash_new( void);
 void         SpatialHash_free(SpatialHash *hash);
 
-/* Private Methods */
+/* Methods */
 void  SpatialHash_clear(      SpatialHash *hash);
 void  SpatialHash_insert(     SpatialHash *hash, void        *data,   Vector3   center,        Vector3  bounds);
 void *SpatialHash_queryRegion(SpatialHash *hash, BoundingBox  region, void    **query_results, int     *count);

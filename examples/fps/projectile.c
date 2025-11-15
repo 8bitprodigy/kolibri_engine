@@ -35,7 +35,7 @@ Renderable
 	blast_Renderable = (Renderable){
 			.data        = &blast_sprite,
 			.Render      = RenderBillboard,
-			.transparent = true,
+			.transparent = false,
 		};
 
 EntityVTable 

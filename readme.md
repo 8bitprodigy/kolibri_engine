@@ -210,13 +210,159 @@ Defines macros, constants, enums, and types used commonly throughout the engine 
 
 ### **entity.h**:
 
+- *Typedefs*:
+```c
+typedef void (*EntityCallback)(         Entity *entity);
+typedef void (*EntityCollisionCallback)(Entity *entity, CollisionResult collision);
+typedef void (*EntityUpdateCallback)(   Entity *entity, float           delta);
+
+typedef struct
+EntityVTable
+{
+    EntityCallback          Setup;       /* Called on initialization of a new Entity */
+    EntityCallback          Enter;       /* Called upon Entity entering the scene */
+    EntityUpdateCallback    Update;      /* Called once every tick prior to rendering */
+    EntityUpdateCallback    Render;      /* Called once every frame prior to rendering the Entity */
+    EntityCollisionCallback OnCollision; /* Called when the Entity collides with something while moving */
+    EntityCollisionCallback OnCollided;  /* Called when another Entity collides with this Entity */
+    EntityCallback          Exit;        /* Called upon Entity exiting the scene */
+    EntityCallback          Free;        /* Called upon freeing Entity from memory */
+}
+EntityVTable;
+
+
+typedef struct 
+Entity 
+{
+    void           *user_data;
+    EntityVTable   *vtable;
+    Renderable     *renderables[  MAX_LOD_LEVELS];
+    float           lod_distances[MAX_LOD_LEVELS];
+    uint8           lod_count;
+    float           visibility_radius;
+    float           floor_max_angle;
+    union {
+        Vector3 bounds;
+        struct {
+            float
+                radius,
+                height,
+                _reserved_;
+        };
+    };
+    Vector3         
+                    bounds_offset,
+                    renderable_offset,
+                    velocity;
+    int            max_slides;
+    union {
+        Transform transform;
+        struct {
+            Vector3    position;
+            Quaternion orientation;
+            Vector3    scale;
+        };
+    };
+    
+    struct {
+        union {
+            uint8 layers;
+            struct {
+                bool
+                    layer_0:1,
+                    layer_1:1,
+                    layer_2:1,
+                    layer_3:1,
+                    layer_4:1,
+                    layer_5:1,
+                    layer_6:1,
+                    layer_7:1;
+            };
+        };
+        union {
+            uint8 masks;
+            struct {
+                bool
+                    mask_0:1,
+                    mask_1:1,
+                    mask_2:1,
+                    mask_3:1,
+                    mask_4:1,
+                    mask_5:1,
+                    mask_6:1,
+                    mask_7:1;
+            };
+        };
+    }
+    collision;
+    
+    union {
+        uint8 flags;
+        struct {
+            bool
+                active         :1,
+                visible        :1,
+                solid          :1; /* Solid or area collision */
+            CollisionShape 
+                collision_shape:2; /* 0 = None | 1 = AABB | 2 = Cylinder | 3 = Sphere */
+            bool
+                _flag_5        :1,
+                _flag_6        :1,
+                _flag_7        :1;
+        };
+    };
+
+    char *local_data[];
+} 
+Entity;
+```
+
+- *Constructor / Destructor *
+  - `Entity *Entity_new(const Entity *template_entity, Scene *scene, size_t local_data_size)`: Constructs a new entity from the given `template_entity`, adding it to the `scene`, with optional `local_data_size` memory allocated at the end.
+  - `void Entity_free(Entity *entity)`: Destructs the given `entity` removing it from the scene.
+
+- *Setters / Getters*:
+  - `double Entity_getAge(Entity *entity)`: Get the age of the entity in seconds since the time of its creation.
+  - `BoundingBox Entity_getBoundingBox(Entity *entity)`: Get the raylib `BoundingBox` of the entity.
+  - `Renderable *Entity_getLODRenderable(Entity *entity, Vector3 camera_position)`: Get the `Renderable` for `entity` at the given `camera_position`.
+  - `Engine *Entity_getEngine(Entity *entity)`: Get the `engine` which `entity` is subordinate to.
+  - `Entity *Entity_getNext(Entity *entity)`: Get the next `Entity` in the linked list in relation to `entity`.
+  - `Entity *Entity_getPrev(Entity *entity)`: Get the previous `Entity` in the linked list in relation to `entity`.
+  - `Scene *Entity_getScene(Entity *entity)`: Get the `Scene` the `entity` is currently in.
+  - `uint64 Entity_getUniqueID(Entity *entity)`: Get the unique ID of `entity`.
+  - `bool Entity_isOnFloor(Entity *entity)`: Returns true if `entity` is touching a floor.
+  - `bool Entity_isOnWall(Entity *entity)`: Returns true if `entity` is touching a wall.
+  - `bool Entity_isOnCeiling(Entity *entity)`: Returns true if `entity` is touching a ceiling.
+
+- *Methods*:
+  - `CollisionResult Entity_move(Entity *entity, Vector3 movement)`: Move the `entity` by `movement` until the first collision.
+  - `CollisionResult Entity_moveAndSlide(Entity *entity, Vector3 movement)`: Move the `entity` by `movement`, allowing it to slide(requires you set the `Entity.max_slides` value).
+
 ### **head.h**:
+  
 
 ### **renderer.h**:
+- *Typedefs*:
+  - `Renderer`: Opaque struct of the renderer.
+
+- *Methods*:
+  - `void Renderer_submitEntity(Renderer *renderer, Entity *entity)`: Called each frame in order to submit an entity to be rendered.
+  - `void Renderer_submitGeometry(Renderer *renderer, Renderable *renderable, Vector3 pos, Vector3 bounds)`: Called each frame in order to submit a chunk of geometry(such as level geometry) to be rendered.
 
 ### **scene.h**:
 
 ### **spatialhash.h**:
+- *Typedefs*:
+  - `SpatialHash`: Opaque struct for the spatial hash.
+
+- *Constructor / Destructor*:
+  - `SpatialHash *SpatialHash_new(void)`: Construct a new `SpatialHash`.
+  - `void SpatialHash_free(SpatialHash *hash)`: Destruct a `SpatialHash`, freeing it from memory.
+
+- *Methods*:
+  - `void SpatialHash_clear(SpatialHash *hash)`: Clears all the items from the `SpatialHash`, `hash`.
+  - `void  SpatialHash_insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bounds)`: Inserts `data` into `hash` at `center` with `bounds` dimensions for later retrieval.
+  - `void *SpatialHash_queryRegion(SpatialHash *hash, BoundingBox region, void **query_results, int *count)`: Queries all the entries in `hash` within `region`, and populates `query_results` with `count` of them.
 
 ## Protected API:
 
