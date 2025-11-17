@@ -41,6 +41,43 @@ This engine is so simple, it weighs in at only \~3000 lines of C.
 
 ---
 
+## Systems:
+
+### Collision
+
+This handles continuous collision between all `Entity`s in the scene.
+
+### DynamicArray
+
+A dynamically resizeable array used internally by the engine and provided to users.
+
+### Engine
+
+This is the main system you will interface with in your game. All the other systems are subordinate to this in some manner. It uses an opaque struct to hold its state and references to all the other, subordinate systems.
+
+### Entity
+
+This is what will appear in the world - enemies, props, projectiles, etc.. You will create templates of this struct to define the properties and behaviors of your Entities.
+
+### Head
+
+This couples a camera, input, pointer to an entity, and rendering context together. You will use this to see the world and interface with it.
+
+### Renderer
+
+This manages rendering the `Scene` to the various screen `Region`s handled by all current `Head`s.
+
+### Scene
+
+This provides an interface which handles the world geometry and collision through callbacks. This is how maps/level formats will be implemented.
+
+### SpatialHash
+
+This provides a broad-phase method to store objects in the `Scene` in order to provide spatial queries for systems like `Collision`, provided to users.
+
+
+---
+
 ## Public API:
 
 These are the APIs used to make your game(s).
@@ -339,6 +376,72 @@ Entity;
   - `CollisionResult Entity_moveAndSlide(Entity *entity, Vector3 movement)`: Move the `entity` by `movement`, allowing it to slide(requires you set the `Entity.max_slides` value).
 
 ### **head.h**:
+- *Typedefs*:
+```c
+/* Callback Types */
+typedef void        (*HeadCallback)(            Head *head);
+typedef void        (*HeadUpdateCallback)(      Head *head, float delta);
+typedef void        (*HeadResizeCallback)(      Head *head, uint  width,  uint height);
+
+typedef struct
+HeadVTable
+{
+    HeadCallback       Setup;      /* Called immediately after initialization */
+    HeadUpdateCallback Update;     /* Called every frame before rendering */
+    HeadCallback       PreRender;  /* Called during render, prior to rendering the scene.*/
+    HeadCallback       PostRender; /* Called after rendering the scene */
+    HeadResizeCallback Resize;     /* Called upon window resize */
+    HeadCallback       Exit;       /* Called upon removal of Head from engine */
+    HeadCallback       Free;       /* Called upon freeing the Head from memory */
+}
+HeadVTable;
+
+typedef struct
+{
+	float max_render_distance;
+	int   max_entities_per_frame;
+	union {
+		uint8 flags;
+		struct {
+			bool frustum_culling          :1;
+			bool sort_transparent_entities:1;
+			bool level_of_detail          :1;
+			bool flag_3                   :1; /* 3-4 not yet defined */
+			bool flag_4                   :1;
+			bool draw_entity_origin       :1;
+			bool draw_bounding_boxes      :1;
+			bool show_lod_levels          :1;
+		};
+	};
+}
+RendererSettings;
+```
+
+- *Constructor / Destructor*:
+  - `Head *Head_new(int Controller_ID, Region region, HeadVTable *vtable, Engine *engine)`: Constructs a new `Head` with a screen region of `region`, the callbacks in `vtable`, adds it to `engine` and returns the pointer.
+  - `void Head_free(Head *head)`: Destructs the `head`, calling its `HeadVTable.Free()` callback, and then freeing itself from memory.
+
+- *Setters / Getters*:
+  - `Head *Head_getNext(Head *head)`: Gets the pointer to the next `Head` in the linked list from `head`.
+  - `Head *Head_getPrev(Head *head)`: Gets the pointer to the previous `Head` in the linked list from `head`.
+  - `Camera3D *Head_getCamera(Head *head)`: Gets the pointer to `head`'s `Camera3D`.
+  - `Engine *Head_getEngine(Head *head)`: Gets the pointer to the `Engine` the given `head` is in.
+  - `Frustum *Head_getFrustum(Head *head)`: Gets the pointer to the `head`'s `Camera3D`'s `Frustum`.
+  - `RenderTexture *Head_getViewport(Head *head)`: **Only available if `HEAD_USE_RENDER_TEXTURE` is defined**. Gets the pointer to the `RenderTexture` viewport.
+  - `Region Head_getRegion(Head *head)`: Gets the pointer to `head`'s `Region` of the screen it renders to.
+  - `void Head_setRegion(Head *head, Region region)`: Sets the `head`'s screen region.
+  - `void *Head_getUserData( Head *head)`: Gets the pointer to the data pointed to by `head`.
+  - `void Head_setUserData(Head *head, void *user_data)`: Sets the data `head` points to.
+  - `void Head_setVTable(Head *head, HeadVTable *vtable)`: Sets the `HeadVTable` `head` uses for callbacks.
+  - `HeadVTable *Head_getVTable(Head *head)`: Gets the pointer to the `HeadVTable` currently used by `head`.
+  - `RendererSettings *Head_getRendererSettings(Head *head)`: Gets the pointer to the `RenderSettings` used by `head`.
+
+- *Methods*:
+  - `void Head_setup(Head *head)`: Calls the `HeadVTable.Setup()` function `head` currently points to.
+  - `void Head_update(Head *head, float delta)`: Calls the `HeadVTable.Update()` function `head` currently points to.
+  - `void Head_preRender(Head *head)`: Calls the `HeadVTable.PreRender()` function `head` currently points to.
+  - `void Head_postRender(Head *head)`: Calls the `HeadVTable.PostRender()` function `head` currently points to.
+  - `void Head_exit(Head *head)`: Calls the `HeadVTable.Exit()` function `head` currently points to.
   
 
 ### **renderer.h**:
@@ -350,6 +453,59 @@ Entity;
   - `void Renderer_submitGeometry(Renderer *renderer, Renderable *renderable, Vector3 pos, Vector3 bounds)`: Called each frame in order to submit a chunk of geometry(such as level geometry) to be rendered.
 
 ### **scene.h**:
+- *Typedefs*:
+```c
+typedef struct Scene Scene;
+
+
+typedef void            (*SceneCallback)(         Scene *scene);
+typedef void            (*SceneDataCallback)(     Scene *scene, void    *map_data);
+typedef void            (*SceneUpdateCallback)(   Scene *scene, float    delta);
+typedef void            (*SceneEntityCallback)(   Scene *scene, Entity  *entity);
+typedef CollisionResult (*SceneCollisionCallback)(Scene *scene, Entity  *entity, Vector3 to);
+typedef CollisionResult (*SceneRaycastCallback)(  Scene *scene, Vector3  from,   Vector3 to);
+typedef void            (*SceneRenderCallback)(   Scene *scene, Head    *head);
+
+
+typedef struct
+SceneVTable
+{
+    SceneDataCallback            Setup;          /* Called on initialization */
+    SceneCallback                Enter;          /* Called on entering the engine */
+    SceneUpdateCallback          Update;         /* Called once every frame after updating all the entities and before rendering */
+    SceneEntityCallback          EntityEnter;    /* Called every time an Entity enters the scene */
+    SceneEntityCallback          EntityExit;     /* Called every time an Entity exits the scene */
+    SceneCollisionCallback       CheckCollision; /* Called when checking if an entity would collide if moved */
+    SceneCollisionCallback       MoveEntity;     /* Called Every time an Entity moves in order to check if it has collided with the scene */
+    SceneRaycastCallback         Raycast;        /* Called Every time a raycast is performed in order to check if has collided with the scene */
+    SceneRenderCallback          Render;         /* Called once every frame in order to render the scene */
+    SceneCallback                Exit;           /* Called upon Scene exiting the engine */
+    SceneDataCallback            Free;           /* Called upon freeing the Scene from memory */
+}
+SceneVTable;
+```
+
+- *Constructor / Destructor*:
+  - `Scene *Scene_new(SceneVTable *scene_type, void *data, Engine *engine)`: Constructs a new `Scene` with the callbacks defined in `scene_type`, `data`, and adds it to `engine`.
+  - `void Scene_free(Scene *scene)`: Destructs `scene` by calling its `SceneVTable.Free()` callback, and then freeing itself from memory.
+
+- *Setters / Getters*;
+  - `Engine *Scene_getEngine(Scene *scene)`: Gets the pointer to the `Engine` `scene` is currently in.
+  - `uint Scene_getEntityCount( Scene *scene)`: Gets the number of `Entity`s in `scene`.
+  - `EntityList *Scene_getEntityList(  Scene *scene)`: Gets the `Entity`s in the scene as an array.
+  - `void *Scene_getMapData(Scene *scene)`: Gets the pointer to `scene`'s data.
+
+- *Methods*;
+  - `void Scene_enter(Scene *scene)`: Calls the `SceneVTable.Enter()` function `scene` currently points to.
+  - `void Scene_update(Scene *scene, float    delta)`: Calls the `SceneVTable.Update()` function `scene` currently points to.
+  - `void Scene_entityEnter(Scene *scene, Entity  *entity)`: Calls the `SceneVTable.EntityEnter()` function `scene` currently points to.
+  - `void Scene_entityExit(Scene *scene, Entity  *entity)`: Calls the `SceneVTable.EntityExit()` function `scene` currently points to.
+  - `CollisionResult Scene_checkCollision( Scene *scene, Entity  *entity, Vector3 to)`: Calls the `SceneVTable.CheckCollision()` function `scene` currently points to. Returns the `CollisionResult`.
+  - `CollisionResult Scene_checkContinuous(Scene *scene, Entity  *entity, Vector3 movement)`: Calls the `SceneVTable.CheckContinuous()` function `scene` currently points to. Returns the `CollisionResult`.
+  - `CollisionResult Scene_raycast(Scene *scene, Vector3  from,   Vector3 to)`: Calls the `SceneVTable.Raycast()` function `scene` currently points to.
+  - `void Scene_render(Scene *scene, Head    *head)`: Calls the `SceneVTable.Render()` function `scene` currently points to.
+  - `void Scene_exit(Scene *scene)`: Calls the `SceneVTable.Exit()` function `scene` currently points to.
+
 
 ### **spatialhash.h**:
 - *Typedefs*:
@@ -379,30 +535,10 @@ These APIs are used internally within the engine. They are NOT to be used to mak
 ### **\_renderer\_.h**:
 
 ### **\_scene\_.h**:
+  
+### **\_spatialhash\_.h**:
 
 
-
----
-
-## Systems:
-
-### Engine
-
-This is the main system you will interface with in your game. All the other systems are subordinate to this in some manner. It uses an opaque struct to hold its state and references to all the other, subordinate systems.
-
-### Entity
-
-This is what will appear in the world - enemies, props, projectiles, etc.. You will create templates of this struct to define the properties and behaviors of your Entities.
-
-### Head
-
-This couples a camera, input, pointer to an entity, and rendering context together. You will use this to see the world and interface with it.
-
-### Scene
-
-### Collision
-
-### Renderer
 
 ---
 

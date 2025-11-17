@@ -27,7 +27,6 @@ HeadVTable
 HeadVTable;
 
 typedef struct
-RendererSettings
 {
 	float max_render_distance;
 	int   max_entities_per_frame;
