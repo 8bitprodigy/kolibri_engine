@@ -525,19 +525,185 @@ SceneVTable;
 These APIs are used internally within the engine. They are NOT to be used to make games. They are documented here in order to enable developers to better understand the engine for education and modification.
 
 ### **\_collison\_.h**:
+- *Typedefs*:
+  - `typedef struct CollisionScene CollisionScene`: Opaque type for the collision scene.
+
+- *Scene MGMT*:
+  - `void CollisionScene__markRebuild(CollisionScene *scene)`:
+  - `void CollisionScene__insertEntity(CollisionScene *scene, Entity *entity)`:
+  - `void CollisionScene__clear(CollisionScene *scene)`:
+
+- *Methods*:
+  - `Entity **CollisionScene__queryRegion(CollisionScene *scene, BoundingBox  bbox, int *count)`: Returns an array of `Entity`s in the `scene` within the given `bbox`, and modifies `count` to indicate the length of the array.
+  - `CollisionResult CollisionScene__checkCollision(CollisionScene *scene, Entity *entity, Vector3 to)`: Checks `entity` for a discreet collision within `scene` if it's at position `to`. Returns results as `CollisionResult`.
+  - `CollisionResult CollisionScene__moveEntity(CollisionScene *scene, Entity *entity, Vector3 movement)`: Checks `entity` for a continuous collision within `scene` by moving it along `movement`. Returns result as `CollisionResult`.
+  - `CollisionResult CollisionScene__raycast(CollisionScene *scene, K_Ray ray)`: Checks a raycast `ray` within `scene`. Returns result as `CollisionResult`.
+  - `void CollisionScene__update(CollisionScene *scene)`: Rebuilds the whole `CollisionScene` `SpatialHash`.
 
 ### **\_engine\_.h**:
+- *Methods*:
+  - `Head *Engine__getHeads(Engine *engine)`: Returns the pointer to the first `head` in the list attached to `engine`.
+  - `void Engine__insertHead(Engine *engine, Head *head)`: Adds a new `head` to `engine`.
+  - `void Engine__removeHead(Engine *engine, Head *head)`: Removes the given `head` from `engine`.
+  - `Scene *Engine__getScene(Engine *engine)`: Returns the pointer to the current `Scene`.
+  - `void Engine__insertScene(Engine *engine, Scene *scene)`: Adds a new `Scene`, `scene`, to the `engine`.
+  - `void Engine__removeScene(Engine *engine, Scene *scene)`: Removes the `Scene`, `scene`, rom the `engine`.
+  - `Renderer *Engine__getRenderer(Engine *engine)`: Returns a pointer to the `engine`'s `Renderer`.
 
 ### **\_entity\_.h**:
+- *Typedefs*:
+```c
+typedef struct
+EntityNode
+{
+	struct EntityNode
+		*prev,
+		*next;
+
+    Engine *engine;
+    Scene  *scene;
+    uint64  unique_ID;
+    double  creation_time;
+    size_t  size;
+    int     current_lod;
+    float   last_lod_distance; /* Cache to avoid recalculating every frame */
+    union {
+        uint8 flags;
+        struct {
+            bool
+                visible_last_frame:1, /* For frustum culling optimizations */
+                on_floor          :1, /* Collision States */
+                on_wall           :1,
+                on_ceiling        :1,
+                _flag_4           :1, /* Not yet defined */
+                _flag_5           :1,
+                _flag_6           :1,
+                _flag_7           :1;
+        };
+    };
+	
+	Entity  base;
+}
+EntityNode;
+```
+- *Destructors*:
+  - `void EntityNode__free(EntityNode *entity_node)`: Frees `entity_node` from memory.
+  - `void EntityNode__freeAll(EntityNode *entity_node)`: Frees all `EntityNode`s in the chain connected to `entity_node`.
+
+- *Methods*:
+  - `void EntityNode__insert(EntityNode *self, EntityNode *to)`: Inserts `EntityNode` `self` behind `to`.
+  - `void EntityNode__updateAll(EntityNode *entity_node, float delta)`: Calls the update callback of `entity_node`, passing it the elapsed time as `delta`. Called once every tick.
+  - `void EntityNode__renderAll(EntityNode *entity_node, float delta)`: Calls the render callback of `entity_node`, passing it the elapsed time as `delta`. Called once every frame.
 
 ### **\_head\_.h**:
+- *Typedefs*:
+```c
+typedef struct 
+Head
+{
+    Camera3D                  camera;
+    Vector3
+        prev_position,
+        prev_target;
+    float                     prev_fovy;
+    int
+        prev_width,
+        prev_height;
+#ifdef HEAD_USE_RENDER_TEXTURE
+    RenderTexture             viewport;
+#endif /* HEAD_USE_RENDER_TEXTURE */
+    Region                    region;
+	RendererSettings          settings;
+    Frustum                   frustum;
+    Engine                   *engine;
+    void                     *user_data;
+
+    struct Head
+		*prev,
+		*next;
+
+	HeadVTable *vtable;
+} 
+Head;
+```
+
+- *Methods*:
+  - `void Head__freeAll(Head *head)`: Frees all `Head`s in the chain connected to `head`.
+  - `void Head__updateAll(Head *head, float delta)`: Updates all `Head`s in the chain connected to `head`, passing the elapsed time since last frame as `delta`. Called every render frame.
 
 ### **\_renderer\_.h**:
+- *Typedefs*:
+  - `typedef struct Renderer Renderer`
+
+- *Constructor / Destructor*:
+  - `Renderer *Renderer__new( Engine *engine)`: Constructs a new `Renderer` and attaches it to `engine`.
+  - `void Renderer__free(Renderer *renderer)`: Frees `renderer` from memory.
+
+- *Methods*:
+  - `void Renderer__render(Renderer *renderer, Head *head)`: Renders the current scene to `head`'s region/viewport.
 
 ### **\_scene\_.h**:
+- *Typedefs*:
+```c
+typedef struct 
+Scene
+{
+    struct Scene
+        *prev,
+        *next;
+    
+    Engine         *engine;
+    MemPool         entity_pool;
+    EntityNode     *entities;
+    CollisionScene *collision_scene;
+    SceneVTable    *vtable;
+    void           *map_data;
+    EntityList      entity_list;
+    uint            entity_count;
+    
+    union {
+        uint8 flags;
+        struct {
+            bool dirty_EntityList:1;
+            bool flag_1          :1; /* 1-7 not yet defined */
+            bool flag_2          :1;
+            bool flag_3          :1; 
+            bool flag_4          :1;
+            bool flag_5          :1;
+            bool flag_6          :1;
+            bool flag_7          :1;
+        };
+    };
+} 
+Scene;
+```
+
+- *Methods*:
+  - `void Scene__freeAll(Scene *scene)`: Frees all `Scene`s attached to the engine.
+  - `EntityNode *Scene__getEntities(Scene *scene)`: Returns an array of all `EntityNode`s attached to `scene`
+  - `void Scene__insertEntity(Scene *scene, EntityNode *node)`: Inserts a new `EntityNode`, `node`, into `scene`.
+  - `void Scene__removeEntity(Scene *scene, EntityNode *node)`: Removes the `EntityNode`, `node`, from `scene`.
+  - `void Scene__update(Scene *scene, float delta)`: Updates the `scene`, passing the elapsed time since last update via `delta`.
+
   
 ### **\_spatialhash\_.h**:
+- *Typedefs*:
+```c
+typedef struct SpatialEntry SpatialEntry;
 
+typedef struct 
+SpatialHash
+{
+	SpatialEntry *entry_pool; /* pre-allocated entries for performance */
+	SpatialEntry *free_entries; /* Free list for recycling */
+	int           pool_size;
+	int           pool_used;
+    int           hash_size; /* Number of hash buckets */
+    float         cell_size; /* Size of each cell */
+	SpatialEntry *cells[SPATIAL_HASH_SIZE]; 
+}
+SpatialHash;
+```
 
 
 ---

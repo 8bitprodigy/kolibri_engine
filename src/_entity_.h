@@ -47,10 +47,10 @@ EntityNode;
 /* Destructor */
 void EntityNode__free(     EntityNode *entity_node);
 void EntityNode__freeAll(  EntityNode *entity_node);
-void EntityNode__insert(   EntityNode *self,         EntityNode *to);
 
 
 /* Methods */
+void EntityNode__insert(   EntityNode *self,         EntityNode *to);
 void EntityNode__updateAll(EntityNode *entity_node, float delta);
 void EntityNode__renderAll(EntityNode *entity_node, float delta);
 
