@@ -4,6 +4,7 @@
 #include "dynamicarray.h"
 #include "scene.h"
 /* THIS MUST NECESSARILY COME AFTER ANY <raylib.h> */
+#include <raylib.h>
 #include <raymath.h>
 
 
@@ -59,8 +60,12 @@ Renderer__new(Engine *engine)
 	renderer->transparent_renderables = DynamicArray(Renderable*,       256);
 	renderer->transparent_render_data = DynamicArray(void*,             256);
 	renderer->transparent_distances   = DynamicArray(float,             256);
-
-	if (!renderer->transparent_renderables || !renderer->transparent_distances) {
+    
+	if (!renderer->transparent_renderables 
+        || !renderer->transparent_distances
+        || !renderer->transparent_render_data 
+        || !renderer->wrapper_pool
+	) {
 	    ERR_OUT("Failed to allocate memory for transparent rendering.");
 	    SpatialHash_free( renderer->visibility_hash);
 	    DynamicArray_free(renderer->wrapper_pool);
@@ -70,7 +75,7 @@ Renderer__new(Engine *engine)
 	    free(renderer);
 	    return NULL;
 	}
-
+    
 	return renderer;
 }
 
@@ -281,13 +286,7 @@ Renderer__render(Renderer *renderer, Head *head)
             float dist = Vector3Distance(render_pos, camera_pos);
             DynamicArray_add((void**)&renderer->transparent_renderables, &renderable);
             DynamicArray_add((void**)&renderer->transparent_distances,   &dist);
-            DBG_OUT("Before append: render_data=%p, &render_data=%p", render_data, &render_data);
-            DBG_OUT("Array header: length=%zu, capacity=%zu, datum_size=%zu\n", 
-                    DynamicArray_length(renderer->transparent_render_data),
-                    DynamicArray_capacity(renderer->transparent_render_data),
-                    DynamicArray_datumSize(renderer->transparent_render_data)
-                );
-            DynamicArray_add(renderer->transparent_render_data,          &render_data);
+            DynamicArray_add((void**)&renderer->transparent_render_data,          &render_data);  
         }
         else if (renderable->Render) {
             renderable->Render(renderable, render_data, camera);
@@ -300,7 +299,6 @@ Renderer__render(Renderer *renderer, Head *head)
 
     Renderer__sortTransparent(renderer);
 
-    //rlDisableDepthMask();
     
 	for (size_t i = 0; i < transparent_count; i++) {
 	    Renderable *renderable  = renderer->transparent_renderables[i];
@@ -309,8 +307,7 @@ Renderer__render(Renderer *renderer, Head *head)
 	        renderable->Render(renderable, render_data, camera);
 	    }
 	}
-
-	//rlEnableDepthMask();
+	
 }
 
 static void

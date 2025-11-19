@@ -37,7 +37,7 @@ It's so minimal, one could use it as a framework to build a more specific, more 
 
 - A dynamic array container API (used internally, but exposed publicly for convenience)
 
-This engine is so simple, it weighs in at only \~3000 lines of C.
+This engine is so simple, it weighs in at only \~3600 lines of C.
 
 ---
 
