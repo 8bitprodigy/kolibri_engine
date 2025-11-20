@@ -295,11 +295,10 @@ Renderer__render(Renderer *renderer, Head *head)
 
 	/* PASS 2: Sort and render transparent */
 	size_t transparent_count = DynamicArray_length(renderer->transparent_renderables);
-	if (transparent_count < 0) return;
+	if (transparent_count <= 0) return;
 
     Renderer__sortTransparent(renderer);
 
-    
 	for (size_t i = 0; i < transparent_count; i++) {
 	    Renderable *renderable  = renderer->transparent_renderables[i];
         void       *render_data = renderer->transparent_render_data[i];
@@ -307,7 +306,6 @@ Renderer__render(Renderer *renderer, Head *head)
 	        renderable->Render(renderable, render_data, camera);
 	    }
 	}
-	
 }
 
 static void
@@ -320,6 +318,10 @@ swap_transparent(Renderer *renderer, int i, int j)
     Renderable *temp_rend = renderer->transparent_renderables[i];
     renderer->transparent_renderables[i] = renderer->transparent_renderables[j];
     renderer->transparent_renderables[j] = temp_rend;
+
+    void *temp_data = renderer->transparent_render_data[i];
+    renderer->transparent_render_data[i] = renderer->transparent_render_data[j];
+    renderer->transparent_render_data[j] = temp_data;
 }
 
 static int
