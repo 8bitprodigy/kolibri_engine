@@ -83,14 +83,36 @@ RenderBillboard(
 	Entity     *entity  = (Entity*)render_data;
 	SpriteData *sdata   = (SpriteData*)entity->local_data;
 	Texture2D   texture = data->frames[sdata->current_frame];
-	Vector3          
-			   pos     = Vector3Add(entity->position, entity->renderable_offset),
-			   scale   = entity->scale;
-	DrawBillboard(
+	float       
+		scale    = 1.0f,
+		rotation = 0.0f;
+	Vector3 
+		pos     = Vector3Add(entity->position, entity->renderable_offset),
+		forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position)),
+		right   = Vector3Normalize(Vector3CrossProduct(forward, (Vector3){0, 1, 0})),
+		camera_local_up = Vector3CrossProduct(right, forward);
+
+	Rectangle source = (Rectangle){
+			0.0f,
+			0.0f,
+			(float)texture.width,
+			(float)texture.height,
+		};
+	Vector2 size = (Vector2){
+			scale * fabsf((float)source.width/source.height),
+			scale
+		};
+	
+	
+	DrawBillboardPro(
 			*camera, 
 			texture, 
-			entity->position, 
-			1.0f, 
+			source,
+			entity->position,
+			camera_local_up,
+			size,
+			Vector2Scale(size, 0.5f),
+			rotation, 
 			WHITE
 		);
 }
