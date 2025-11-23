@@ -31,6 +31,8 @@ Head
 		*next;
 
 	HeadVTable *vtable;
+
+	char                     local_data[];
 } 
 Head;
 

@@ -39,6 +39,9 @@
 #ifndef DEFAULT_FRAME_RATE
 	#define DEFAULT_FRAME_RATE 180
 #endif
+#ifndef PATH_PREFIX
+	#define PATH_PREFIX "./"
+#endif
 
 
 #define NUM_WEAPONS 10
@@ -92,7 +95,9 @@ typedef struct
 	Texture2D  skybox_textures[6];
 	Entity    *target;
 	void      *target_data;
-	float      eye_height;
+	float      
+			   look_sensitivity,
+			   eye_height;
 	int     
 			   current_weapon,
 			   viewport_scale,
@@ -134,12 +139,13 @@ ProjectileInfo;
 
 typedef struct
 {
+	SpriteData   sprite_data;
 	Entity
-		    *source,
-		    *target;
+				*source,
+				*target;
 	Vector3
-		     prev_offset;
-	float    elapsed_time;
+				 prev_offset;
+	float        elapsed_time;
 }
 ProjectileData;
 

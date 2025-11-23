@@ -2,6 +2,27 @@
 #define UTILS_H
 
 #include "common.h"
+#include <string.h>
+
+
+/*
+	Typedefs
+*/
+typedef struct
+{
+	float      time_per_frame;
+	size_t     num_frames;
+	Texture2D *frames;
+}
+SpriteInfo;
+
+typedef struct
+{
+	size_t 
+		start_frame,
+		current_frame;
+}
+SpriteData;
 
 
 /* Texture loader/releaser */

@@ -46,7 +46,7 @@ HeadVTable head_Callbacks = {
 void
 testHeadSetup(Head *head)
 {
-	TestHeadData *user_data = malloc(sizeof(TestHeadData));
+	TestHeadData *user_data = Head_getLocalData(head);
 	if (!user_data) {
 		ERR_OUT("Failed to allocate TestHeadData.");
 		return;
@@ -55,12 +55,14 @@ testHeadSetup(Head *head)
 	user_data->viewport_scale = 1;
 	user_data->target         = NULL;
 	user_data->target_data    = NULL;
+	user_data->controller     = 0;
+	user_data->look_sensitivity = 50.0f;
 
 	user_data->current_weapon = 0;
 
 	for (int i = 0; i < 6; i++) {
-		char filename[256];
-		snprintf(filename, sizeof(filename), SKY_PATH, SkyBox_names[i]);
+		static char filename[256];
+		snprintf(filename, sizeof(filename), PATH_PREFIX SKY_PATH, SkyBox_names[i]);
 		DBG_OUT("Sky Texture loaded: %s", filename);
 		user_data->skybox_textures[i] = LoadTexture(filename);
 		SetTextureFilter(user_data->skybox_textures[i], TEXTURE_FILTER_BILINEAR);
@@ -71,8 +73,8 @@ testHeadSetup(Head *head)
 		Handle HUD Weapons
 	*/
 	Model *weapons = &user_data->weapons[0];
-	weapons[0] = LoadModel("resources/models/weapons/weapon5.obj");
-	Texture2D weaponTexture = LoadTexture("resources/models/weapons/weapon5.png");
+	weapons[0] = LoadModel(PATH_PREFIX "resources/models/weapons/weapon5.obj");
+	Texture2D weaponTexture = LoadTexture(PATH_PREFIX "resources/models/weapons/weapon5.png");
 	SetMaterialTexture(&weapons->materials[0], MATERIAL_MAP_ALBEDO, weaponTexture);
 	SetTextureFilter(weaponTexture, TEXTURE_FILTER_BILINEAR);
 
@@ -200,9 +202,12 @@ testHeadUpdate(Head *head, float delta)
     TestHeadData *data = Head_getUserData(head);
 
 	int 
+		controller_num = data->controller,
 		screen_width   = GetScreenWidth(),
 		screen_height  = GetScreenHeight();
-	float aspect_ratio = (float)screen_width / (float)screen_height;
+	float 
+		look_sensitivity = data->look_sensitivity,
+		aspect_ratio = (float)screen_width / (float)screen_height;
     /* Adjust viewport size */
     if      (IsKeyPressed(KEY_EQUAL)) {
         if (0 < data->viewport_scale) data->viewport_scale--;
@@ -242,17 +247,31 @@ PLAYER_INPUT:
     Engine     *engine      = Head_getEngine(head);
 
 	if (
-		GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_MIDDLE_RIGHT, KEY_ESCAPE)
+		GET_KEY_OR_BUTTON_PRESSED(controller_num, GAMEPAD_BUTTON_MIDDLE_RIGHT, KEY_ESCAPE)
     )
     {
 		Engine_pause(engine, true);
 	}
-
 	
+Vector2 look_delta;
+#ifndef ON_CONSOLE
+	look_delta = GetMouseDelta();
+#else
+	look_delta = (Vector2){
+			GetGamepadAxisMovement(
+					controller_num, 
+					GAMEPAD_AXIS_LEFT_X
+				)*look_sensitivity,
+			GetGamepadAxisMovement(
+					controller_num,
+					GAMEPAD_AXIS_LEFT_Y
+				)*look_sensitivity
+		};
+#endif
     Vector2 
-        mouse_look = GetMouseDelta(),
+        mouse_look = look_delta,
         move_dir   = GET_KEY_OR_BUTTON_VECTOR(
-				0, 
+				controller_num, 
 				GAMEPAD_BUTTON_RIGHT_FACE_UP,
 				KEY_W, 
 				GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
@@ -262,7 +281,6 @@ PLAYER_INPUT:
 				GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
 				KEY_A
 			);
-    
     UpdateCameraPro(
             camera,
             V3_ZERO,
@@ -290,7 +308,7 @@ PLAYER_INPUT:
 	player_data->move_dir     = movement;
 	if (
 		GET_KEY_OR_BUTTON_PRESSED(
-			0, 
+			controller_num, 
 			GAMEPAD_BUTTON_LEFT_TRIGGER_1, 
 			KEY_SPACE
 		)
@@ -319,8 +337,8 @@ PLAYER_INPUT:
 	
 	if (
 		IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
-		|| IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_1)
-		|| IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_2)
+		|| IsGamepadButtonPressed(controller_num, GAMEPAD_BUTTON_RIGHT_TRIGGER_1)
+		|| IsGamepadButtonPressed(controller_num, GAMEPAD_BUTTON_RIGHT_TRIGGER_2)
 	) {
 		Projectile_new(
 				camera->target,

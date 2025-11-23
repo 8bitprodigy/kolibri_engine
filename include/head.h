@@ -49,10 +49,10 @@ RendererSettings;
 
 /* Constructor */
 Head *Head_new(  
-	int              Controller_ID,
     Region           region,
     HeadVTable      *vtable,
-    Engine          *engine
+    Engine          *engine,
+    size_t           local_data_size
 );
 /* Destructor */
 void Head_free(Head *head);
@@ -69,6 +69,7 @@ RenderTexture    *Head_getViewport(        Head *head);
 #endif /* HEAD_USE_RENDER_TEXTURE */
 Region            Head_getRegion(          Head *head);
 void              Head_setRegion(          Head *head, Region region);
+void             *Head_getLocalData(       Head *head);
 void             *Head_getUserData(        Head *head);
 void              Head_setUserData(        Head *head, void *user_data);
 void              Head_setVTable(          Head *head, HeadVTable *vtable);

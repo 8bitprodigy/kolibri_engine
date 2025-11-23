@@ -1,7 +1,7 @@
 # TODO...
 
 ## FPS Example
-- [X] Implement shooting
+- [x] Implement shooting
 	- Projectiles now spawn, but do not yet move.
 	- Projectiles now move and disappear after a set amount of time.
 	- Needs to have them either despawn or be part of a pool that recycles them.
@@ -9,6 +9,7 @@
 
 ## General/Unknown:
 - [ ] (engine/head) Fix RenderTexture viewports 
+- [ ] (engine/head) Fix Region-based viewports so arbitrary screen regions can be rendered to correctly, and not just the center of the screen.
 - [x] (`common.h`) Fix not all entities being updated/rendered
 	- Forgot to update `MAX_NUM_ENTITIES` in `common.h`
 
@@ -38,4 +39,4 @@
 - [x] Re-subordinate `Entity`s to `Scene`s
 
 ## Renderer:
-- [ ] Implement 2-pass rendering to support renderables with transparency.
+- [x] Implement 2-pass rendering to support renderables with transparency.

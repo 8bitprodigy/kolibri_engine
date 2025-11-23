@@ -10,7 +10,7 @@ Model
 	blast_model;
 	
 Texture2D
-	blast_sprite,
+	blast_sprite[16],
 	blast_texture;
 
 /*
@@ -31,9 +31,16 @@ ProjectileInfo
 			.timeout =  3.5f,
 		};
 
+SpriteInfo
+	blast_sprite_info = {
+		.time_per_frame = 1.0f/12.0f,
+		.num_frames     = 16,
+		.frames         = blast_sprite
+	};
+
 Renderable
 	blast_Renderable = (Renderable){
-			.data        = &blast_sprite,
+			.data        = &blast_sprite_info,
 			.Render      = RenderBillboard,
 			.transparent = true,
 		};
@@ -76,9 +83,14 @@ Blast_Template = (Entity){
 void
 Projectile_MediaInit(void)
 {
-	blast_model   = LoadModel(  "./resources/models/projectiles/blast.obj");
-	blast_texture = LoadTexture("./resources/models/projectiles/blast.png");
-	blast_sprite  = LoadTexture("./resources/sprites/stool.png");
+	blast_model   = LoadModel(  PATH_PREFIX "resources/models/projectiles/blast.obj");
+	blast_texture = LoadTexture(PATH_PREFIX "resources/models/projectiles/blast.png");
+	for (int i = 0; i < 16; i++) {
+		static char filename[256];
+		snprintf(filename, sizeof(filename), PATH_PREFIX "resources/sprites/green_blast_%i.png", i);
+		blast_sprite[i]  = LoadTexture(filename);
+		SetTextureFilter(blast_sprite[i], TEXTURE_FILTER_BILINEAR);
+	}
 	SetMaterialTexture(&blast_model.materials[0], MATERIAL_MAP_ALBEDO, blast_texture);
 	SetTextureFilter(blast_texture, TEXTURE_FILTER_BILINEAR);
 	DBG_OUT("Projectile_MediaInit() ran.");
@@ -94,9 +106,15 @@ Projectile_new(Vector3 position, Vector3 direction, Entity *template, Scene *sce
 		);
 
 	ProjectileData *data = (ProjectileData*)&projectile->local_data;
-	
+
+	size_t start_frame = rand() % 16;
+	data->sprite_data       = (SpriteData){
+			.start_frame   = start_frame,
+			.current_frame = start_frame,
+		};
 	data->prev_offset       = V3_ZERO;
 	data->elapsed_time      = 0.0f;
+	
 	projectile->position    = position;
 	projectile->visible     = true;
 	projectile->active      = true;
@@ -167,6 +185,15 @@ projectileRender(Entity *self, float delta)
 	Quaternion spin     = QuaternionFromAxisAngle(velocityDir, spinAngle);
 	// Combine: first align, then spin around that new forward axis
 	self->orientation   = QuaternionMultiply(spin, align);
+
+	SpriteInfo *sinfo = (SpriteInfo*)self->renderables[0]->data;
+	SpriteData *sdata = &data->sprite_data;
+	float       age   = Entity_getAge(self);
+	sdata->current_frame = (int)(
+			sdata->start_frame 
+			+ (age/sinfo->time_per_frame)
+		) 
+		% 16;
 }
 
 void 

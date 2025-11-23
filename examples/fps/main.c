@@ -47,10 +47,10 @@ runEngine(void *data, void *value)
 {
 	engine = Engine_new(&engine_Callbacks, tick_rate);
 	Head   *head   = Head_new(
-			0, 
 			(Region){0,0,screen_width, screen_height}, 
 			&head_Callbacks, 
-			engine
+			engine,
+			sizeof(TestHeadData)
 		);
 	
 	RendererSettings *settings = Head_getRendererSettings(head);
@@ -67,6 +67,7 @@ runEngine(void *data, void *value)
 	player->position = (Vector3){0.0f, 1.0f, 0.0f};
 	
 	head_data = (TestHeadData*)Head_getUserData(head);
+	head_data->controller  = 0;
 	head_data->target      = player;
 	head_data->target_data = player->user_data;
 	head_data->eye_height  = 1.75f;
@@ -145,7 +146,7 @@ main(int argc, char **argv)
 #ifndef ON_CONSOLE
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
 #endif /* ON_CONSOLE */
-	//SetTargetFPS(frame_rate);
+	
 	InitWindow(screen_width, screen_height, "Kolibri Engine Test");
 	
 	HandleMouse();
@@ -158,7 +159,9 @@ main(int argc, char **argv)
 			MENU_PADDING,
 			MenuButton( "Run",        runEngine,  engine),
 			MenuButton( "Options...", switchMenu, &optionsMenu),
+#ifndef ON_CONSOLE
 			MenuButton( "Exit",       closeAll,   engine)
+#endif
 		),
 	optionsMenu = Menu( "Options",
 			MENU_WIDTH,

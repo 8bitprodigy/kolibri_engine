@@ -1,27 +1,31 @@
 PROJECTNAME = fps_example
 PLATFORM    = dc
 
-SRCDIR     = ../../src
-GAMESRCDIR = .
-OBJDIR     = obj/$(PLATFORM)
+SRCDIR      = ../../src
+EXAMPLESDIR = ..
+GAMESRCDIR  = .
+OBJDIR      = obj/$(PLATFORM)
 
 TARGET = $(PROJECTNAME).dc.elf
 CDI    = $(PROJECTNAME).cdi
 
 # Source files
 ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
+EXAMPLES_SRC = $(wildcard $(EXAMPLESDIR)/*.c)
 GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
 
 ENGINE_OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
+EXAMPLES_OBJS = $(EXAMPLES_SRC:$(EXAMPLESDIR)/%.c=$(OBJDIR)/game/%.o)
 GAME_OBJS   = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
 
-OBJS = $(ENGINE_OBJS) $(GAME_OBJS)
+OBJS = $(ENGINE_OBJS) $(EXAMPLES_OBJS) $(GAME_OBJS)
 
 # KOS-specific flags and libraries
 KOSCCFLAGS += -Iinclude -I../../include -I/usr/local/include -I../
 KOSCCFLAGS += -lraylib -lGL -lkosutils -g3 -O3 -flto 
 KOSCCFLAGS += -DSCREEN_HEIGHT=480 -DSCREEN_WIDTH=640
-KOSCCFLAGS += -DSKY_PATH='"resources/sky/SBS_sky_panorama.jpg"'
+KOSCCFLAGS += -DPATH_PREFIX='"/cd/"' -DDEBUG -DDEFAULT_TICK_RATE=35
+KOSCCFLAGS += -DSKY_PATH='"resources/sky/SBS_SKY_panorama_half_%s.png"'
 KOSCCFLAGS += -DNO_MOUSE -DON_CONSOLE -DENGINE_SINGLE_HEAD_ONLY
 KOS_CFLAGS += -I${KOS_PORTS}/include/raylib
 
@@ -51,16 +55,19 @@ prepare:
 $(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
 	kos-cc $(KOSCCFLAGS) -c -o $@ $<
 
+$(OBJDIR)/game/%.o: $(EXAMPLESDIR)/%.c
+	kos-cc $(KOSCCFLAGS) -c -o $@ $<
+	
 $(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c
 	kos-cc $(KOSCCFLAGS) -c -o $@ $<
 
 $(TARGET): $(OBJS)
-	kos-cc -o $(TARGET) $(OBJS) $(KOSCCFLAGS)
+	kos-cc -o $(TARGET) $(OBJS) $(LIBDIR) $(KOSCCFLAGS)
 
 # Create CDI image for burning to CD or running in emulator
 cdi: prepare $(TARGET)
 	@echo "Building DreamCast disc...\n"
-	mkdcdisc -e $(TARGET) -o $(PROJECTNAME).cdi
+	mkdcdisc -N -e $(TARGET) -d resources -o $(PROJECTNAME).cdi
 
 # Run using KOS loader
 run: $(TARGET)

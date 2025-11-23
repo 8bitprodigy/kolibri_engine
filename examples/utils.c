@@ -1,4 +1,5 @@
 #include "entity.h"
+#include "fps/game.h"
 #include <raylib.h>
 #include "utils.h"
 
@@ -78,14 +79,16 @@ RenderBillboard(
 	Camera3D   *camera
 )
 {
-	Texture2D *texture = (Texture2D*)renderable->data;
-	Entity    *entity  = (Entity*)render_data;
+	SpriteInfo *data    = (SpriteInfo*)renderable->data;
+	Entity     *entity  = (Entity*)render_data;
+	SpriteData *sdata   = (SpriteData*)entity->local_data;
+	Texture2D   texture = data->frames[sdata->current_frame];
 	Vector3          
 			   pos     = Vector3Add(entity->position, entity->renderable_offset),
 			   scale   = entity->scale;
 	DrawBillboard(
 			*camera, 
-			*texture, 
+			texture, 
 			entity->position, 
 			1.0f, 
 			WHITE

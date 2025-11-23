@@ -103,13 +103,13 @@ updateHeadFrustum(Head *head)
 */
 Head *
 Head_new(
-	int         Controller_ID,
     Region      region,
     HeadVTable *VTable,
-    Engine     *engine
+    Engine     *engine,
+    size_t      local_data_size
 )
 {
-	Head *head = malloc(sizeof(Head));
+	Head *head = malloc(sizeof(Head) + local_data_size);
 
 	if (!head) {
 		ERR_OUT("Failed to allocate memory for Head.");
@@ -229,6 +229,13 @@ Head_setRegion(Head *Self, Region new_region)
 #ifdef HEAD_USE_RENDER_TEXTURE
 	Self->viewport = LoadRenderTexture(new_region.width, new_region.height);
 #endif /* HEAD_USE_RENDER_TEXTURE */
+}
+
+
+void *
+Head_getLocalData(Head *Self)
+{
+	return (void*)&Self->local_data;
 }
 
 
