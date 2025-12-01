@@ -8,10 +8,14 @@
 #include <string.h>
 
 #include "assman.h"
+#include "infinite_plane_scene.h"
 #include "kolibri.h"
 #include "utils.h"
 
 
+#ifndef WINDOW_TITLE
+	#define WINDOW_TITLE "Kolibri Engine FPS Test"
+#endif
 #ifndef SCREEN_WIDTH
 	#define SCREEN_WIDTH 854
 #endif
@@ -153,14 +157,6 @@ void   Projectile_MediaInit(void);
 void   Projectile_new(      Vector3 position, Vector3 direction, Entity *template, Scene *scene);
 extern EntityVTable projectile_Callbacks;
 extern Entity       Blast_Template;
-
-/* 
-	scene_impl.c
-*/
-extern SceneVTable scene_Callbacks;
-
-void            testSceneRender(   Scene *scene, Head   *head);
-CollisionResult testSceneCollision(Scene *scene, Entity *entity, Vector3 to);
 
 /*
 	options.c

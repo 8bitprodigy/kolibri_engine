@@ -9,6 +9,9 @@
 #include "kolibri.h"
 
 
+#ifndef WINDOW_TITLE
+	#define WINDOW_TITLE "Kolibri Engine FPS Test"
+#endif
 #ifndef SCREEN_WIDTH
 	#define SCREEN_WIDTH 854
 #endif
@@ -26,9 +29,9 @@
 	#define MENU_PADDING 10
 #endif
 #ifdef NO_MOUSE
-	#define initMouse() SetMousePosition(0, 0)
+	#define HandleMouse() SetMousePosition(0, 0)
 #else
-	#define initMouse()
+	#define HandleMouse()
 #endif
 #ifndef DEFAULT_TICK_RATE
 	#define DEFAULT_TICK_RATE 60

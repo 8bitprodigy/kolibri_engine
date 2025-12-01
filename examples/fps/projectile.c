@@ -33,9 +33,11 @@ ProjectileInfo
 
 SpriteInfo
 	blast_sprite_info = {
-		.time_per_frame = 1.0f/12.0f,
-		.num_frames     = 16,
-		.frames         = blast_sprite
+		.scale            = 1.0f,
+		.time_per_frame   = 1.0f/12.0f,
+		.num_frames       = 16,
+		.frames           = blast_sprite,
+		.sprite_alignment = SPRITE_ALIGN_CAMERA,
 	};
 
 Renderable
@@ -185,15 +187,15 @@ projectileRender(Entity *self, float delta)
 	Quaternion spin     = QuaternionFromAxisAngle(velocityDir, spinAngle);
 	// Combine: first align, then spin around that new forward axis
 	self->orientation   = QuaternionMultiply(spin, align);
-
+	
 	SpriteInfo *sinfo = (SpriteInfo*)self->renderables[0]->data;
 	SpriteData *sdata = &data->sprite_data;
-	float       age   = Entity_getAge(self);
-	sdata->current_frame = (int)(
-			sdata->start_frame 
-			+ (age/sinfo->time_per_frame)
-		) 
-		% 16;
+	sdata->current_frame = AnimateSprite(
+			sinfo,
+			sdata,
+			Entity_getAge(self),
+			16
+		);
 }
 
 void 

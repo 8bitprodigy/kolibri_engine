@@ -1,5 +1,6 @@
 #include <raylib.h>
 #include "_engine_.h"
+#include "_renderer_.h"
 
 
 #define foreach_Head( head_ptr ) \
@@ -126,6 +127,7 @@ Engine_free(Engine *self)
 {
 	Head__freeAll(self->heads);
 	Scene__freeAll(self->scene);
+	Renderer__free(self->renderer);
 	free(self);
 }
 

@@ -37,7 +37,11 @@ It's so minimal, one could use it as a framework to build a more specific, more 
 
 - A dynamic array container API (used internally, but exposed publicly for convenience)
 
-This engine is so simple, it weighs in at only \~3600 lines of C.
+This engine is so simple, it weighs in at only \~3500 lines of C.
+The goal of this engine is that it should be so small, the whole thing could be understood and maintained by a single person.
+It is designed following the same principle Leidtke used for his L4 microkernel:
+
+> A concept is tolerated inside the microkernel only if moving it outside the kernel, i.e., permitting competing implementations, would prevent the implementation of the system's required functionality.
 
 ---
 

@@ -4,6 +4,22 @@
 #include "utils.h"
 
 
+
+size_t 
+AnimateSprite(
+	SpriteInfo *info, 
+	SpriteData *data, 
+	float       age, 
+	size_t      num_frames
+)
+{
+	return (size_t)(
+			data->start_frame 
+			+ (age/info->time_per_frame)
+		) 
+		% num_frames;
+}
+
 /* Texture loader/releaser */
 void *
 texture_loader(const char *path, void *data, Camera3D *camera)
@@ -79,18 +95,38 @@ RenderBillboard(
 	Camera3D   *camera
 )
 {
-	SpriteInfo *data    = (SpriteInfo*)renderable->data;
+	SpriteInfo *info    = (SpriteInfo*)renderable->data;
 	Entity     *entity  = (Entity*)render_data;
-	SpriteData *sdata   = (SpriteData*)entity->local_data;
-	Texture2D   texture = data->frames[sdata->current_frame];
+	SpriteData *data   = (SpriteData*)entity->local_data;
+	Texture2D   texture = info->frames[data->current_frame];
 	float       
-		scale    = 1.0f,
+		scale    = info->scale,
 		rotation = 0.0f;
+
+	scale = (scale == 0.0f)? 1.0f : scale;
+	
 	Vector3 
 		pos     = Vector3Add(entity->position, entity->renderable_offset),
 		forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position)),
 		right   = Vector3Normalize(Vector3CrossProduct(forward, (Vector3){0, 1, 0})),
-		camera_local_up = Vector3CrossProduct(right, forward);
+		up;
+
+	switch (info->sprite_alignment) {
+	case SPRITE_ALIGN_X:
+		up = V3_LEFT;
+		break;
+	case SPRITE_ALIGN_Y:
+		up = V3_UP;
+		break;
+	case SPRITE_ALIGN_Z:
+		up = V3_FORWARD;
+		break;
+	case SPRITE_ALIGN_LOCAL_AXIS:
+		up = Vector3Normalize(*(Vector3*)&entity->orientation);
+		break;
+	case SPRITE_ALIGN_CAMERA:
+		up = Vector3CrossProduct(right, forward);
+	}
 
 	Rectangle source = (Rectangle){
 			0.0f,
@@ -102,6 +138,7 @@ RenderBillboard(
 			scale * fabsf((float)source.width/source.height),
 			scale
 		};
+
 	
 	
 	DrawBillboardPro(
@@ -109,7 +146,7 @@ RenderBillboard(
 			texture, 
 			source,
 			entity->position,
-			camera_local_up,
+			up,
 			size,
 			Vector2Scale(size, 0.5f),
 			rotation, 

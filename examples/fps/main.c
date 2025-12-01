@@ -46,13 +46,13 @@ void
 runEngine(void *data, void *value)
 {
 	engine = Engine_new(&engine_Callbacks, tick_rate);
-	Head   *head   = Head_new(
+	Head *head = Head_new(
 			(Region){0,0,screen_width, screen_height}, 
 			&head_Callbacks, 
 			engine,
 			sizeof(TestHeadData)
 		);
-	
+		
 	RendererSettings *settings = Head_getRendererSettings(head);
 //	settings->frustum_culling = false;
 	Camera3D *cam = Head_getCamera(head);
@@ -63,7 +63,7 @@ runEngine(void *data, void *value)
 
 	scene = Scene_new(&scene_Callbacks, NULL, engine);
 	
-	player    = Entity_new(&playerTemplate, scene, 0);
+	player = Entity_new(&playerTemplate, scene, 0);
 	player->position = (Vector3){0.0f, 1.0f, 0.0f};
 	
 	head_data = (TestHeadData*)Head_getUserData(head);
@@ -98,7 +98,7 @@ runEngine(void *data, void *value)
 void 
 closeAll(void *data, void *value)
 {
-	if (data) Engine_requestExit((Engine*)data);
+	if (data) Engine_requestExit(engine);
 	readyToClose = true;
 }
 
@@ -147,7 +147,7 @@ main(int argc, char **argv)
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
 #endif /* ON_CONSOLE */
 	
-	InitWindow(screen_width, screen_height, "Kolibri Engine Test");
+	InitWindow(screen_width, screen_height, WINDOW_TITLE);
 	
 	HandleMouse();
 	
@@ -179,19 +179,19 @@ main(int argc, char **argv)
 			ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
 			
 			Menu_draw(
-				currentMenu,
-				GetScreenWidth(), 
-				GetScreenHeight(),
-				GET_KEY_OR_BUTTON_AXIS_PRESSED(
-						0, 
-						GAMEPAD_BUTTON_LEFT_FACE_DOWN, 
-						KEY_DOWN, 
-						GAMEPAD_BUTTON_LEFT_FACE_UP, 
-						KEY_UP
-					),
-				0, 0,
-				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
-			);
+					currentMenu,
+					GetScreenWidth(), 
+					GetScreenHeight(),
+					GET_KEY_OR_BUTTON_AXIS_PRESSED(
+							0, 
+							GAMEPAD_BUTTON_LEFT_FACE_DOWN, 
+							KEY_DOWN, 
+							GAMEPAD_BUTTON_LEFT_FACE_UP, 
+							KEY_UP
+						),
+					0, 0,
+					GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
+				);
 		EndDrawing();
 	}
 

@@ -6,6 +6,7 @@
 	- Projectiles now move and disappear after a set amount of time.
 	- Needs to have them either despawn or be part of a pool that recycles them.
 - [ ] Implement enemy AI
+- [ ] Implement heightmap terrain Scene type
 
 ## General/Unknown:
 - [ ] (engine/head) Fix RenderTexture viewports 

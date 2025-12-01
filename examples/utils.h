@@ -8,11 +8,24 @@
 /*
 	Typedefs
 */
+typedef enum
+{
+	SPRITE_ALIGN_X,
+	SPRITE_ALIGN_Y,
+	SPRITE_ALIGN_Z,
+	SPRITE_ALIGN_LOCAL_AXIS,
+	SPRITE_ALIGN_CAMERA,
+}
+SpriteAlignment;
+
 typedef struct
 {
-	float      time_per_frame;
-	size_t     num_frames;
-	Texture2D *frames;
+	float            
+	                 scale,
+	                 time_per_frame;
+	size_t           num_frames;
+	Texture2D       *frames;
+	SpriteAlignment  sprite_alignment;
 }
 SpriteInfo;
 
@@ -24,6 +37,8 @@ typedef struct
 }
 SpriteData;
 
+
+size_t AnimateSprite(SpriteInfo *info, SpriteData *data, float age, size_t num_frames);
 
 /* Texture loader/releaser */
 void *texture_loader(const char *path,  void *data, Camera3D *camera);

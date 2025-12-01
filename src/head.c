@@ -158,14 +158,16 @@ Head_free(Head *Self)
 void
 Head__freeAll(Head *self)
 {
-	Head *next = self->next;
-	if (next == self) {
-		Head_free(self);
-		return;
-	}
-	
-	Head_free(self);
-	Head__freeAll(next);
+    if (self == NULL) return;
+    
+    Head *current = self;
+    Head *first = self;
+    
+    do {
+        Head *next = current->next;
+        Head_free(current);
+        current = next;
+    } while (current != NULL && current != first);
 }
 
 

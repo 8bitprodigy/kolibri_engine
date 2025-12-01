@@ -73,9 +73,9 @@ SkyBox_draw(Camera *camera, Texture2D textures[6], Quaternion orientation)
 
         /* keep depth writes off so it doesn't occlude world */
 
-        rlBegin(RL_QUADS);
 			rlColor4ub(255, 255, 255, 255);
 			for (int f = 0; f < 6; ++f) {
+				rlBegin(RL_QUADS);
 				/* Skip faces the camera is not facing 
 				Vector3 n = Vector3Transform(SkyBox_normals[f], rot);
 				if (0.0f < Vector3DotProduct(forward, n)) continue;*/
@@ -103,8 +103,8 @@ SkyBox_draw(Camera *camera, Texture2D textures[6], Quaternion orientation)
 				rlTexCoord2f(u1, v1); rlVertex3f(c.x, c.y, c.z);
 				rlTexCoord2f(u0, v1); rlVertex3f(d.x, d.y, d.z);
 
+				rlEnd();
 			}
-        rlEnd();
 			
 		rlSetTexture(0); /* unbind (optional) */
 	
