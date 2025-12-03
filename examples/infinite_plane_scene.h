@@ -3,7 +3,16 @@
 
 #include "kolibri.h"
 
-extern SceneVTable scene_Callbacks;
+
+#ifndef PATH_PREFIX
+	#define PATH_PREFIX "./"
+#endif
+#ifndef PLANE_SIZE
+	#define PLANE_SIZE 256.0f
+#endif
+
+
+extern SceneVTable infinite_Plane_Scene_Callbacks;
 
 void            testSceneRender(   Scene *scene, Head   *head);
 CollisionResult testSceneCollision(Scene *scene, Entity *entity, Vector3 to);

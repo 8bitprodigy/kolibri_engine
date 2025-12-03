@@ -10,6 +10,7 @@
 #include "assman.h"
 #include "infinite_plane_scene.h"
 #include "kolibri.h"
+#include "sprite.h"
 #include "utils.h"
 
 

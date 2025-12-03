@@ -1,4 +1,6 @@
 #include "game.h"
+#include "sprite.h"
+
 #include <raylib.h>
 #include <raymath.h>
 
@@ -10,7 +12,7 @@ Model
 	blast_model;
 	
 Texture2D
-	blast_sprite[16],
+	blast_sprite,
 	blast_texture;
 
 /*
@@ -31,14 +33,13 @@ ProjectileInfo
 			.timeout =  3.5f,
 		};
 
-SpriteInfo
-	blast_sprite_info = {
+SpriteInfo blast_sprite_info;/* = {
 		.scale            = 1.0f,
 		.time_per_frame   = 1.0f/12.0f,
 		.num_frames       = 16,
-		.frames           = blast_sprite,
+		.atlas           = blast_sprite,
 		.sprite_alignment = SPRITE_ALIGN_CAMERA,
-	};
+	};*/
 
 Renderable
 	blast_Renderable = (Renderable){
@@ -87,14 +88,20 @@ Projectile_MediaInit(void)
 {
 	blast_model   = LoadModel(  PATH_PREFIX "resources/models/projectiles/blast.obj");
 	blast_texture = LoadTexture(PATH_PREFIX "resources/models/projectiles/blast.png");
-	for (int i = 0; i < 16; i++) {
-		static char filename[256];
-		snprintf(filename, sizeof(filename), PATH_PREFIX "resources/sprites/green_blast_%i.png", i);
-		blast_sprite[i]  = LoadTexture(filename);
-		SetTextureFilter(blast_sprite[i], TEXTURE_FILTER_BILINEAR);
-	}
+	blast_sprite  = LoadTexture(PATH_PREFIX "resources/sprites/green_blast.png");
+	
+	SetTextureFilter(blast_sprite, TEXTURE_FILTER_BILINEAR);
 	SetMaterialTexture(&blast_model.materials[0], MATERIAL_MAP_ALBEDO, blast_texture);
 	SetTextureFilter(blast_texture, TEXTURE_FILTER_BILINEAR);
+
+	blast_sprite_info = CreateRegularSprite(
+			1.0f,
+			1.0f/12.0f,
+			blast_sprite,
+			4, 4,
+			SPRITE_ALIGN_CAMERA
+		);
+	
 	DBG_OUT("Projectile_MediaInit() ran.");
 }
 

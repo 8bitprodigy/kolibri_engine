@@ -8,51 +8,77 @@
 /*
 	Callback Forward Declarations
 */
-void            testSceneRender(         Scene *scene, Head   *head);
-CollisionResult testSceneCollision(      Scene *scene, Entity *entity, Vector3 to);
-CollisionResult testSceneRaycast(        Scene *scene, Vector3 from,   Vector3 to);
-bool            testSceneEntityIsOnFloor(Scene *scene, Entity *entity);
+void            infinitePlaneSceneSetup(    Scene *scene, void   *map_data);
+void            infinitePlaneSceneRender(   Scene *scene, Head   *head);
+CollisionResult infinitePlaneSceneCollision(Scene *scene, Entity *entity,   Vector3 to);
+CollisionResult infinitePlaneSceneRaycast(  Scene *scene, Vector3 from,     Vector3 to);
+void            infinitePlaneSceneFree(     Scene *scene, void   *map_data);
 
 
-
+Texture debug_texture;
 /*
 	Template Declarations
 */
-SceneVTable scene_Callbacks = {
-	.Setup          = NULL, 
+SceneVTable infinite_Plane_Scene_Callbacks = {
+	.Setup          = infinitePlaneSceneSetup, 
 	.Enter          = NULL, 
 	.Update         = NULL, 
 	.EntityEnter    = NULL, 
 	.EntityExit     = NULL, 
-	.CheckCollision = testSceneCollision, 
-	.MoveEntity     = testSceneCollision, 
-	.Raycast        = testSceneRaycast,
-	.Render         = testSceneRender, 
+	.CheckCollision = infinitePlaneSceneCollision, 
+	.MoveEntity     = infinitePlaneSceneCollision, 
+	.Raycast        = infinitePlaneSceneRaycast,
+	.Render         = infinitePlaneSceneRender, 
 	.Exit           = NULL, 
-	.Free           = NULL
+	.Free           = infinitePlaneSceneFree,
 };
 
+void 
+DrawInfinitePlane(Camera *cam, float tileScale)
+{
+    float 
+		size = PLANE_SIZE,
+		cx   = cam->position.x,
+		cz   = cam->position.z;
+
+    rlBegin(RL_QUADS);
+		rlSetTexture(debug_texture.id);
+		rlTexCoord2f((cx - size) * tileScale, (cz - size) * tileScale);
+		rlVertex3f(cx - size, 0.0f, cz - size);
+
+		rlTexCoord2f((cx - size) * tileScale, (cz + size) * tileScale);
+		rlVertex3f(cx - size, 0.0f, cz + size);
+
+		rlTexCoord2f((cx + size) * tileScale, (cz + size) * tileScale);
+		rlVertex3f(cx + size, 0.0f, cz + size);
+
+		rlTexCoord2f((cx + size) * tileScale, (cz - size) * tileScale);
+		rlVertex3f(cx + size, 0.0f, cz - size);
+
+    rlEnd();
+    rlSetTexture(0);
+}
+
+void 
+infinitePlaneSceneSetup(Scene *scene, void *map_data)
+{
+	debug_texture = LoadTexture(
+			PATH_PREFIX 
+			"resources/textures/dev/Prototype_Grid_Gray_08-128x128.png"
+		);
+	GenTextureMipmaps(&debug_texture);
+	SetTextureFilter(debug_texture, TEXTURE_FILTER_TRILINEAR);
+}
 
 void
-testSceneRender(Scene *scene, Head *head)
+infinitePlaneSceneRender(Scene *scene, Head *head)
 {
 	Renderer *renderer = Engine_getRenderer(Scene_getEngine(scene));
 	Camera   *camera   = Head_getCamera(head);
 #ifndef ON_CONSOLE
 	//DrawGrid(100, 1.0f);
 #endif
-	DrawPlane(
-			(Vector3){
-					camera->position.x,
-					0.0f,
-					camera->position.z
-				},
-			(Vector2){
-					128.0f,
-					128.0f
-				},
-			WHITE
-		);
+	DrawInfinitePlane(camera, 1.0f);
 	EntityList *ent_list = Scene_getEntityList(scene);
 	for (int i = 0; i < ent_list->count; i++) {
 		Renderer_submitEntity(renderer, ent_list->entities[i]);
@@ -60,7 +86,7 @@ testSceneRender(Scene *scene, Head *head)
 }
 
 CollisionResult /* Infinite plane at 0.0f y-position */
-testSceneCollision(Scene *scene, Entity *entity, Vector3 to)
+infinitePlaneSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 {
 	if (entity->position.y > 0.0f && to.y > 0.0f) return NO_COLLISION;
 
@@ -94,7 +120,7 @@ testSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 }
 
 CollisionResult
-testSceneRaycast(Scene *self, Vector3 from, Vector3 to)
+infinitePlaneSceneRaycast(Scene *self, Vector3 from, Vector3 to)
 {
 	CollisionResult result = {0};
 
@@ -123,17 +149,8 @@ testSceneRaycast(Scene *self, Vector3 from, Vector3 to)
 	return result;
 }
 
-
-bool
-testSceneEntityIsOnFloor(Scene *self, Entity *entity)
+void 
+infinitePlaneSceneFree(Scene *scene, void *map_data)
 {
-	if (entity->position.y <= 0.0f) {
-		entity->position.y = 0.0f;
-		entity->velocity.y = 0.0f;
-		return true;
-	}
-
-	return Scene_checkContinuous(self, entity, (Vector3){0.0f, -0.01f,  0.0f}).hit;
-
-	return false;
+	UnloadTexture(debug_texture);
 }

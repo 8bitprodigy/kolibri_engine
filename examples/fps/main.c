@@ -61,7 +61,7 @@ runEngine(void *data, void *value)
 	cam->position = (Vector3){0.0f, 1.75f, 0.0f};
 	cam->target   = (Vector3){10.0f, 0.0f, 10.0f};
 
-	scene = Scene_new(&scene_Callbacks, NULL, engine);
+	scene = Scene_new(&infinite_Plane_Scene_Callbacks, NULL, engine);
 	
 	player = Entity_new(&playerTemplate, scene, 0);
 	player->position = (Vector3){0.0f, 1.0f, 0.0f};
