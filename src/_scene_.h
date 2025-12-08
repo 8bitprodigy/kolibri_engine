@@ -20,7 +20,7 @@ Scene
 	EntityNode     *entities;
 	CollisionScene *collision_scene;
     SceneVTable    *vtable;
-    void           *map_data;
+    void           *info;
 	EntityList      entity_list;
     uint            entity_count;
     
@@ -37,6 +37,8 @@ Scene
 			bool flag_7          :1;
         };
     };
+
+    unsigned char data[];
 } 
 Scene;
 

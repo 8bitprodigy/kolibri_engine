@@ -35,7 +35,7 @@ SceneVTable
 SceneVTable;
 
 /* Constructor/Desructor */
-Scene          *Scene_new(SceneVTable *scene_type, void *data, Engine *engine);
+Scene          *Scene_new(SceneVTable *scene_type, void *info, void *data, size_t data_size, Engine *engine);
 void            Scene_free(Scene      *scene);
 
 /* Setters/Getters */
@@ -43,6 +43,7 @@ Engine         *Scene_getEngine(      Scene *scene);
 uint            Scene_getEntityCount( Scene *scene);
 EntityList     *Scene_getEntityList(  Scene *scene);
 void           *Scene_getMapData(     Scene *scene);
+void           *Scene_getMapInfo(     Scene *scene);
 
 /* Public Methods */
 void            Scene_enter(          Scene *scene);

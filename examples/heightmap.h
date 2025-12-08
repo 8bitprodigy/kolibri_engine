@@ -7,7 +7,7 @@
 
 
 #ifndef TERRAIN_NUM_SQUARES
-	#define TERRAIN_NUM_SQUARES 128
+	#define TERRAIN_NUM_SQUARES 256
 #endif
 #ifndef TERRAIN_SQUARE_SIZE
 	#define TERRAIN_SQUARE_SIZE 2.0f
@@ -23,31 +23,29 @@
 
 extern SceneVTable heightmap_Scene_Callbacks;
 
-typedef struct
-HeightmapData
+typedef struct 
 {
 	float    *heightmap;
 	Vector3   sun_angle;
-	uint      size;
+	float     offset;
+	uint      cells_wide;
 	union {
 		struct {
 			Color
 				hi_color,
 				lo_color;
-		}
-		colors[2];
+		};
+		Color colors[2];
 	};
-	Mesh terrain_mesh;
-	Model terrain_model;
 }
-HeightmapData;
+Heightmap;
 
 
 float *genHeightmapXOR();
-float *genHeightmapDiamondSquare(size_t cells_wide, size_t seed);
+float *genHeightmapDiamondSquare(size_t cells_wide, float roughness, float decay, size_t seed);
 
 
-Scene *Heightmap_new(HeightmapData *heightmap_data);
+Scene *Heightmap_new(Heightmap *heightmap, Engine *engine);
 
 
 #endif /* HEIGHTMAP_H */

@@ -1,5 +1,6 @@
 #include <raylib.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "_engine_.h"
 #include "_scene_.h"
@@ -24,34 +25,38 @@ void removeScene(Scene *scene);
 Scene *
 Scene_new(
     SceneVTable *map_type, 
-    void        *data, 
+    void        *info,
+    void        *data,
+    size_t       data_size, 
     Engine      *engine)
 {
-    Scene *scene = malloc(sizeof(Scene));
+    Scene *scene = malloc(sizeof(Scene) + data_size);
     if (!scene) {
         ERR_OUT("Failed to allocate Scene.");
         return NULL;
     }
 
-    scene->prev     = scene;
-    scene->next     = scene;
+    scene->prev                 = scene;
+    scene->next                 = scene;
     
-    scene->engine           = engine;
-    scene->entities         = NULL;
-    scene->entity_pool      = CreateMemPool(sizeof(EntityNode) * MAX_NUM_ENTITIES);
-    scene->entity_count     = 0;
-	scene->collision_scene  = CollisionScene__new(scene);
-    scene->map_data         = data;
-    scene->vtable           = map_type;
+    scene->engine               = engine;
+    scene->entities             = NULL;
+    scene->entity_pool          = CreateMemPool(sizeof(EntityNode) * MAX_NUM_ENTITIES);
+    scene->entity_count         = 0;
+	scene->collision_scene      = CollisionScene__new(scene);
+    scene->info                 = info;
+    scene->vtable               = map_type;
 
     scene->dirty_EntityList     = true;
-    scene->entity_list.entities = DynamicArray_new(sizeof(Entity*), 128);
+    scene->entity_list.entities = DynamicArray(sizeof(Entity*), 128);
     scene->entity_list.count    = 0;
     scene->entity_list.capacity = 0;
-
+    
     Engine__insertScene(engine, scene);
 
     if (map_type->Setup) map_type->Setup(scene, data);
+    
+    if (data_size) memcpy(scene->data, data, data_size);
 
     return scene;
 } /* Scene_new */
@@ -62,7 +67,7 @@ void
 Scene_free(Scene *scene)
 {
     SceneVTable *vtable = scene->vtable; 
-    if (vtable && vtable->Free) vtable->Free(scene, scene->map_data);
+    if (vtable && vtable->Free) vtable->Free(scene, scene->info);
     
     Engine__removeScene(  scene->engine, scene);
 	DestroyMemPool(      &scene->entity_pool);
@@ -120,9 +125,14 @@ Scene_getEntityList(Scene *self)
 void *
 Scene_getMapData(Scene *self)
 {
-    return self->map_data;
+    return &self->data;
 }
 
+void *
+Scene_getMapInfo(Scene *self)
+{
+    return self->info;
+}
 
 /*
     PUBLIC METHODS

@@ -64,7 +64,7 @@ infinitePlaneSceneSetup(Scene *scene, void *map_data)
 {
 	debug_texture = LoadTexture(
 			PATH_PREFIX 
-			"resources/textures/dev/Prototype_Grid_Gray_08-128x128.png"
+			"resources/textures/dev/08.png"
 		);
 	GenTextureMipmaps(&debug_texture);
 	SetTextureFilter(debug_texture, TEXTURE_FILTER_TRILINEAR);
@@ -109,14 +109,14 @@ infinitePlaneSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 	}
 
 	return (CollisionResult){
-		true,
-		distance,
-		hit_floor_point,
-		V3_UP,
-		0,
-		NULL,
-		NULL
-	};
+			true,
+			distance,
+			hit_floor_point,
+			V3_UP,
+			0,
+			NULL,
+			NULL,
+		};
 }
 
 CollisionResult

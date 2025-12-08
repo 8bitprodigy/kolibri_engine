@@ -170,27 +170,21 @@ move(Entity *self, Vector3 movement)
 {
     if (Vector3Equals(movement, V3_ZERO)) return NO_COLLISION;
     
-    Scene           *scene  = ENTITY_TO_NODE(self)->scene;
-	CollisionResult  result = Scene_checkContinuous(scene, self, movement);
-	
-    // Handle the movement based on collision result
+    Scene *scene = ENTITY_TO_NODE(self)->scene;
+    CollisionResult result = Scene_checkContinuous(scene, self, movement);
+    
     if (!result.hit) {
-        // No collision - move freely
         self->position = Vector3Add(self->position, movement);
     } else {
-        // Collision detected - move to safe distance from collision point
-		float move_len = Vector3Length(movement);
-		float safe_t = fmaxf(0.0f, (result.distance - SEPARATION_EPSILON) / move_len);
-		Vector3 safe_movement = Vector3Scale(movement, safe_t);
-		
-        self->position = Vector3Add(self->position, safe_movement);
+        // Use the position from collision system
+        self->position = result.position;
+        
         // Trigger collision callbacks
         EntityVTable *vtable = self->vtable;
         if (vtable && vtable->OnCollision) {
             vtable->OnCollision(self, result);
         }
         
-        // Notify the other entity if it exists and has a callback
         if (result.entity && result.entity->vtable && result.entity->vtable->OnCollided) {
             CollisionResult other_result = result;
             other_result.entity = self;

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "game.h"
+#include "heightmap.h"
 #define RAYGUI_IMPLEMENTATION
 #define MENU_IMPLEMENTATION
 #include "../menu.h"
@@ -61,10 +62,20 @@ runEngine(void *data, void *value)
 	cam->position = (Vector3){0.0f, 1.75f, 0.0f};
 	cam->target   = (Vector3){10.0f, 0.0f, 10.0f};
 
-	scene = Scene_new(&infinite_Plane_Scene_Callbacks, NULL, engine);
+	/*scene = Scene_new(&infinite_Plane_Scene_Callbacks, NULL, NULL, 0, engine); // */
+	Heightmap heightmap = (Heightmap){
+			.heightmap  = genHeightmapXOR(),
+			.sun_angle  = (Vector3){0.3f, -0.8f, 0.3f},
+			.offset     = 0.0f,
+			.cells_wide = 128,
+			.hi_color   = DARKGREEN,
+			.lo_color   = BEIGE
+		};
+	scene = Heightmap_new(&heightmap, engine);
+	// */
 	
 	player = Entity_new(&playerTemplate, scene, 0);
-	player->position = (Vector3){0.0f, 1.0f, 0.0f};
+	player->position = (Vector3){0.0f, 8.0f, 0.0f};
 	
 	head_data = (TestHeadData*)Head_getUserData(head);
 	head_data->controller  = 0;

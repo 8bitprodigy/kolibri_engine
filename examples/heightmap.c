@@ -4,12 +4,24 @@
 
 #include "common.h"
 #include "dynamicarray.h"
+#include "engine.h"
+#include "entity.h"
 #include <raylib.h>
 #include <raymath.h>
 #include "heightmap.h"
+#include "renderer.h"
 
 
 #define INDEX(array, width, x, y) (array[y * width + x])
+
+
+typedef struct
+{
+	Mesh      mesh;
+	Model     model;
+	Heightmap base;
+}
+HeightmapData;
 
 
 /*
@@ -46,14 +58,23 @@ const Vector3 SUN_ANGLE = (Vector3){0.3f, -0.8f, 0.3f};
 
 
 void
-XORHeightmap(HeightmapData *map)
+XORHeightmap(Heightmap *map)
 {
+	int     grid_size               = map->cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	
 	static const int scale = 256/TERRAIN_NUM_SQUARES;
-	for (int y = 0; y < TERRAIN_NUM_SQUARES+1; y++) {
-		for (int x = 0; x < TERRAIN_NUM_SQUARES+1; x++) {
-			map->heightmap[(y*map->size)+x] = (float)(x ^ y)/TERRAIN_NUM_SQUARES;
-		}
-	}
+	for (int x = 0; x < TERRAIN_NUM_SQUARES+1; x++) 
+		for (int y = 0; y < TERRAIN_NUM_SQUARES+1; y++) 
+			heightmap[y][x] = (float)(x ^ y)/TERRAIN_NUM_SQUARES;
+	
+	DBG_OUT(
+			"heightmap[0][0]=%.3f [1][0]=%.3f [0][1]=%.3f [1][1]=%.3f",
+			heightmap[0][0], 
+			heightmap[1][0], 
+			heightmap[0][1], 
+			heightmap[1][1]
+		);
 }
 
 
@@ -65,19 +86,25 @@ randomRange(float range)
 
 // Set height at position with bounds checking
 void 
-setHeight(HeightmapData *map, int x, int y, float height) 
+setHeight(Heightmap *map, int x, int y, float height) 
 {
+	int     grid_size               = map->cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	
     if (x >= 0 && x <= TERRAIN_NUM_SQUARES && y >= 0 && y <= TERRAIN_NUM_SQUARES) {
-        map->heightmap[(y*map->size)+x]= height;
+        heightmap[y][x] = height;
     }
 }
 
 // Get height at position with bounds checking
 float 
-getHeight(HeightmapData *map, int x, int y) 
+getHeight(Heightmap *map, int x, int y) 
 {
+	int     grid_size               = map->cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	
     if (x >= 0 && x <= TERRAIN_NUM_SQUARES && y >= 0 && y <= TERRAIN_NUM_SQUARES) {
-        return map->heightmap[(y*map->size)+x];
+        return heightmap[y][x];
     }
     return 0.0f;
 }
@@ -85,7 +112,7 @@ getHeight(HeightmapData *map, int x, int y)
 
 void
 diamond(
-	HeightmapData *map, 
+	Heightmap *map, 
 	int    x, 
 	int    y, 
 	int    size,
@@ -106,7 +133,7 @@ diamond(
 
 void
 square(
-	HeightmapData *map, 
+	Heightmap *map, 
 	int    x,
 	int    y,
 	int    size,
@@ -127,12 +154,15 @@ square(
 
 void
 diamondSquareSeeded(
-	HeightmapData *map, 
+	Heightmap *map, 
 	float      Initial_Roughness, 
 	float      Roughness_Decay, 
 	size_t     Seed
 )
 {
+	int     grid_size               = map->cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	
 	srand(Seed);
 
 	setHeight(map, 0,                   0,                   randomRange(Initial_Roughness));
@@ -163,13 +193,13 @@ diamondSquareSeeded(
 
 	/* Normalize heightmap to 0.0-1.0 range */
 	float
-		min_height = map->heightmap[0],
-		max_height = map->heightmap[0];
+		min_height = heightmap[0][0],
+		max_height = heightmap[0][0];
 
 	for (int y = 0; y <= TERRAIN_NUM_SQUARES; y++) {
 		for (int x = 0; x <= TERRAIN_NUM_SQUARES; x++) {
-			if (map->heightmap[(y*map->size)+x] < min_height) min_height  = map->heightmap[(y*map->size)+x];
-			if (max_height < map->heightmap[(y*map->size)+x]) max_height = map->heightmap[(y*map->size)+x];
+			if (heightmap[y][x] < min_height) min_height  = heightmap[y][x];
+			if (max_height < heightmap[y][x]) max_height = heightmap[y][x];
 		}
 	}
 
@@ -180,7 +210,7 @@ diamondSquareSeeded(
 
 	for (int y = 0; y <= TERRAIN_NUM_SQUARES; y++) {
 		for (int x = 0; x <= TERRAIN_NUM_SQUARES; x++) {
-			map->heightmap[(y*map->size)+x]= (map->heightmap[(y*map->size)+x]- min_height) / range;
+			heightmap[y][x]= (heightmap[y][x]- min_height) / range;
 		}
 	}
 }
@@ -188,7 +218,7 @@ diamondSquareSeeded(
 
 void
 diamondSquare(
-	HeightmapData *map, 
+	Heightmap *map, 
 	float  Initial_Roughness, 
 	float  Roughness_Decay
 ) 
@@ -209,18 +239,21 @@ calculateTriangleNormal(Vector3 v1, Vector3 v2, Vector3 v3)
 
 Vector3
 calculateVertexNormal(
-	HeightmapData *map, 
+	Heightmap *map, 
 	int    x, 
 	int    z, 
 	float  scale, 
 	float  height_scale
 )
 {
+	int     grid_size               = map->cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	
 	float 
-		left   = (x > 0) ? map->heightmap[(z*map->size)+x-1]                   : map->heightmap[(z*map->size)+x],
-		right  = (x < TERRAIN_NUM_SQUARES) ? map->heightmap[(z*map->size)+x+1] : map->heightmap[(z*map->size)+x],
-		up     = (z > 0) ? map->heightmap[((z-1)*map->size)+x]                   : map->heightmap[(z*map->size)+x],
-		down   = (z < TERRAIN_NUM_SQUARES) ? map->heightmap[((z+1)*map->size)+x] : map->heightmap[(z*map->size)+x];
+		left   = (x > 0) ? heightmap[z-1][x]                   : heightmap[z][x],
+		right  = (x < TERRAIN_NUM_SQUARES) ? heightmap[z+1][x] : heightmap[z][x],
+		up     = (z > 0) ? heightmap[z][x-1]                   : heightmap[z][x],
+		down   = (z < TERRAIN_NUM_SQUARES) ? heightmap[z][x+1] : heightmap[z][x];
 
 	Vector3 tangent_x = {
         2.0f * scale,                    // Step in X direction
@@ -247,8 +280,12 @@ getLightingFactor(Vector3 normal, float ambient)
 }
 
 float 
-getSimpleLighting(HeightmapData *map, int x, int z) {
-    float current_height  = map->heightmap[(z*map->size)+x];
+getSimpleLighting(Heightmap *map, int x, int z) 
+{
+	int     grid_size               = map->cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	
+    float current_height  = heightmap[z][x];
     float neighbor_height = 0.0f;
     int   neighbor_count  = 0;
     
@@ -262,7 +299,7 @@ getSimpleLighting(HeightmapData *map, int x, int z) {
             
             if (nx >= 0 && nx <= TERRAIN_NUM_SQUARES && 
                 nz >= 0 && nz <= TERRAIN_NUM_SQUARES) {
-                neighbor_height += map->heightmap[(nz*map->size)+nx];
+                neighbor_height += heightmap[nz][nx];
                 neighbor_count++;
             }
         }
@@ -283,14 +320,19 @@ getSimpleLighting(HeightmapData *map, int x, int z) {
 
 Mesh
 genTerrain(
-	HeightmapData *map,
-	float size, 
-	float offset, 
-	int   resolution, 
-	Color color1, 
-	Color color2
+	Heightmap *map
 )
 {
+	int     grid_size               = map->cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	
+	float 
+		size       = WORLD_SIZE,//DynamicArray_length(map->heightmap),
+		offset     = map->offset;
+	int resolution = map->cells_wide;
+	Color 
+		color1 = map->hi_color,
+		color2 = map->lo_color;
 	Mesh mesh = {0};
 	int 
 		edge_vert_count = resolution + 1,
@@ -307,7 +349,7 @@ genTerrain(
 
 			vertices[i] = (Vector3){
 				((float)x / resolution - 0.5f) * size,
-				map->heightmap[(z*map->size)+x] * TERRAIN_HEIGHT_SCALE + offset,
+				heightmap[z][x] * TERRAIN_HEIGHT_SCALE + offset,
 				((float)z / resolution - 0.5f) * size
 			};
 
@@ -319,9 +361,9 @@ genTerrain(
 			normals[i] = calculateVertexNormal(map, x, z, 1.0f, TERRAIN_HEIGHT_SCALE);
 			float lighting_factor = getLightingFactor(normals[i], 0.5f);
 			colors[i]  = (Color){
-				(unsigned char)(Lerp(color2.r, color1.r, map->heightmap[(z*map->size)+x]  * lighting_factor)),
-				(unsigned char)(Lerp(color2.g, color1.g, map->heightmap[(z*map->size)+x]) * lighting_factor),
-				(unsigned char)(Lerp(color2.b, color1.b, map->heightmap[(z*map->size)+x]) * lighting_factor),
+				(unsigned char)(Lerp(color2.r, color1.r, heightmap[z][x]  * lighting_factor)),
+				(unsigned char)(Lerp(color2.g, color1.g, heightmap[z][x]) * lighting_factor),
+				(unsigned char)(Lerp(color2.b, color1.b, heightmap[z][x]) * lighting_factor),
 				255
 			};
 		}
@@ -365,8 +407,11 @@ genTerrain(
 }
 
 float
-getTerrainHeight(HeightmapData *map, Vector3 position)
+getTerrainHeight(Heightmap *map, Vector3 position)
 {
+	int     grid_size               = map->cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	
 	float
 		normalized_x = (position.x / WORLD_SIZE) + 0.5f,
 		normalized_z = (position.z / WORLD_SIZE) + 0.5f,
@@ -378,8 +423,8 @@ getTerrainHeight(HeightmapData *map, Vector3 position)
 		z = (int)floorf(float_z);
 
 	if (x < 0 || z < 0 
-		|| TERRAIN_NUM_SQUARES < x 
-		|| TERRAIN_NUM_SQUARES < z
+		|| TERRAIN_NUM_SQUARES <= x 
+		|| TERRAIN_NUM_SQUARES <= z
 	) {
 		return 0.0f;
 	}
@@ -387,83 +432,291 @@ getTerrainHeight(HeightmapData *map, Vector3 position)
 	float
 		x_frac = float_x - x,
 		z_frac = float_z - z,
-		lower = Lerp(map->heightmap[(z*map->size)+x],     map->heightmap[(z*map->size)+x+1],   x_frac),
-		upper = Lerp(map->heightmap[((z+1)*map->size)+x], map->heightmap[((z+1)*map->size)+x+1], x_frac);
+		// Interpolate bottom edge (z row) along x
+		lower = Lerp(heightmap[z][x], heightmap[z][x+1], x_frac),
+		// Interpolate top edge (z+1 row) along x
+		upper = Lerp(heightmap[z+1][x], heightmap[z+1][x+1], x_frac);
 	
+	// Interpolate between bottom and top edges along z
 	return Lerp(lower, upper, z_frac) * TERRAIN_HEIGHT_SCALE;
 }
-/*
-Vector3
-calculateVertexNormal(int x, int z, float scale, float height_scale)
-{
-	float 
-		left   = (x > 0) ? heightmap[x-1][z]                   : heightmap[x][z],
-		right  = (x < TERRAIN_NUM_SQUARES) ? heightmap[x+1][z] : heightmap[x][z],
-		up     = (z > 0) ? heightmap[x][z-1]                   : heightmap[x][z],
-		down   = (z < TERRAIN_NUM_SQUARES) ? heightmap[x][z+1] : heightmap[x][z];
 
-	// Calculate normal using central differences
-	Vector3 normal = {
-		(left - right) * height_scale,
-		2.0f * scale,
-		(up - down) * height_scale
-	};
-
-	return Vector3Normalize(normal);
-}
-*/
 float *
 genHeightmapXOR()
 {
-	float *heightmap = DynamicArray(float, 256*256);
+    int size = TERRAIN_NUM_SQUARES + 1;  
+    float *map = DynamicArray(float, size * size);
+	float (*heightmap)[size] = (float(*)[size])map;
 
-	for (int y = 0; y < 256; y++)
-		for (int x = 0; x < 256; x++)
-			heightmap[y * 256 + x] = (float)(x^y)/256.0f;
-	
-	return heightmap;
+    for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+            heightmap[y][x] = (float)(x^y)/TERRAIN_NUM_SQUARES;
+            
+	DBG_OUT(
+			"XOR Write: [0][0]=%f, [10][10]=%f, [64][64]=%f",
+			heightmap[0][0],
+			heightmap[10][10], 
+			heightmap[64][64]
+		);
+    return map;
 }
 
 float *
-genHeightmapDiamondSquare(size_t cells_wide, size_t seed)
+genHeightmapDiamondSquare(
+	size_t cells_wide, 
+	float roughness, 
+	float decay, 
+	size_t seed
+)
 {
 	
 }
 
 Scene * 
-Heightmap_new(HeightmapData *heightmap_data)
+Heightmap_new(Heightmap *heightmap, Engine *engine)
 {
-	
+	HeightmapData heightmap_data;
+	heightmap_data.base  = *heightmap;
+	return Scene_new(
+			&heightmap_Scene_Callbacks, 
+			NULL, 
+			&heightmap_data, 
+			sizeof(HeightmapData), 
+			engine
+		);
 }
 
 
 void
 heightmapSceneSetup(Scene *scene, void *map_data)
 {
+	HeightmapData *data = (HeightmapData*)map_data;
+	Heightmap *heightmap = &data->base;
 	
+    DBG_OUT("Heightmap pointer: %p", heightmap->heightmap);
+    DBG_OUT("Cells wide: %d", heightmap->cells_wide);
+    int grid_size = heightmap->cells_wide + 1;
+    float (*hm)[grid_size] = (float(*)[grid_size])heightmap->heightmap;
+	DBG_OUT(
+			"XOR Read: [0][0]=%f, [10][10]=%f, [64][64]=%f",
+			hm[0][0], 
+			hm[10][10], 
+			hm[64][64]
+		);
+           
+	data->mesh  = genTerrain(heightmap);
+	data->model = LoadModelFromMesh(data->mesh);
+	DBG_OUT(
+			"Model loaded: materials=%d, meshCount=%d", 
+			data->model.materialCount, 
+			data->model.meshCount
+        );
+	DBG_OUT(
+			"Drawing at position (0,%.2f,0) with world size %.2f", 
+			heightmap->offset, 
+			WORLD_SIZE
+		);
+    DBG_OUT("Mesh uploaded, vertex count: %d", data->mesh.vertexCount);
 }
 
 void 
 heightmapSceneRender(Scene *scene, Head *head)
 {
+	Renderer      *renderer = Engine_getRenderer(Scene_getEngine(scene));
+	HeightmapData *data     = Scene_getMapData(scene);
 	
+	static int frame_count = 0;
+	if (frame_count++ % 60 == 0) {
+		DBG_OUT("Rendering terrain at frame %d", frame_count);
+	}
+	
+	DrawModel(data->model, V3_ZERO, 1.0f, WHITE);
+	
+	BoundingBox bbox = {
+			{-WORLD_SIZE/2, 0.0f, -WORLD_SIZE/2},
+			{WORLD_SIZE/2, TERRAIN_HEIGHT_SCALE, WORLD_SIZE/2}
+		};
+	DrawBoundingBox(bbox, RED);
+	
+	EntityList *ent_list = Scene_getEntityList(scene);
+	for (int i = 0; i < ent_list->count; i++) {
+		Renderer_submitEntity(renderer, ent_list->entities[i]);
+	}
 }
 
 CollisionResult
 heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 {
-	
+    HeightmapData *data = Scene_getMapData(scene);
+    Heightmap     *map  = &data->base;
+    Vector3 from = entity->position;
+    
+    // Calculate entity half height for centering
+    float entity_half_height = 0.0f;
+    if (entity->collision_shape == COLLISION_CYLINDER || 
+        entity->collision_shape == COLLISION_SPHERE) {
+        entity_half_height = entity->height * 0.5f;
+    }
+    
+    // Get terrain surface heights (where entity center should be)
+    float terrain_at_from = getTerrainHeight(map, from) + map->offset + entity_half_height;
+    float terrain_at_to = getTerrainHeight(map, to) + map->offset + entity_half_height;
+    
+    // If both positions above terrain, no collision (like infinite plane)
+    if (from.y > terrain_at_from && to.y > terrain_at_to) {
+        return NO_COLLISION;
+    }
+    
+    // Calculate hit point and distance
+    Vector3 hit_floor_point;
+    float distance;
+    
+    if (from.y > terrain_at_from && to.y <= terrain_at_to) {
+        // Crossing from above to terrain - interpolate to find hit point
+        float t = invLerp(from.y, to.y, terrain_at_to);
+        hit_floor_point = Vector3Lerp(from, to, t);
+        hit_floor_point.y = terrain_at_to;  // Snap to exact terrain height
+        distance = Vector3Distance(from, hit_floor_point);
+	} else {
+		// Already at/below terrain
+		hit_floor_point = (Vector3){to.x, terrain_at_to, to.z};
+		
+		// Return distance as the FULL intended movement, not just vertical adjustment
+		// This allows horizontal movement while correcting Y
+		Vector3 intended_move = Vector3Subtract(to, from);
+		distance = Vector3Length(intended_move);  // Full movement distance
+	}
+    
+    // Calculate normal
+    float normalized_x = (to.x / WORLD_SIZE) + 0.5f;
+    float normalized_z = (to.z / WORLD_SIZE) + 0.5f;
+    int grid_x = CLAMP((int)(normalized_x * TERRAIN_NUM_SQUARES), 0, TERRAIN_NUM_SQUARES);
+    int grid_z = CLAMP((int)(normalized_z * TERRAIN_NUM_SQUARES), 0, TERRAIN_NUM_SQUARES);
+    Vector3 normal = calculateVertexNormal(map, grid_x, grid_z, 1.0f, TERRAIN_HEIGHT_SCALE);
+    
+    return (CollisionResult){
+        true,
+        distance,
+        hit_floor_point,
+        normal,
+        0,
+        NULL,
+        NULL,
+    };
 }
 
 CollisionResult 
 heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
 {
+    HeightmapData *data = Scene_getMapData(scene);
+    Heightmap     *map  = &data->base;
+    
+	int     grid_size             = map->cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
 	
+    CollisionResult result = NO_COLLISION;
+    
+    K_Ray ray = (K_Ray){
+        .position  = from,
+        .direction = Vector3Normalize(Vector3Subtract(to, from)),
+        .length    = Vector3Distance(from, to),
+    };
+    
+    // Convert world positions to heightmap grid coordinates
+    float 
+        start_x = (from.x / WORLD_SIZE + 0.5f) * TERRAIN_NUM_SQUARES,
+        start_z = (from.z / WORLD_SIZE + 0.5f) * TERRAIN_NUM_SQUARES,
+        end_x   = (to.x / WORLD_SIZE + 0.5f)   * TERRAIN_NUM_SQUARES,
+        end_z   = (to.z / WORLD_SIZE + 0.5f)   * TERRAIN_NUM_SQUARES;
+    
+    int 
+        x0 = (int)floorf(start_x),
+        z0 = (int)floorf(start_z),
+        x1 = (int)floorf(end_x),
+        z1 = (int)floorf(end_z);
+    
+    // Bresenham line algorithm to traverse grid cells
+    int 
+        dx = abs(x1 - x0),
+        dz = abs(z1 - z0),
+        sx = (x0 < x1) ? 1 : -1,
+        sz = (z0 < z1) ? 1 : -1,
+        err = dx - dz,
+        x = x0,
+        z = z0;
+    
+    float closest_distance = ray.length;
+    
+    // Traverse cells along the line
+    while (true) {
+        // Check if within bounds
+        if (x >= 0 && x < TERRAIN_NUM_SQUARES && z >= 0 && z < TERRAIN_NUM_SQUARES) {
+            // Get the four corners of this heightmap cell
+            float cell_size = WORLD_SIZE / TERRAIN_NUM_SQUARES;
+            float world_x = (x / (float)TERRAIN_NUM_SQUARES - 0.5f) * WORLD_SIZE;
+            float world_z = (z / (float)TERRAIN_NUM_SQUARES - 0.5f) * WORLD_SIZE;
+            
+            Vector3 p1 = {
+                world_x,
+                heightmap[z][x]         * TERRAIN_HEIGHT_SCALE + map->offset,
+                world_z
+            };
+            Vector3 p2 = {
+                world_x + cell_size,
+                heightmap[z + 1][x]     * TERRAIN_HEIGHT_SCALE + map->offset,
+                world_z
+            };
+            Vector3 p3 = {
+                world_x + cell_size,
+                heightmap[z + 1][x + 1] * TERRAIN_HEIGHT_SCALE + map->offset,
+                world_z + cell_size
+            };
+            Vector3 p4 = {
+                world_x,
+                heightmap[z][x + 1]     * TERRAIN_HEIGHT_SCALE + map->offset,
+                world_z + cell_size
+            };
+            
+            // Test quad using raylib's GetRayCollisionQuad
+            RayCollision collision = GetRayCollisionQuad(ray.ray, p1, p2, p3, p4);
+            
+            if (collision.hit && collision.distance < closest_distance) {
+                closest_distance = collision.distance;
+                result.hit = true;
+                result.distance = collision.distance;
+                result.position = collision.point;
+                result.normal = collision.normal;
+                result.material_id = 0;
+                result.user_data = NULL;
+                result.entity = NULL;
+            }
+        }
+        
+        // Break if we reached the end
+        if (x == x1 && z == z1) break;
+        
+        // Bresenham step
+        int e2 = 2 * err;
+        if (e2 > -dz) {
+            err -= dz;
+            x += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            z += sz;
+        }
+    }
+    
+    return result;
 }
 
 void 
 heightmapSceneFree(Scene *scene, void *map_data)
 {
-	
+	HeightmapData *data = (HeightmapData*)map_data;
+	Heightmap     *map  = &data->base;
+	DynamicArray_free(map->heightmap);
+	UnloadModel(data->model);
+	UnloadMesh( data->mesh);
 }
 

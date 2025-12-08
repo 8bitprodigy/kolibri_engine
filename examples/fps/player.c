@@ -1,4 +1,5 @@
 #include "game.h"
+#include "scene.h"
 
 
 /*
@@ -100,7 +101,22 @@ playerUpdate(Entity *self, float delta)
 	
 	bool is_on_floor = Entity_isOnFloor(self);
 
-	if (is_on_floor) velocity->y = 0;
+	if (is_on_floor) {
+		CollisionResult floor_check = Scene_checkCollision(
+				Entity_getScene(self), 
+				self, 
+				Vector3Add(
+						self->position, 
+						(Vector3){0, -0.1f, 0}
+					)
+			);
+		if (floor_check.hit) {
+			float floor_dot = Vector3DotProduct(floor_check.normal, V3_UP);
+			if (floor_dot > 0.99f) {  // Nearly flat ground
+				velocity->y = 0;
+			}
+		}
+	}
 	if (is_on_floor && data->request_jump) {
 		velocity->y = JUMP_VELOCITY;
 		data->request_jump = false;
