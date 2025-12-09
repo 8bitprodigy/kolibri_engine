@@ -23,7 +23,15 @@ setCollisionState(EntityNode *node, CollisionResult *collision)
 	if (!collision->hit) return;
 	float 
 		dot_up              = Vector3DotProduct(collision->normal, V3_UP),
-		floor_dot_threshold = cosf(node->base.floor_max_angle);
+		floor_dot_threshold = cosf(node->base.floor_max_angle * DEG2RAD);
+	DBG_OUT(
+			"setCollisionState: normal=(%.2f,%.2f,%.2f) dot_up=%.3f threshold=%.3f",
+			collision->normal.x, 
+			collision->normal.y, 
+			collision->normal.z,
+			dot_up, 
+			floor_dot_threshold
+		); // */
 	
 	if      (floor_dot_threshold  < dot_up) node->on_floor   = true;
 	else if (dot_up < -floor_dot_threshold) node->on_ceiling = true;

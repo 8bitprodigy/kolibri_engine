@@ -102,6 +102,7 @@ playerUpdate(Entity *self, float delta)
 	bool is_on_floor = Entity_isOnFloor(self);
 
 	if (is_on_floor) {
+		data->frames_since_grounded = 0;
 		CollisionResult floor_check = Scene_checkCollision(
 				Entity_getScene(self), 
 				self, 
@@ -117,14 +118,16 @@ playerUpdate(Entity *self, float delta)
 			}
 		}
 	}
-	if (is_on_floor && data->request_jump) {
+	if (data->frames_since_grounded < 5 && data->request_jump) {
 		velocity->y = JUMP_VELOCITY;
 		data->request_jump = false;
 	}
-	if (!is_on_floor) 
+	if (!is_on_floor) {
+		data->frames_since_grounded++;
 		velocity->y -= (0.0f < velocity->y)
 			? JUMP_GRAVITY * delta 
 			: FALL_GRAVITY * delta;
+	}
 	data->direction = Vector3Lerp(data->direction, data->move_dir, delta * CONTROL);
 	
 	float   

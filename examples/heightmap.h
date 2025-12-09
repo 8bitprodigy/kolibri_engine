@@ -27,7 +27,10 @@ typedef struct
 {
 	float    *heightmap;
 	Vector3   sun_angle;
-	float     offset;
+	float     
+			  offset,
+			  world_size,
+			  height_scale;
 	uint      cells_wide;
 	union {
 		struct {
@@ -45,7 +48,7 @@ float *genHeightmapXOR();
 float *genHeightmapDiamondSquare(size_t cells_wide, float roughness, float decay, size_t seed);
 
 
-Scene *Heightmap_new(Heightmap *heightmap, Engine *engine);
+Scene *HeightmapScene_new(Heightmap *heightmap, Engine *engine);
 
 
 #endif /* HEIGHTMAP_H */

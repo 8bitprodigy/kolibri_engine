@@ -64,14 +64,16 @@ runEngine(void *data, void *value)
 
 	/*scene = Scene_new(&infinite_Plane_Scene_Callbacks, NULL, NULL, 0, engine); // */
 	Heightmap heightmap = (Heightmap){
-			.heightmap  = genHeightmapXOR(),
-			.sun_angle  = (Vector3){0.3f, -0.8f, 0.3f},
-			.offset     = 0.0f,
-			.cells_wide = 128,
-			.hi_color   = DARKGREEN,
-			.lo_color   = BEIGE
+			.heightmap    = genHeightmapXOR(),
+			.sun_angle    = (Vector3){0.3f, -0.8f, 0.3f},
+			.offset       = 0.0f,
+			.world_size   = 512.0f,
+			.height_scale = 10.0f,
+			.cells_wide   = 256,
+			.hi_color     = DARKGREEN,
+			.lo_color     = BEIGE
 		};
-	scene = Heightmap_new(&heightmap, engine);
+	scene = HeightmapScene_new(&heightmap, engine);
 	// */
 	
 	player = Entity_new(&playerTemplate, scene, 0);
@@ -102,7 +104,7 @@ runEngine(void *data, void *value)
 			}
 		}
 	}
-	
+	// */
 	Engine_run(engine);
 }
 

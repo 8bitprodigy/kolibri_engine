@@ -123,7 +123,8 @@ typedef struct
 		prev_velocity,
 		move_dir,
 		direction;
-	bool    request_jump;
+	int  frames_since_grounded;
+	bool request_jump;
 }
 PlayerData;
 
