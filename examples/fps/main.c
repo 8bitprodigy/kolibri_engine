@@ -69,7 +69,7 @@ runEngine(void *data, void *value)
 			.offset       = 0.0f,
 			.world_size   = 512.0f,
 			.height_scale = 10.0f,
-			.cells_wide   = 256,
+			.cells_wide   = 255,
 			.hi_color     = DARKGREEN,
 			.lo_color     = BEIGE
 		};

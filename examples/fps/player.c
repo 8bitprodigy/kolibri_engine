@@ -112,11 +112,15 @@ playerUpdate(Entity *self, float delta)
 					)
 			);
 		if (floor_check.hit) {
-			float floor_dot = Vector3DotProduct(floor_check.normal, V3_UP);
-			if (floor_dot > 0.99f) {  // Nearly flat ground
+			float 
+				floor_dot     = Vector3DotProduct(floor_check.normal, V3_UP),
+				dot_threshold = cosf(self->floor_max_angle * DEG2RAD);
+			if (floor_dot > dot_threshold) {  // Nearly flat ground
 				velocity->y = 0;
 			}
 		}
+	}
+	if (data->request_jump) {
 	}
 	if (data->frames_since_grounded < 5 && data->request_jump) {
 		velocity->y = JUMP_VELOCITY;

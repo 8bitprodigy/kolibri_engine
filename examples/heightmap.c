@@ -421,7 +421,7 @@ getTerrainHeight(Heightmap *map, Vector3 position)
 float *
 genHeightmapXOR()
 {
-    const int size = 256 + 1;  
+    const int size = 256;
     float *map = DynamicArray(float, size * size);
 	float (*heightmap)[size] = (float(*)[size])map;
 
@@ -498,6 +498,9 @@ heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
     Heightmap     *map  = &data->base;
     Vector3 from = entity->position;
     
+	if (to.y > from.y) {
+        return NO_COLLISION;
+    }
     // Calculate entity half height for centering
     float entity_half_height = 0.0f;
     if (entity->collision_shape == COLLISION_CYLINDER || 

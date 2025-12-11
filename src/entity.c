@@ -24,14 +24,6 @@ setCollisionState(EntityNode *node, CollisionResult *collision)
 	float 
 		dot_up              = Vector3DotProduct(collision->normal, V3_UP),
 		floor_dot_threshold = cosf(node->base.floor_max_angle * DEG2RAD);
-	DBG_OUT(
-			"setCollisionState: normal=(%.2f,%.2f,%.2f) dot_up=%.3f threshold=%.3f",
-			collision->normal.x, 
-			collision->normal.y, 
-			collision->normal.z,
-			dot_up, 
-			floor_dot_threshold
-		); // */
 	
 	if      (floor_dot_threshold  < dot_up) node->on_floor   = true;
 	else if (dot_up < -floor_dot_threshold) node->on_ceiling = true;
@@ -184,10 +176,21 @@ move(Entity *self, Vector3 movement)
     if (!result.hit) {
         self->position = Vector3Add(self->position, movement);
     } else {
-        // Use the position from collision system
-        self->position = result.position;
+        // Check if this is a floor collision (normal pointing up)
+        float dot_up = Vector3DotProduct(result.normal, V3_UP);
+				
+		if (result.entity == NULL) {
+			// Scene geometry (terrain/plane) - use corrected position
+			self->position = result.position;
+		} else {
+			// Entity collision - use safe distance
+			float move_len = Vector3Length(movement);
+			float safe_t = fmaxf(0.0f, (result.distance - SEPARATION_EPSILON) / move_len);
+			Vector3 safe_movement = Vector3Scale(movement, safe_t);
+			self->position = Vector3Add(self->position, safe_movement);
+		}
         
-        // Trigger collision callbacks
+        // Callbacks...
         EntityVTable *vtable = self->vtable;
         if (vtable && vtable->OnCollision) {
             vtable->OnCollision(self, result);

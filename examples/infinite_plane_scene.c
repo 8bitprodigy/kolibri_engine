@@ -85,38 +85,42 @@ infinitePlaneSceneRender(Scene *scene, Head *head)
 	}
 }
 
-CollisionResult /* Infinite plane at 0.0f y-position */
+CollisionResult
 infinitePlaneSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 {
-	if (entity->position.y > 0.0f && to.y > 0.0f) return NO_COLLISION;
-
-	Vector3
-		from = entity->position,
-		hit_floor_point;
-	float   distance;
-
-	if (0.0f < from.y && to.y <= 0.0f) {
-		hit_floor_point = Vector3Lerp(
-			from, 
-			to,
-			invLerp(from.y, to.y, 0.0f)
-		);
-		distance = Vector3Distance(from, hit_floor_point);
+    Vector3 from = entity->position;
+    
+    // If both positions above plane, no collision
+    if (entity->position.y > 0.0f && to.y > 0.0f) return NO_COLLISION;
+    
+    // If moving upward (jumping), no collision
+    if (to.y > from.y) return NO_COLLISION;
+    if (fabsf(from.y) < 0.01f && to.y >= from.y) {
+		return NO_COLLISION;
 	}
-	else {
-		hit_floor_point = (Vector3){from.x, 0.0f, from.z};
+	
+    Vector3 hit_floor_point;
+    float distance;
+
+    if (0.0f < from.y && to.y <= 0.0f) {
+        // Crossing through plane
+        hit_floor_point = Vector3Lerp(from, to, invLerp(from.y, to.y, 0.0f));
+        distance = Vector3Distance(from, hit_floor_point);
+	} else {
+		// Already at/on plane
+		hit_floor_point = (Vector3){from.x, 0.0f, from.z};  // Stay at current horizontal position
 		distance = fabsf(from.y);
 	}
 
-	return (CollisionResult){
-			true,
-			distance,
-			hit_floor_point,
-			V3_UP,
-			0,
-			NULL,
-			NULL,
-		};
+    return (CollisionResult){
+        true,
+        distance,
+        hit_floor_point,
+        V3_UP,
+        0,
+        NULL,
+        NULL,
+    };
 }
 
 CollisionResult
