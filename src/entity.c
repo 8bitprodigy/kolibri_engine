@@ -176,21 +176,10 @@ move(Entity *self, Vector3 movement)
     if (!result.hit) {
         self->position = Vector3Add(self->position, movement);
     } else {
-        // Check if this is a floor collision (normal pointing up)
-        float dot_up = Vector3DotProduct(result.normal, V3_UP);
-				
-		if (result.entity == NULL) {
-			// Scene geometry (terrain/plane) - use corrected position
-			self->position = result.position;
-		} else {
-			// Entity collision - use safe distance
-			float move_len = Vector3Length(movement);
-			float safe_t = fmaxf(0.0f, (result.distance - SEPARATION_EPSILON) / move_len);
-			Vector3 safe_movement = Vector3Scale(movement, safe_t);
-			self->position = Vector3Add(self->position, safe_movement);
-		}
+        // Use the position from collision system
+        self->position = result.position;
         
-        // Callbacks...
+        // Trigger collision callbacks
         EntityVTable *vtable = self->vtable;
         if (vtable && vtable->OnCollision) {
             vtable->OnCollision(self, result);

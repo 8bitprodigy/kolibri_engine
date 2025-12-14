@@ -96,7 +96,7 @@ Projectile_MediaInit(void)
 
 	blast_sprite_info = CreateRegularSprite(
 			1.0f,
-			1.0f/12.0f,
+			1.0f/15.0f,
 			blast_sprite,
 			4, 4,
 			SPRITE_ALIGN_CAMERA

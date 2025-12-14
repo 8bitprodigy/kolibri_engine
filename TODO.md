@@ -7,6 +7,7 @@
 	- Needs to have them either despawn or be part of a pool that recycles them.
 - [ ] Implement enemy AI
 - [ ] Implement heightmap terrain Scene type
+- [ ] Figure out why the Heightmap Scene segfaults on exit to main menu
 
 ## General/Unknown:
 - [ ] (engine/head) Fix RenderTexture viewports 

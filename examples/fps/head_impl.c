@@ -66,7 +66,7 @@ testHeadSetup(Head *head)
 		DBG_OUT("Sky Texture loaded: %s", filename);
 		user_data->skybox_textures[i] = LoadTexture(filename);
 		SetTextureFilter(user_data->skybox_textures[i], TEXTURE_FILTER_BILINEAR);
-		SetTextureWrap(   user_data->skybox_textures[i], TEXTURE_WRAP_MIRROR_REPEAT);
+		SetTextureWrap(   user_data->skybox_textures[i], TEXTURE_WRAP_CLAMP);
 	}
 
 	/*

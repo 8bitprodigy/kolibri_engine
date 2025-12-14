@@ -12,7 +12,7 @@
 
 
 #ifdef DEBUG
-    #define DBG_EXPR( expression ) expression
+    #define DBG_EXPR( ... ) __VA_ARGS__
     #define DBG_OUT(  Text, ... ) do{printf( "[DEBUG] " Text "\n", ##__VA_ARGS__ ); fflush(stdout);} while(false)
     #define ERR_OUT(  Error_Text ) perror( "[ERROR] " Error_Text "\n" )    
 #else
@@ -24,6 +24,10 @@
 #ifndef CLAMP
 	#define CLAMP(value, min, max) ((value) < (min) ? (min) : ((value) > (max) ? (max) : (value)))
 #endif /* CLAMP */
+
+#ifndef MAX
+    #define MAX(A, B) ((A>B)?A:B)
+#endif
 
 /****************
 	CONSTANTS

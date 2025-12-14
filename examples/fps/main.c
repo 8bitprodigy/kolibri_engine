@@ -63,15 +63,17 @@ runEngine(void *data, void *value)
 	cam->target   = (Vector3){10.0f, 0.0f, 10.0f};
 
 	/*scene = Scene_new(&infinite_Plane_Scene_Callbacks, NULL, NULL, 0, engine); // */
-	Heightmap heightmap = (Heightmap){
-			.heightmap    = genHeightmapXOR(),
-			.sun_angle    = (Vector3){0.3f, -0.8f, 0.3f},
-			.offset       = 0.0f,
-			.world_size   = 512.0f,
-			.height_scale = 10.0f,
-			.cells_wide   = 255,
-			.hi_color     = DARKGREEN,
-			.lo_color     = BEIGE
+	HeightmapData heightmap = (HeightmapData){
+			.sun_angle     = (Vector3){0.0f, -0.4f, -0.6f},
+			.ambient_value = 0.6f,
+			.offset        = 0.0f,
+			.height_scale  = 100.0f,
+			.cell_size     = 2.0f,
+			.chunk_cells   = 16,
+			.chunks_wide   = 16,
+			.hi_color      = WHITE,
+			.lo_color      = WHITE,
+			.texture       = LoadTexture(PATH_PREFIX "resources/textures/grass/00.png"),
 		};
 	scene = HeightmapScene_new(&heightmap, engine);
 	// */
@@ -84,7 +86,7 @@ runEngine(void *data, void *value)
 	head_data->target      = player;
 	head_data->target_data = player->user_data;
 	head_data->eye_height  = 1.75f;
-	
+/*	
 	Entity *ents[21][21][21];
 	int z = 0; 
  

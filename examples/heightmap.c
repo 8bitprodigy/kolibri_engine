@@ -17,11 +17,16 @@
 
 typedef struct
 {
-	Mesh      mesh;
-	Model     model;
-	Heightmap base;
+	HeightmapData data;
+
+	float       world_size;
+	size_t      cells_wide;
+	float      *heightmap;
+	Color      *colormap;
+	Vector3    *normalmap;
+	Renderable *renderables;
 }
-HeightmapData;
+Heightmap;
 
 
 /*
@@ -55,6 +60,13 @@ SceneVTable heightmap_Scene_Callbacks = {
 const Vector3 SUN_ANGLE = (Vector3){0.3f, -0.8f, 0.3f};
 
 
+void
+RenderHeightMapChunk(Renderable *renderable, void *data, Camera3D *camera)
+{
+	Heightmap *map_data = (Heightmap*)data;
+}
+
+
 float 
 randomRange(float range) 
 {
@@ -63,24 +75,24 @@ randomRange(float range)
 
 // Set height at position with bounds checking
 void 
-setHeight(Heightmap *map, int x, int y, float height) 
+setHeight(float *heightmap_data, size_t cells_wide, int x, int y, float height) 
 {
-	int     grid_size               = map->cells_wide + 1;
-	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+    size_t  grid_size = cells_wide + 1;
+    float (*heightmap)[grid_size] = (float(*)[grid_size])heightmap_data;
 	
-    if (x >= 0 && x <= map->cells_wide && y >= 0 && y <= map->cells_wide) {
+    if (x >= 0 && x <= cells_wide && y >= 0 && y <= cells_wide) {
         heightmap[y][x] = height;
     }
 }
 
 // Get height at position with bounds checking
 float 
-getHeight(Heightmap *map, int x, int y) 
+getHeight(float *heightmap_data, size_t cells_wide, int x, int y) 
 {
-	int     grid_size               = map->cells_wide + 1;
-	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+    size_t  grid_size = cells_wide + 1;
+    float (*heightmap)[grid_size] = (float(*)[grid_size])heightmap_data;
 	
-    if (x >= 0 && x <= map->cells_wide && y >= 0 && y <= map->cells_wide) {
+    if (x >= 0 && x <= cells_wide && y >= 0 && y <= cells_wide) {
         return heightmap[y][x];
     }
     return 0.0f;
@@ -89,79 +101,82 @@ getHeight(Heightmap *map, int x, int y)
 
 void
 diamond(
-	Heightmap *map, 
-	int    x, 
-	int    y, 
-	int    size,
-	float  roughness
+	float  *heightmap_data, 
+	size_t  cells_wide,
+	int     x, 
+	int     y, 
+	int     size,
+	float   roughness
 )
 {
 	int half = size / 2;
 	float avg = (
-			getHeight(  map, x - half, y - half)
-			+ getHeight(map, x + half, y - half)
-			+ getHeight(map, x - half, y + half)
-			+ getHeight(map, x + half, y + half)
+			getHeight(  heightmap_data, cells_wide, x - half, y - half)
+			+ getHeight(heightmap_data, cells_wide, x + half, y - half)
+			+ getHeight(heightmap_data, cells_wide, x - half, y + half)
+			+ getHeight(heightmap_data, cells_wide, x + half, y + half)
 		) / 4.0f;
 
-	setHeight(map, x, y, avg + randomRange(roughness));
+	setHeight(heightmap_data, cells_wide, x, y, avg + randomRange(roughness));
 }
 
 
 void
 square(
-	Heightmap *map, 
-	int    x,
-	int    y,
-	int    size,
-	float  roughness
+	float  *heightmap_data, 
+	size_t  cells_wide,
+	int     x,
+	int     y,
+	int     size,
+	float   roughness
 )
 {
 	int half = size / 2;
 	float avg = (
-			getHeight(  map, x,        y - half)
-			+ getHeight(map, x + half, y)
-			+ getHeight(map, x,        y + half)
-			+ getHeight(map, x - half, y)
+			getHeight(  heightmap_data, cells_wide, x,        y - half)
+			+ getHeight(heightmap_data, cells_wide, x + half, y)
+			+ getHeight(heightmap_data, cells_wide, x,        y + half)
+			+ getHeight(heightmap_data, cells_wide, x - half, y)
 		) / 4.0f;
 
-	setHeight(map, x, y, avg + randomRange(roughness));
+	setHeight(heightmap_data, cells_wide, x, y, avg + randomRange(roughness));
 }
 
 
 void
 diamondSquareSeeded(
-	Heightmap *map, 
-	float      Initial_Roughness, 
-	float      Roughness_Decay, 
-	size_t     Seed
+	float  *heightmap_data, 
+	int     cells_wide,
+	float   Initial_Roughness, 
+	float   Roughness_Decay, 
+	size_t  Seed
 )
 {
-	int     grid_size               = map->cells_wide + 1;
-	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	int     grid_size               = cells_wide + 1;
+	float (*heightmap)[grid_size] = (float(*)[grid_size])heightmap_data;
 	
 	srand(Seed);
 
-	setHeight(map, 0,                   0,                   randomRange(Initial_Roughness));
-	setHeight(map, map->cells_wide, 0,                   randomRange(Initial_Roughness));
-	setHeight(map, 0,                   map->cells_wide, randomRange(Initial_Roughness));
-	setHeight(map, map->cells_wide, map->cells_wide, randomRange(Initial_Roughness));
+	setHeight(heightmap_data, cells_wide, 0,          0,          randomRange(Initial_Roughness));
+	setHeight(heightmap_data, cells_wide, cells_wide, 0,          randomRange(Initial_Roughness));
+	setHeight(heightmap_data, cells_wide, 0,          cells_wide, randomRange(Initial_Roughness));
+	setHeight(heightmap_data, cells_wide, cells_wide, cells_wide, randomRange(Initial_Roughness));
 
 	float roughness = Initial_Roughness;
 
 	/* Diamond-Square algorithm */
-	for (int size = map->cells_wide; 1 < size; size /= 2) {
+	for (int size = cells_wide; 1 < size; size /= 2) {
 		int half = size / 2;
 
-		for (int y = half; y < map->cells_wide; y += size) {
-			for (int x = half; x < map->cells_wide; x += size) {
-				diamond(map, x, y, size, roughness);
+		for (int y = half; y < cells_wide; y += size) {
+			for (int x = half; x < cells_wide; x += size) {
+				diamond(heightmap_data, cells_wide, x, y, size, roughness);
 			}
 		}
 
-		for (int y = 0; y <= map->cells_wide; y += half) {
-			for (int x = (y + half) % size; x <= map->cells_wide; x += size) {
-				square(map, x, y, size, roughness);
+		for (int y = 0; y <= cells_wide; y += half) {
+			for (int x = (y + half) % size; x <= cells_wide; x += size) {
+				square(heightmap_data, cells_wide, x, y, size, roughness);
 			}
 		}
 
@@ -173,8 +188,8 @@ diamondSquareSeeded(
 		min_height = heightmap[0][0],
 		max_height = heightmap[0][0];
 
-	for (int y = 0; y <= map->cells_wide; y++) {
-		for (int x = 0; x <= map->cells_wide; x++) {
+	for (int y = 0; y <= cells_wide; y++) {
+		for (int x = 0; x <= cells_wide; x++) {
 			if (heightmap[y][x] < min_height) min_height  = heightmap[y][x];
 			if (max_height < heightmap[y][x]) max_height = heightmap[y][x];
 		}
@@ -185,8 +200,8 @@ diamondSquareSeeded(
 		return; 
 	}
 
-	for (int y = 0; y <= map->cells_wide; y++) {
-		for (int x = 0; x <= map->cells_wide; x++) {
+	for (int y = 0; y <= cells_wide; y++) {
+		for (int x = 0; x <= cells_wide; x++) {
 			heightmap[y][x]= (heightmap[y][x]- min_height) / range;
 		}
 	}
@@ -195,12 +210,13 @@ diamondSquareSeeded(
 
 void
 diamondSquare(
-	Heightmap *map, 
-	float  Initial_Roughness, 
-	float  Roughness_Decay
+	float  *heightmap, 
+	size_t  cells_wide,
+	float   Initial_Roughness, 
+	float   Roughness_Decay
 ) 
 {
-	diamondSquareSeeded(map, Initial_Roughness, Roughness_Decay, (unsigned int)time(NULL));
+	diamondSquareSeeded(heightmap, cells_wide, Initial_Roughness, Roughness_Decay, (unsigned int)time(NULL));
 }
 
 
@@ -250,10 +266,10 @@ calculateVertexNormal(
 }
 
 float
-getLightingFactor(Vector3 normal, float ambient) 
+getLightingFactor(Vector3 normal, Vector3 sun_angle, float ambient) 
 {
-	float dot = Vector3DotProduct(normal, Vector3Normalize(SUN_ANGLE));
-	return (dot < 0.0f) ? ambient : ambient + (dot * (1.0f - ambient));
+	float dot = -Vector3DotProduct(normal, Vector3Normalize(sun_angle));
+	return  ambient + (dot * (1.0f - ambient));
 }
 
 float 
@@ -296,20 +312,19 @@ getSimpleLighting(Heightmap *map, int x, int z)
 }
 
 Mesh
-genTerrain(
-	Heightmap *map
-)
+genTerrain(Heightmap *map)
 {
-	int     grid_size               = map->cells_wide + 1;
+	int     grid_size             = map->cells_wide + 1;
 	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	HeightmapData *data           = (HeightmapData*)&map->data; 
 	
 	float 
-		size       = map->world_size,//DynamicArray_length(map->heightmap),
-		offset     = map->offset;
-	int resolution = map->cells_wide;
+		size          = map->world_size,//DynamicArray_length(map->heightmap),
+		offset        = data->offset;
+	size_t resolution = map->cells_wide;
 	Color 
-		color1 = map->hi_color,
-		color2 = map->lo_color;
+		color1 = data->hi_color,
+		color2 = data->lo_color;
 	Mesh mesh = {0};
 	int 
 		edge_vert_count = resolution + 1,
@@ -326,19 +341,24 @@ genTerrain(
 
 			vertices[i] = (Vector3){
 				((float)x / resolution - 0.5f) * size,
-				heightmap[z][x] * map->height_scale + offset,
+				heightmap[z][x] * data->height_scale + offset,
 				((float)z / resolution - 0.5f) * size
 			};
 
 			tex_coords[i] = (Vector2){
-				(float)x / resolution,
-				(float)z / resolution
+				(float)x,// / resolution,
+				(float)z,// / resolution
 			};
 
-			normals[i] = calculateVertexNormal(map, x, z, 1.0f, map->height_scale);
-			float lighting_factor = getLightingFactor(normals[i], 0.5f);
-			colors[i]  = (Color){
-				(unsigned char)(Lerp(color2.r, color1.r, heightmap[z][x]  * lighting_factor)),
+			normals[i] = calculateVertexNormal(map, x, z, 1.0f, data->height_scale);
+			float lighting_factor = getLightingFactor(
+				normals[i], 
+				data->sun_angle, 
+				data->ambient_value
+			);
+
+			colors[i] = (Color){
+				(unsigned char)(Lerp(color2.r, color1.r, heightmap[z][x]) * lighting_factor),
 				(unsigned char)(Lerp(color2.g, color1.g, heightmap[z][x]) * lighting_factor),
 				(unsigned char)(Lerp(color2.b, color1.b, heightmap[z][x]) * lighting_factor),
 				255
@@ -405,6 +425,7 @@ getTerrainHeight(Heightmap *map, Vector3 position)
 	) {
 		return 0.0f;
 	}
+	HeightmapData *data = (HeightmapData*)&map->data;
 	
 	float
 		x_frac = float_x - x,
@@ -415,7 +436,7 @@ getTerrainHeight(Heightmap *map, Vector3 position)
 		upper = Lerp(heightmap[z+1][x], heightmap[z+1][x+1], x_frac);
 	
 	// Interpolate between bottom and top edges along z
-	return Lerp(lower, upper, z_frac) * map->height_scale;
+	return Lerp(lower, upper, z_frac) * data->height_scale;
 }
 
 float *
@@ -439,19 +460,38 @@ genHeightmapDiamondSquare(
 	size_t seed
 )
 {
+    size_t size = cells_wide + 1;
+	float *heightmap = DynamicArray(float, size * size);
 	
+	diamondSquareSeeded(heightmap, cells_wide, roughness,decay, seed);
+
+	return heightmap;
 }
 
 Scene * 
-HeightmapScene_new(Heightmap *heightmap, Engine *engine)
+HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 {
-	HeightmapData heightmap_data;
-	heightmap_data.base  = *heightmap;
+	Heightmap *heightmap = malloc(sizeof(Heightmap));
+	if (!heightmap) {
+		ERR_OUT("Failed to allocate memory for Heightmap!");
+		return NULL;
+	}
+	
+	heightmap->cells_wide = heightmap_data->chunks_wide * heightmap_data->chunk_cells;
+	heightmap->world_size = heightmap->cells_wide       * heightmap_data->cell_size;
+	heightmap->data       = *heightmap_data;
+	heightmap->heightmap  = genHeightmapDiamondSquare(
+			heightmap->cells_wide,
+			0.6, 
+			0.3,
+			69
+		);
+	
 	return Scene_new(
 			&heightmap_Scene_Callbacks, 
 			NULL, 
-			&heightmap_data, 
-			sizeof(HeightmapData), 
+			heightmap, 
+			sizeof(Heightmap), 
 			engine
 		);
 }
@@ -460,31 +500,43 @@ HeightmapScene_new(Heightmap *heightmap, Engine *engine)
 void
 heightmapSceneSetup(Scene *scene, void *map_data)
 {
-	HeightmapData *data = (HeightmapData*)map_data;
-	Heightmap *heightmap = &data->base;
+	Heightmap *heightmap = (Heightmap*)map_data;
+	HeightmapData *data = (HeightmapData*)&heightmap->data;
 	
     int grid_size = heightmap->cells_wide + 1;
     float (*hm)[grid_size] = (float(*)[grid_size])heightmap->heightmap;
-           
-	data->mesh  = genTerrain(heightmap);
-	data->model = LoadModelFromMesh(data->mesh);
+	
+	if (data->texture.id != 0) {
+        GenTextureMipmaps(&data->texture);
+		SetTextureFilter(  data->texture, TEXTURE_FILTER_TRILINEAR);
+    }
 }
 
 void 
 heightmapSceneRender(Scene *scene, Head *head)
 {
 	Renderer      *renderer = Engine_getRenderer(Scene_getEngine(scene));
-	HeightmapData *data     = Scene_getMapData(scene);
-	Heightmap     *map      = &data->base;
+	Heightmap     *map      = Scene_getMapData(scene);
+	HeightmapData *data     = &map->data;
 	
-	DrawModel(data->model, V3_ZERO, 1.0f, WHITE);
-	
-	BoundingBox bbox = {
-			{-map->world_size/2, 0.0f, -map->world_size/2},
-			{map->world_size/2, map->height_scale, map->world_size/2}
-		};
-	DrawBoundingBox(bbox, RED);
-	
+	DBG_EXPR( 
+			float half_width = map->world_size/2.0f;
+			
+			BoundingBox bbox = {
+					{-half_width, data->offset, -half_width},
+					{half_width, data->height_scale, half_width}
+				};
+			DrawBoundingBox(bbox, MAGENTA);
+
+			/* Solid are positive axes, wireframe are negative axes. */
+			DrawCube(     (Vector3){ half_width, data->height_scale, 0.0f},        5.0f, 5.0f, 5.0f, RED);
+			DrawCubeWires((Vector3){-half_width, data->height_scale, 0.0f},        5.0f, 5.0f, 5.0f, RED);
+			DrawCube(     (Vector3){ 0.0f,       data->height_scale, 0.0f},        5.0f, 5.0f, 5.0f, GREEN);
+			DrawCubeWires((Vector3){ 0.0f,       data->offset,       0.0f},        5.0f, 5.0f, 5.0f, GREEN);
+			DrawCube(     (Vector3){0.0f,        data->height_scale,  half_width}, 5.0f, 5.0f, 5.0f, BLUE);
+			DrawCubeWires((Vector3){0.0f,        data->height_scale, -half_width}, 5.0f, 5.0f, 5.0f, BLUE);
+		);
+//*/	
 	EntityList *ent_list = Scene_getEntityList(scene);
 	for (int i = 0; i < ent_list->count; i++) {
 		Renderer_submitEntity(renderer, ent_list->entities[i]);
@@ -494,8 +546,8 @@ heightmapSceneRender(Scene *scene, Head *head)
 CollisionResult
 heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 {
-    HeightmapData *data = Scene_getMapData(scene);
-    Heightmap     *map  = &data->base;
+    Heightmap     *map  = Scene_getMapData(scene);
+    HeightmapData *data = &map->data;
     Vector3 from = entity->position;
     
 	if (to.y > from.y) {
@@ -509,8 +561,9 @@ heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
     }
     
     // Get terrain surface heights (where entity center should be)
-    float terrain_at_from = getTerrainHeight(map, from) + map->offset + entity_half_height;
-    float terrain_at_to = getTerrainHeight(map, to) + map->offset + entity_half_height;
+    float 
+		terrain_at_from = getTerrainHeight(map, from) + data->offset + entity_half_height,
+		terrain_at_to   = getTerrainHeight(map, to)   + data->offset + entity_half_height;
     
     // If both positions above terrain, no collision (like infinite plane)
     if (from.y > terrain_at_from && to.y > terrain_at_to) {
@@ -538,12 +591,22 @@ heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 	}
     
     // Calculate normal
-    float normalized_x = (to.x / map->world_size) + 0.5f;
-    float normalized_z = (to.z / map->world_size) + 0.5f;
-    int grid_x = CLAMP((int)(normalized_x * map->cells_wide), 0, map->cells_wide);
-    int grid_z = CLAMP((int)(normalized_z * map->cells_wide), 0, map->cells_wide);
-    Vector3 normal = calculateVertexNormal(map, grid_x, grid_z, 1.0f, map->height_scale);
-    
+    float 
+		normalized_x = (to.x / map->world_size) + 0.5f,
+		normalized_z = (to.z / map->world_size) + 0.5f;
+    int 
+		grid_x = CLAMP((int)(normalized_x * map->cells_wide), 0, map->cells_wide),
+		grid_z = CLAMP((int)(normalized_z * map->cells_wide), 0, map->cells_wide);
+    Vector3 normal = calculateVertexNormal(map, grid_x, grid_z, 1.0f, data->height_scale);
+    // Check if this is a walkable floor
+	float 
+		dot_up = Vector3DotProduct(normal, V3_UP),
+		floor_threshold = cosf(entity->floor_max_angle * DEG2RAD);
+
+	// If it's a walkable floor, return vertical normal so slide doesn't deflect horizontally
+	if (dot_up > floor_threshold) {
+		normal = V3_UP;
+	}
     return (CollisionResult){
         true,
         distance,
@@ -558,8 +621,8 @@ heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 CollisionResult 
 heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
 {
-    HeightmapData *data = Scene_getMapData(scene);
-    Heightmap     *map  = &data->base;
+    Heightmap     *map  = Scene_getMapData(scene);
+    HeightmapData *data = &map->data;
     
 	int     grid_size             = map->cells_wide + 1;
 	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
@@ -608,22 +671,22 @@ heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
             
             Vector3 p1 = {
                 world_x,
-                heightmap[z][x]         * map->height_scale + map->offset,
+                heightmap[z][x]         * data->height_scale + data->offset,
                 world_z
             };
             Vector3 p2 = {
                 world_x + cell_size,
-                heightmap[z + 1][x]     * map->height_scale + map->offset,
+                heightmap[z + 1][x]     * data->height_scale + data->offset,
                 world_z
             };
             Vector3 p3 = {
                 world_x + cell_size,
-                heightmap[z + 1][x + 1] * map->height_scale + map->offset,
+                heightmap[z + 1][x + 1] * data->height_scale + data->offset,
                 world_z + cell_size
             };
             Vector3 p4 = {
                 world_x,
-                heightmap[z][x + 1]     * map->height_scale + map->offset,
+                heightmap[z][x + 1]     * data->height_scale + data->offset,
                 world_z + cell_size
             };
             
@@ -663,10 +726,11 @@ heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
 void 
 heightmapSceneFree(Scene *scene, void *map_data)
 {
-	HeightmapData *data = (HeightmapData*)map_data;
-	Heightmap     *map  = &data->base;
+	Heightmap     *map  = (Heightmap*)map_data;
+	HeightmapData *data = &map->data;
 	DynamicArray_free(map->heightmap);
-	UnloadModel(data->model);
-	UnloadMesh( data->mesh);
+	DynamicArray_free(map->colormap);
+	DynamicArray_free(map->normalmap);
+	DynamicArray_free(map->renderables);
 }
 

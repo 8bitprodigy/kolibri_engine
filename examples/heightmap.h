@@ -25,13 +25,16 @@ extern SceneVTable heightmap_Scene_Callbacks;
 
 typedef struct 
 {
-	float    *heightmap;
 	Vector3   sun_angle;
 	float     
+			  ambient_value,
 			  offset,
-			  world_size,
-			  height_scale;
-	uint      cells_wide;
+			  lod_distances[MAX_LOD_LEVELS],
+			  height_scale,
+			  cell_size;
+	size_t      
+			  chunk_cells,
+			  chunks_wide;
 	union {
 		struct {
 			Color
@@ -40,15 +43,12 @@ typedef struct
 		};
 		Color colors[2];
 	};
+	Texture2D texture;
 }
-Heightmap;
+HeightmapData;
 
 
-float *genHeightmapXOR();
-float *genHeightmapDiamondSquare(size_t cells_wide, float roughness, float decay, size_t seed);
-
-
-Scene *HeightmapScene_new(Heightmap *heightmap, Engine *engine);
+Scene *HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine);
 
 
 #endif /* HEIGHTMAP_H */

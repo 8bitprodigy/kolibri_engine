@@ -50,7 +50,7 @@ playerTemplate = (Entity){
 	.visible           = true,
 	.collision_shape   = COLLISION_BOX, 
 	.solid             = true,
-	.floor_max_angle   = 45.0f,
+	.floor_max_angle   = 60.0f,
 	.max_slides        = MAX_SLIDES,
 };
 
@@ -100,6 +100,7 @@ playerUpdate(Entity *self, float delta)
 		 dir       = *direction;
 	
 	bool is_on_floor = Entity_isOnFloor(self);
+	static int frame = 0;
 
 	if (is_on_floor) {
 		data->frames_since_grounded = 0;
@@ -108,7 +109,7 @@ playerUpdate(Entity *self, float delta)
 				self, 
 				Vector3Add(
 						self->position, 
-						(Vector3){0, -0.1f, 0}
+						(Vector3){0, -0.05f, 0}
 					)
 			);
 		if (floor_check.hit) {

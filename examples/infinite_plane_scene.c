@@ -64,7 +64,7 @@ infinitePlaneSceneSetup(Scene *scene, void *map_data)
 {
 	debug_texture = LoadTexture(
 			PATH_PREFIX 
-			"resources/textures/dev/08.png"
+			"resources/textures/dev/xor.gif"
 		);
 	GenTextureMipmaps(&debug_texture);
 	SetTextureFilter(debug_texture, TEXTURE_FILTER_TRILINEAR);
