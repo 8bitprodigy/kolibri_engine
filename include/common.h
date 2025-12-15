@@ -16,7 +16,7 @@
     #define DBG_OUT(  Text, ... ) do{printf( "[DEBUG] " Text "\n", ##__VA_ARGS__ ); fflush(stdout);} while(false)
     #define ERR_OUT(  Error_Text ) perror( "[ERROR] " Error_Text "\n" )    
 #else
-    #define DBG_EXPR( expression ) 
+    #define DBG_EXPR( ... ) 
     #define DBG_OUT(  Text, ... )
     #define ERR_OUT(  Error_Text )
 #endif
@@ -68,7 +68,7 @@
 	#define SPATIAL_HASH_SIZE 4099
 #endif
 #ifndef CELL_SIZE
-	#define CELL_SIZE 20.0f
+	#define CELL_SIZE 64.0f
 #endif
 #ifndef INITIAL_ENTITY_CAPACITY
 	#define INITIAL_ENTITY_CAPACITY 256

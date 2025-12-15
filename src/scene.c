@@ -54,9 +54,9 @@ Scene_new(
     
     Engine__insertScene(engine, scene);
 
-    if (map_type->Setup) map_type->Setup(scene, data);
-    
     if (data_size) memcpy(scene->data, data, data_size);
+    
+    if (map_type->Setup) map_type->Setup(scene, scene->data);
 
     return scene;
 } /* Scene_new */

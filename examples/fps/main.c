@@ -68,9 +68,9 @@ runEngine(void *data, void *value)
 			.ambient_value = 0.6f,
 			.offset        = 0.0f,
 			.height_scale  = 100.0f,
-			.cell_size     = 2.0f,
-			.chunk_cells   = 16,
-			.chunks_wide   = 16,
+			.cell_size     = 4.0f,
+			.chunk_cells   = 8,
+			.chunks_wide   = 32,
 			.hi_color      = WHITE,
 			.lo_color      = WHITE,
 			.texture       = LoadTexture(PATH_PREFIX "resources/textures/grass/00.png"),
@@ -86,7 +86,7 @@ runEngine(void *data, void *value)
 	head_data->target      = player;
 	head_data->target_data = player->user_data;
 	head_data->eye_height  = 1.75f;
-/*	
+	
 	Entity *ents[21][21][21];
 	int z = 0; 
  

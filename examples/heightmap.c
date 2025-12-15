@@ -86,7 +86,7 @@ RenderHeightMapChunk(Renderable *renderable, void *_data_, Camera3D *camera)
 	HeightmapData *data = (HeightmapData*)&map->data;
 
 	ChunkData *chunk = (ChunkData*)renderable;
-
+	
 	float 
 		offset       = data->offset,
 		height_scale = data->height_scale,
@@ -114,17 +114,8 @@ RenderHeightMapChunk(Renderable *renderable, void *_data_, Camera3D *camera)
 	float
 		chunk_offset_x = (chunk_x - chunks_wide / 2.0f) * chunk_cells * cell_size,
 		chunk_offset_z = (chunk_z - chunks_wide / 2.0f) * chunk_cells * cell_size;
-
+/*	
 	DBG_EXPR(
-			DBG_OUT(
-					"Rendering chunk %d,%d at pos (%.1f, %.1f, %.1f)", 
-					chunk->chunk_x, 
-					chunk->chunk_z, 
-					chunk->position.x, 
-					chunk->position.y, 
-					chunk->position.z
-				);
-
 			DrawCubeWires(
 					chunk->position, 
 					chunk->bounds.x, 
@@ -133,7 +124,7 @@ RenderHeightMapChunk(Renderable *renderable, void *_data_, Camera3D *camera)
 					ORANGE
 				);
 		);
-	
+//*/
 	rlPushMatrix();
 	
 	rlBegin(RL_TRIANGLES);
@@ -223,6 +214,7 @@ RenderHeightMapChunk(Renderable *renderable, void *_data_, Camera3D *camera)
 	}
 	
 	rlEnd();
+	//DBG_OUT("Finished rendering chunk");
 	
 	if (data->texture.id != 0) {
 		rlSetTexture(0);
@@ -694,31 +686,6 @@ generateColorMap(Heightmap *map)
 	return colormap;
 }
 
-Scene * 
-HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
-{
-	Heightmap heightmap;
-	
-	heightmap.cells_wide = heightmap_data->chunks_wide * heightmap_data->chunk_cells;
-	int grid_size        = heightmap.cells_wide + 1;
-	heightmap.world_size = heightmap.cells_wide       * heightmap_data->cell_size;
-	heightmap.data       = *heightmap_data;
-	heightmap.heightmap  = genHeightmapDiamondSquare(
-			heightmap.cells_wide,
-			0.6, 
-			0.3,
-			69
-		);
-	
-	return Scene_new(
-			&heightmap_Scene_Callbacks, 
-			NULL, 
-			&heightmap, 
-			sizeof(Heightmap), 
-			engine
-		);
-}
-
 ChunkData *
 generateChunks(Heightmap *map)
 {
@@ -756,7 +723,7 @@ generateChunks(Heightmap *map)
 					if (h > max_height) max_height = h;
 				}
 			}
-
+			
 			chunks[idx] = (ChunkData){
 					.renderable = {
 							.data        = map,
@@ -782,6 +749,31 @@ generateChunks(Heightmap *map)
 	return chunks;
 }
 
+Scene * 
+HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
+{
+	Heightmap heightmap;
+	
+	heightmap.cells_wide = heightmap_data->chunks_wide * heightmap_data->chunk_cells;
+	int grid_size        = heightmap.cells_wide + 1;
+	heightmap.world_size = heightmap.cells_wide       * heightmap_data->cell_size;
+	heightmap.data       = *heightmap_data;
+	
+	heightmap.heightmap  = genHeightmapDiamondSquare(
+			heightmap.cells_wide,
+			0.7, 
+			0.5,
+			69
+		);
+	
+	return Scene_new(
+			&heightmap_Scene_Callbacks, 
+			NULL, 
+			&heightmap, 
+			sizeof(Heightmap), 
+			engine
+		);
+}
 
 void
 heightmapSceneSetup(Scene *scene, void *map_data)
