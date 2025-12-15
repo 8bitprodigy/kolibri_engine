@@ -6,25 +6,44 @@
 #include "dynamicarray.h"
 #include "engine.h"
 #include "entity.h"
-#include <raylib.h>
-#include <raymath.h>
 #include "heightmap.h"
 #include "renderer.h"
 
 
 #define INDEX(array, width, x, y) (array[y * width + x])
 
+typedef struct
+{
+	Renderable renderable;
+	union {
+		struct {
+			int
+				x,
+				z;
+		} idx;
+		struct {
+			int
+				chunk_x,
+				chunk_z;
+		};
+		int posa[2];
+	};
+	Vector3
+		position,
+		bounds;
+}
+ChunkData;
 
 typedef struct
 {
 	HeightmapData data;
 
-	float       world_size;
-	size_t      cells_wide;
-	float      *heightmap;
-	Color      *colormap;
-	Vector3    *normalmap;
-	Renderable *renderables;
+	float      world_size;
+	size_t     cells_wide;
+	float     *heightmap;
+	Color     *colormap;
+	Vector3   *normalmap;
+	ChunkData *chunks;
 }
 Heightmap;
 
@@ -61,9 +80,154 @@ const Vector3 SUN_ANGLE = (Vector3){0.3f, -0.8f, 0.3f};
 
 
 void
-RenderHeightMapChunk(Renderable *renderable, void *data, Camera3D *camera)
+RenderHeightMapChunk(Renderable *renderable, void *_data_, Camera3D *camera)
 {
-	Heightmap *map_data = (Heightmap*)data;
+	Heightmap     *map  = (Heightmap*)renderable->data;
+	HeightmapData *data = (HeightmapData*)&map->data;
+
+	ChunkData *chunk = (ChunkData*)renderable;
+
+	float 
+		offset       = data->offset,
+		height_scale = data->height_scale,
+		cell_size    = data->cell_size;
+		
+	int
+		chunk_cells = data->chunk_cells,
+		chunks_wide = data->chunks_wide,
+		
+		chunk_x = chunk->idx.x,
+		chunk_z = chunk->idx.z,
+
+		grid_size      = data->chunk_cells + 1,
+		total_cells    = data->chunks_wide * data->chunk_cells,
+		heightmap_grid = total_cells + 1;
+
+	float (*heightmap)[heightmap_grid]   = (float(*)[heightmap_grid])map->heightmap;
+	Color (*colormap)[heightmap_grid]    = (Color(*)[heightmap_grid])map->colormap;
+	Vector3 (*normalmap)[heightmap_grid] = (Vector3(*)[heightmap_grid])map->normalmap;
+
+	int
+		start_x = chunk_x * chunk_cells,
+		start_z = chunk_z * chunk_cells;
+
+	float
+		chunk_offset_x = (chunk_x - chunks_wide / 2.0f) * chunk_cells * cell_size,
+		chunk_offset_z = (chunk_z - chunks_wide / 2.0f) * chunk_cells * cell_size;
+
+	DBG_EXPR(
+			DBG_OUT(
+					"Rendering chunk %d,%d at pos (%.1f, %.1f, %.1f)", 
+					chunk->chunk_x, 
+					chunk->chunk_z, 
+					chunk->position.x, 
+					chunk->position.y, 
+					chunk->position.z
+				);
+
+			DrawCubeWires(
+					chunk->position, 
+					chunk->bounds.x, 
+					chunk->bounds.y, 
+					chunk->bounds.z, 
+					ORANGE
+				);
+		);
+	
+	rlPushMatrix();
+	
+	rlBegin(RL_TRIANGLES);
+
+	if (data->texture.id != 0) {
+		rlSetTexture(data->texture.id);
+	}
+	
+	for (int z = 0; z < chunk_cells; z++) {
+		for (int x = 0; x < chunk_cells; x++) {
+			int
+				hm_x = start_x + x,
+				hm_z = start_z + z;
+
+			Vector3
+				v_tl = {
+						x * cell_size + chunk_offset_x,
+						heightmap[hm_z][hm_x] * height_scale + offset,
+						z * cell_size + chunk_offset_z
+					},
+				v_tr = {
+						(x + 1) * cell_size + chunk_offset_x,
+						heightmap[hm_z][hm_x + 1] * height_scale + offset,
+						z * cell_size + chunk_offset_z
+					},
+				v_bl = {
+						x * cell_size + chunk_offset_x,
+						heightmap[hm_z + 1][hm_x] * height_scale + offset,
+						(z + 1) * cell_size + chunk_offset_z
+					},
+				v_br = {
+						(x + 1) * cell_size + chunk_offset_x,
+						heightmap[hm_z + 1][hm_x + 1] * height_scale + offset,
+						(z + 1) * cell_size + chunk_offset_z,
+					};
+
+			Color 
+				c_tl = colormap[hm_z][hm_x],
+				c_tr = colormap[hm_z][hm_x + 1],
+				c_bl = colormap[hm_z + 1][hm_x],
+				c_br = colormap[hm_z + 1][hm_x + 1];
+
+			Vector3
+				n_tl = normalmap[hm_z][hm_x],
+				n_tr = normalmap[hm_z][hm_x + 1],
+				n_bl = normalmap[hm_z + 1][hm_x],
+				n_br = normalmap[hm_z + 1][hm_x + 1];
+
+			Vector2
+				uv_tl = {0.0f, 0.0f},
+				uv_tr = {1.0f, 0.0f},
+				uv_bl = {0.0f, 1.0f},
+				uv_br = {1.0f, 1.0f};
+
+			/* First triangle (top-left -> bottom-left -> top-right) */
+            rlColor4ub(  c_tl.r,  c_tl.g, c_tl.b, c_tl.a);
+            rlNormal3f(  n_tl.x,  n_tl.y, n_tl.z);
+            rlTexCoord2f(uv_tl.x, uv_tl.y);
+            rlVertex3f(  v_tl.x,  v_tl.y, v_tl.z);
+            
+            rlColor4ub(  c_bl.r,  c_bl.g, c_bl.b, c_bl.a);
+            rlNormal3f(  n_bl.x,  n_bl.y, n_bl.z);
+            rlTexCoord2f(uv_bl.x, uv_bl.y);
+            rlVertex3f(  v_bl.x,  v_bl.y, v_bl.z);
+            
+            rlColor4ub(  c_tr.r,  c_tr.g, c_tr.b, c_tr.a);
+            rlNormal3f(  n_tr.x,  n_tr.y, n_tr.z);
+            rlTexCoord2f(uv_tr.x, uv_tr.y);
+            rlVertex3f(  v_tr.x,  v_tr.y, v_tr.z);
+
+            /* Second triangle (top-right -> bottom-left -> bottom-right) */
+            rlColor4ub(  c_tr.r,  c_tr.g, c_tr.b, c_tr.a);
+            rlNormal3f(  n_tr.x,  n_tr.y, n_tr.z);
+            rlTexCoord2f(uv_tr.x, uv_tr.y);
+            rlVertex3f(  v_tr.x,  v_tr.y, v_tr.z);
+            
+            rlColor4ub(  c_bl.r,  c_bl.g, c_bl.b, c_bl.a);
+            rlNormal3f(  n_bl.x,  n_bl.y, n_bl.z);
+            rlTexCoord2f(uv_bl.x, uv_bl.y);
+            rlVertex3f(  v_bl.x,  v_bl.y, v_bl.z);
+            
+            rlColor4ub(  c_br.r,  c_br.g, c_br.b, c_br.a);
+            rlNormal3f(  n_br.x,  n_br.y, n_br.z);
+            rlTexCoord2f(uv_br.x, uv_br.y);
+            rlVertex3f(  v_br.x,  v_br.y, v_br.z);
+		}
+	}
+	
+	rlEnd();
+	
+	if (data->texture.id != 0) {
+		rlSetTexture(0);
+	}
+    rlPopMatrix();
 }
 
 
@@ -468,20 +632,79 @@ genHeightmapDiamondSquare(
 	return heightmap;
 }
 
+Vector3 *
+generateNormalMap(Heightmap *map)
+{
+	HeightmapData  *data                  = &map->data;
+	int             grid_size             = map->cells_wide + 1;
+	float         (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+
+	Vector3
+		*normalmap            = DynamicArray(Vector3, grid_size * grid_size),
+		(*normals)[grid_size] = (Vector3(*)[grid_size])normalmap;
+	
+	for (int z = 0; z < grid_size; z++) {
+		for (int x = 0; x < grid_size; x++) {
+			normals[z][x] = calculateVertexNormal(
+					map,
+					x,
+					z,
+					1.0f,
+					data->height_scale
+				);
+		}
+	}
+
+	return normalmap;
+}
+
+Color *
+generateColorMap(Heightmap *map)
+{
+	HeightmapData  *data                  = &map->data;
+	int             grid_size             = map->cells_wide + 1;
+	float         (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	Vector3       (*normalmap)[grid_size] = (Vector3(*)[grid_size])map->normalmap;
+	
+	Color
+	 	*colormap           = DynamicArray(Color, grid_size * grid_size),
+		(*colors)[grid_size] = (Color(*)[grid_size])colormap;
+
+	for (int z = 0; z < grid_size; z++) {
+		for (int x = 0; x < grid_size; x++) {
+			float lighting_factor = getLightingFactor(
+					normalmap[z][x],
+					data->sun_angle,
+					data->ambient_value
+				);
+
+			Color
+				hi_color = data->hi_color,
+				lo_color = data->lo_color;
+			
+			colors[z][x] = (Color){
+				(unsigned char)(Lerp(lo_color.r, hi_color.r, heightmap[z][x]) * lighting_factor),
+				(unsigned char)(Lerp(lo_color.g, hi_color.g, heightmap[z][x]) * lighting_factor),
+				(unsigned char)(Lerp(lo_color.b, hi_color.b, heightmap[z][x]) * lighting_factor),
+				255
+			};
+		}
+	}
+
+	return colormap;
+}
+
 Scene * 
 HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 {
-	Heightmap *heightmap = malloc(sizeof(Heightmap));
-	if (!heightmap) {
-		ERR_OUT("Failed to allocate memory for Heightmap!");
-		return NULL;
-	}
+	Heightmap heightmap;
 	
-	heightmap->cells_wide = heightmap_data->chunks_wide * heightmap_data->chunk_cells;
-	heightmap->world_size = heightmap->cells_wide       * heightmap_data->cell_size;
-	heightmap->data       = *heightmap_data;
-	heightmap->heightmap  = genHeightmapDiamondSquare(
-			heightmap->cells_wide,
+	heightmap.cells_wide = heightmap_data->chunks_wide * heightmap_data->chunk_cells;
+	int grid_size        = heightmap.cells_wide + 1;
+	heightmap.world_size = heightmap.cells_wide       * heightmap_data->cell_size;
+	heightmap.data       = *heightmap_data;
+	heightmap.heightmap  = genHeightmapDiamondSquare(
+			heightmap.cells_wide,
 			0.6, 
 			0.3,
 			69
@@ -490,21 +713,88 @@ HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 	return Scene_new(
 			&heightmap_Scene_Callbacks, 
 			NULL, 
-			heightmap, 
+			&heightmap, 
 			sizeof(Heightmap), 
 			engine
 		);
+}
+
+ChunkData *
+generateChunks(Heightmap *map)
+{
+	HeightmapData  *data                  = &map->data;
+	int             grid_size             = map->cells_wide + 1;
+	float         (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+
+	int        num_chunks = data->chunks_wide * data->chunks_wide;
+	ChunkData *chunks     = DynamicArray(ChunkData, num_chunks);
+
+	for (int chunk_z = 0; chunk_z < data->chunks_wide; chunk_z++) {
+		for (int chunk_x = 0; chunk_x < data->chunks_wide; chunk_x++) {
+			int idx = chunk_z * data->chunks_wide + chunk_x;
+
+			float
+				chunk_offset_x = (chunk_x - data->chunks_wide * 0.5f) * data->chunk_cells * data->cell_size,
+				chunk_offset_z = (chunk_z - data->chunks_wide * 0.5f) * data->chunk_cells * data->cell_size,
+				chunk_size     = data->chunk_cells * data->cell_size;
+
+			int
+				start_x = chunk_x * data->chunk_cells,
+				start_z = chunk_z * data->chunk_cells;
+
+			float 
+				min_height = INFINITY,
+				max_height = -INFINITY;
+
+			for (int z = 0; z <= data->chunk_cells; z++) {
+				for (int x = 0; x <= data->chunk_cells; x++) {
+					int 
+						hm_x = start_x + x,
+						hm_z = start_z + z;
+					float h  = heightmap[hm_z][hm_x] * data->height_scale + data->offset;
+					if (h < min_height) min_height = h;
+					if (h > max_height) max_height = h;
+				}
+			}
+
+			chunks[idx] = (ChunkData){
+					.renderable = {
+							.data        = map,
+							.Render      = RenderHeightMapChunk,
+							.transparent = false,
+						},
+					.chunk_x  = chunk_x,
+					.chunk_z  = chunk_z,
+					.position = (Vector3){
+							chunk_offset_x + chunk_size * 0.5f,
+							(min_height + max_height)   * 0.5f,
+							chunk_offset_z + chunk_size * 0.5f
+						},
+					.bounds = (Vector3){
+							chunk_size,
+							max_height - min_height,
+							chunk_size
+						},
+				};
+		}
+	}
+
+	return chunks;
 }
 
 
 void
 heightmapSceneSetup(Scene *scene, void *map_data)
 {
-	Heightmap *heightmap = (Heightmap*)map_data;
-	HeightmapData *data = (HeightmapData*)&heightmap->data;
-	
-    int grid_size = heightmap->cells_wide + 1;
-    float (*hm)[grid_size] = (float(*)[grid_size])heightmap->heightmap;
+	Heightmap     *map  = (Heightmap*)map_data;
+	HeightmapData *data = (HeightmapData*)&map->data;
+
+	size_t chunks_wide = data->chunks_wide;
+	size_t num_chunks  = chunks_wide * chunks_wide;
+
+	map->normalmap = generateNormalMap(map);
+	map->colormap  = generateColorMap(map);
+	map->chunks    = generateChunks(map);
 	
 	if (data->texture.id != 0) {
         GenTextureMipmaps(&data->texture);
@@ -536,11 +826,18 @@ heightmapSceneRender(Scene *scene, Head *head)
 			DrawCube(     (Vector3){0.0f,        data->height_scale,  half_width}, 5.0f, 5.0f, 5.0f, BLUE);
 			DrawCubeWires((Vector3){0.0f,        data->height_scale, -half_width}, 5.0f, 5.0f, 5.0f, BLUE);
 		);
-//*/	
+//*/
+	size_t num_chunks = data->chunks_wide * data->chunks_wide;
+	for (int i = 0; i < num_chunks; i++) 
+		Renderer_submitGeometry(
+				renderer, 
+				&map->chunks[i].renderable, 
+				map->chunks[i].position,
+				map->chunks[i].bounds
+			);
 	EntityList *ent_list = Scene_getEntityList(scene);
-	for (int i = 0; i < ent_list->count; i++) {
+	for (int i = 0; i < ent_list->count; i++) 
 		Renderer_submitEntity(renderer, ent_list->entities[i]);
-	}
 }
 
 CollisionResult
@@ -731,6 +1028,6 @@ heightmapSceneFree(Scene *scene, void *map_data)
 	DynamicArray_free(map->heightmap);
 	DynamicArray_free(map->colormap);
 	DynamicArray_free(map->normalmap);
-	DynamicArray_free(map->renderables);
+	DynamicArray_free(map->chunks);
 }
 
