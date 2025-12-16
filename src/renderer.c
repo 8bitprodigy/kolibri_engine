@@ -126,6 +126,42 @@ isSphereInFrustum(
     return true;
 }
 
+bool
+isAABBInFrustum(
+    Vector3  center,
+    Vector3  extents,
+    Frustum *frustum,
+    float    dist_sq,
+    float    max_distance
+)
+{
+    /* Quick distance check first (using squared distance) */
+    float max_dist_check = max_distance + Vector3Length(extents);
+    if (dist_sq > max_dist_check * max_dist_check) {
+        return false;
+    }
+    
+    /* Test against each frustum plane */
+    for (int i = FRUSTUM_LEFT; i <= FRUSTUM_FAR; i++) {
+        const Plane *plane = &frustum->planes[i];
+        
+        /* Calculate the effective radius of the box along the plane normal */
+        float radius = fabsf(extents.x * plane->normal.x)
+            + fabsf(extents.y * plane->normal.y)
+            + fabsf(extents.z * plane->normal.z);
+        
+        /* Distance from center to plane */
+        float distance = Vector3DotProduct(plane->normal, center) + plane->distance;
+        
+        /* If center is further than radius behind plane, box is completely outside */
+        if (distance < -radius) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
 
 /* Query for entities visible in camera frustum */
 RenderableWrapper **
@@ -371,12 +407,6 @@ Renderer_submitEntity(Renderer *renderer, Entity *entity) {
 
     size_t index = DynamicArray_length(renderer->wrapper_pool);
     DynamicArray_add((void**)&renderer->wrapper_pool, &wrapper);
-    SpatialHash_insert(
-            renderer->visibility_hash, 
-            &renderer->wrapper_pool[index], 
-            entity->position, 
-            entity->bounds
-        );
 }
 
 void Renderer_submitGeometry(
@@ -394,10 +424,4 @@ void Renderer_submitGeometry(
 
     size_t index = DynamicArray_length(renderer->wrapper_pool);
     DynamicArray_add((void**)&renderer->wrapper_pool, &wrapper);
-    SpatialHash_insert(
-            renderer->visibility_hash,
-            &renderer->wrapper_pool[index],
-            position,
-            bounds
-        );
 }

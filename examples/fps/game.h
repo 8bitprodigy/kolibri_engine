@@ -73,6 +73,11 @@
 #define MAX_SLIDES  3
 
 
+/*
+	main.c
+*/
+extern char *path_prefix;
+
 /* 
 	engine_impl.c
 */

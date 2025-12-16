@@ -15,7 +15,7 @@ void playerUpdate(Entity *self, float delta);
 Renderable         
 	r_player = (Renderable){
 			.data   = &MAGENTA,
-			.Render = testRenderableBoxWiresCallback
+			.Render = NULL,//testRenderableBoxWiresCallback
 		};
 
 EntityVTable 

@@ -6,15 +6,18 @@
 #include "dynamicarray.h"
 #include "engine.h"
 #include "entity.h"
+#include "head.h"
 #include "heightmap.h"
 #include "renderer.h"
 
 
 #define INDEX(array, width, x, y) (array[y * width + x])
 
+typedef struct Heightmap Heightmap;
+
 typedef struct
 {
-	Renderable renderable;
+	Heightmap *heightmap;
 	union {
 		struct {
 			int
@@ -26,7 +29,7 @@ typedef struct
 				chunk_x,
 				chunk_z;
 		};
-		int posa[2];
+		int idxa[2];
 	};
 	Vector3
 		position,
@@ -35,11 +38,18 @@ typedef struct
 ChunkData;
 
 typedef struct
+Heightmap
 {
 	HeightmapData data;
 
 	float      world_size;
 	size_t     cells_wide;
+	struct {
+		size_t vertex_count;
+		size_t triangle_count;
+		size_t cells_per_edge;
+		size_t step;
+	} lod_info[MAX_LOD_LEVELS];
 	float     *heightmap;
 	Color     *colormap;
 	Vector3   *normalmap;
@@ -79,20 +89,38 @@ SceneVTable heightmap_Scene_Callbacks = {
 const Vector3 SUN_ANGLE = (Vector3){0.3f, -0.8f, 0.3f};
 
 
-void
-RenderHeightMapChunk(Renderable *renderable, void *_data_, Camera3D *camera)
+int
+getChunkLOD(float dist_sq, HeightmapData *data)
 {
-	Heightmap     *map  = (Heightmap*)renderable->data;
-	HeightmapData *data = (HeightmapData*)&map->data;
+	for (int lod = 0; lod < MAX_LOD_LEVELS; lod++) {
+		float threshold = data->lod_distances[lod];
+		if (dist_sq < threshold * threshold) {
+			return lod;
+		}
+	}
 
-	ChunkData *chunk = (ChunkData*)renderable;
+	return MAX_LOD_LEVELS - 1;
+}
+
+
+void
+RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera)
+{
+	Heightmap     *map   = (Heightmap*)chunk->heightmap;
+	HeightmapData *data  = (HeightmapData*)&map->data;
+
+	Vector3 cam_pos = camera->position;
 	
 	float 
+		dist_sq      = Vector3DistanceSqr(chunk->position, cam_pos),
 		offset       = data->offset,
 		height_scale = data->height_scale,
 		cell_size    = data->cell_size;
 		
 	int
+		lod  = getChunkLOD(dist_sq, data),
+		step = map->lod_info[lod].step,
+		
 		chunk_cells = data->chunk_cells,
 		chunks_wide = data->chunks_wide,
 		
@@ -133,45 +161,49 @@ RenderHeightMapChunk(Renderable *renderable, void *_data_, Camera3D *camera)
 		rlSetTexture(data->texture.id);
 	}
 	
-	for (int z = 0; z < chunk_cells; z++) {
-		for (int x = 0; x < chunk_cells; x++) {
-			int
+	for (int z = 0; z < chunk_cells; z += step) {
+		for (int x = 0; x < chunk_cells; x += step) {
+			int 
 				hm_x = start_x + x,
-				hm_z = start_z + z;
+				hm_z = start_z + z,
+				next_x = (x + step <= chunk_cells) ? x + step : chunk_cells,
+				next_z = (z + step <= chunk_cells) ? z + step : chunk_cells,
+				hm_next_x = start_x + next_x,
+				hm_next_z = start_z + next_z;
 
 			Vector3
 				v_tl = {
-						x * cell_size + chunk_offset_x,
-						heightmap[hm_z][hm_x] * height_scale + offset,
-						z * cell_size + chunk_offset_z
-					},
+					x * cell_size + chunk_offset_x,
+					heightmap[hm_z][hm_x] * height_scale + offset,
+					z * cell_size + chunk_offset_z
+				},
 				v_tr = {
-						(x + 1) * cell_size + chunk_offset_x,
-						heightmap[hm_z][hm_x + 1] * height_scale + offset,
-						z * cell_size + chunk_offset_z
-					},
+					next_x * cell_size + chunk_offset_x,
+					heightmap[hm_z][hm_next_x] * height_scale + offset,
+					z * cell_size + chunk_offset_z
+				},
 				v_bl = {
-						x * cell_size + chunk_offset_x,
-						heightmap[hm_z + 1][hm_x] * height_scale + offset,
-						(z + 1) * cell_size + chunk_offset_z
-					},
+					x * cell_size + chunk_offset_x,
+					heightmap[hm_next_z][hm_x] * height_scale + offset,
+					next_z * cell_size + chunk_offset_z
+				},
 				v_br = {
-						(x + 1) * cell_size + chunk_offset_x,
-						heightmap[hm_z + 1][hm_x + 1] * height_scale + offset,
-						(z + 1) * cell_size + chunk_offset_z,
-					};
+					next_x * cell_size + chunk_offset_x,
+					heightmap[hm_next_z][hm_next_x] * height_scale + offset,
+					next_z * cell_size + chunk_offset_z
+				};
 
 			Color 
 				c_tl = colormap[hm_z][hm_x],
-				c_tr = colormap[hm_z][hm_x + 1],
-				c_bl = colormap[hm_z + 1][hm_x],
-				c_br = colormap[hm_z + 1][hm_x + 1];
+				c_tr = colormap[hm_z][hm_next_x],
+				c_bl = colormap[hm_next_z][hm_x],
+				c_br = colormap[hm_next_z][hm_next_x];
 
 			Vector3
 				n_tl = normalmap[hm_z][hm_x],
-				n_tr = normalmap[hm_z][hm_x + 1],
-				n_bl = normalmap[hm_z + 1][hm_x],
-				n_br = normalmap[hm_z + 1][hm_x + 1];
+				n_tr = normalmap[hm_z][hm_next_x],
+				n_bl = normalmap[hm_next_z][hm_x],
+				n_br = normalmap[hm_next_z][hm_next_x];
 
 			Vector2
 				uv_tl = {0.0f, 0.0f},
@@ -214,7 +246,6 @@ RenderHeightMapChunk(Renderable *renderable, void *_data_, Camera3D *camera)
 	}
 	
 	rlEnd();
-	//DBG_OUT("Finished rendering chunk");
 	
 	if (data->texture.id != 0) {
 		rlSetTexture(0);
@@ -222,6 +253,10 @@ RenderHeightMapChunk(Renderable *renderable, void *_data_, Camera3D *camera)
     rlPopMatrix();
 }
 
+
+/**********************
+	PRIVATE METHODS
+**********************/
 
 float 
 randomRange(float range) 
@@ -421,6 +456,7 @@ calculateVertexNormal(
     return Vector3Normalize(normal);
 }
 
+
 float
 getLightingFactor(Vector3 normal, Vector3 sun_angle, float ambient) 
 {
@@ -428,136 +464,6 @@ getLightingFactor(Vector3 normal, Vector3 sun_angle, float ambient)
 	return  ambient + (dot * (1.0f - ambient));
 }
 
-float 
-getSimpleLighting(Heightmap *map, int x, int z) 
-{
-	int     grid_size               = map->cells_wide + 1;
-	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
-	
-    float current_height  = heightmap[z][x];
-    float neighbor_height = 0.0f;
-    int   neighbor_count  = 0;
-    
-    // Average neighboring heights
-    for (int dx = -1; dx <= 1; dx++) {
-        for (int dz = -1; dz <= 1; dz++) {
-            if (dx == 0 && dz == 0) continue;
-            
-            int nx = x + dx;
-            int nz = z + dz;
-            
-            if (nx >= 0 && nx <= map->cells_wide && 
-                nz >= 0 && nz <= map->cells_wide) {
-                neighbor_height += heightmap[nz][nx];
-                neighbor_count++;
-            }
-        }
-    }
-    
-    if (neighbor_count > 0) {
-        neighbor_height /= neighbor_count;
-        
-        // Calculate relative height difference
-        float height_diff = current_height - neighbor_height;
-        
-        // Convert to lighting factor (higher = brighter)
-        return 0.5f + (height_diff * 2.0f); // Adjust multiplier as needed
-    }
-    
-    return 0.8f; // Default lighting
-}
-
-Mesh
-genTerrain(Heightmap *map)
-{
-	int     grid_size             = map->cells_wide + 1;
-	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
-	HeightmapData *data           = (HeightmapData*)&map->data; 
-	
-	float 
-		size          = map->world_size,//DynamicArray_length(map->heightmap),
-		offset        = data->offset;
-	size_t resolution = map->cells_wide;
-	Color 
-		color1 = data->hi_color,
-		color2 = data->lo_color;
-	Mesh mesh = {0};
-	int 
-		edge_vert_count = resolution + 1,
-		vertex_count = edge_vert_count * edge_vert_count;
-
-	Vector3 *vertices   = (Vector3 *)malloc(vertex_count * sizeof(Vector3));
-	Vector2 *tex_coords = (Vector2 *)malloc(vertex_count * sizeof(Vector2));
-	Vector3 *normals    = (Vector3 *)malloc(vertex_count * sizeof(Vector3));
-	Color   *colors     = (Color   *)malloc(vertex_count * sizeof(Color));
-
-	for (int z = 0; z < edge_vert_count; z++) {
-		for (int x = 0; x < edge_vert_count; x++) {
-			int i = z * edge_vert_count + x;
-
-			vertices[i] = (Vector3){
-				((float)x / resolution - 0.5f) * size,
-				heightmap[z][x] * data->height_scale + offset,
-				((float)z / resolution - 0.5f) * size
-			};
-
-			tex_coords[i] = (Vector2){
-				(float)x,// / resolution,
-				(float)z,// / resolution
-			};
-
-			normals[i] = calculateVertexNormal(map, x, z, 1.0f, data->height_scale);
-			float lighting_factor = getLightingFactor(
-				normals[i], 
-				data->sun_angle, 
-				data->ambient_value
-			);
-
-			colors[i] = (Color){
-				(unsigned char)(Lerp(color2.r, color1.r, heightmap[z][x]) * lighting_factor),
-				(unsigned char)(Lerp(color2.g, color1.g, heightmap[z][x]) * lighting_factor),
-				(unsigned char)(Lerp(color2.b, color1.b, heightmap[z][x]) * lighting_factor),
-				255
-			};
-		}
-	}
-
-	int triangle_count = resolution * resolution * 2;
-	unsigned short *indices = (unsigned short *)malloc(triangle_count * 3 * sizeof(unsigned short));
-	int index = 0;
-
-	for (int z = 0; z < resolution; z++) {
-		for (int x = 0; x < resolution; x++) {
-			int
-				topLeft     = z * edge_vert_count + x,
-				topRight    = topLeft + 1,
-				bottomLeft  = (z + 1) * edge_vert_count + x,
-				bottomRight = bottomLeft + 1;
-
-			/* First Triangle */
-			indices[index++] = topLeft;
-			indices[index++] = bottomLeft;
-			indices[index++] = topRight;
-
-			/* Second Triangle */
-			indices[index++] = topRight;
-			indices[index++] = bottomLeft;
-			indices[index++] = bottomRight;
-		}
-	}
-
-	mesh.vertexCount   = vertex_count;
-	mesh.triangleCount = triangle_count;
-	mesh.vertices      = (float *)vertices;
-	mesh.texcoords     = (float *)tex_coords;
-	mesh.normals       = (float *)normals;
-	mesh.colors        = (unsigned char *)colors;
-	mesh.indices       = indices;
-
-	UploadMesh(&mesh, false);
-	
-	return mesh;
-}
 
 float
 getTerrainHeight(Heightmap *map, Vector3 position)
@@ -595,6 +501,7 @@ getTerrainHeight(Heightmap *map, Vector3 position)
 	return Lerp(lower, upper, z_frac) * data->height_scale;
 }
 
+
 float *
 genHeightmapXOR()
 {
@@ -607,6 +514,7 @@ genHeightmapXOR()
             heightmap[y][x] = (float)(x^y)/256;
     return map;
 }
+
 
 float *
 genHeightmapDiamondSquare(
@@ -623,6 +531,7 @@ genHeightmapDiamondSquare(
 
 	return heightmap;
 }
+
 
 Vector3 *
 generateNormalMap(Heightmap *map)
@@ -649,6 +558,7 @@ generateNormalMap(Heightmap *map)
 
 	return normalmap;
 }
+
 
 Color *
 generateColorMap(Heightmap *map)
@@ -685,6 +595,7 @@ generateColorMap(Heightmap *map)
 
 	return colormap;
 }
+
 
 ChunkData *
 generateChunks(Heightmap *map)
@@ -725,19 +636,15 @@ generateChunks(Heightmap *map)
 			}
 			
 			chunks[idx] = (ChunkData){
-					.renderable = {
-							.data        = map,
-							.Render      = RenderHeightMapChunk,
-							.transparent = false,
-						},
-					.chunk_x  = chunk_x,
-					.chunk_z  = chunk_z,
-					.position = (Vector3){
+					.heightmap = map,
+					.chunk_x   = chunk_x,
+					.chunk_z   = chunk_z,
+					.position  = (Vector3){
 							chunk_offset_x + chunk_size * 0.5f,
 							(min_height + max_height)   * 0.5f,
 							chunk_offset_z + chunk_size * 0.5f
 						},
-					.bounds = (Vector3){
+					.bounds    = (Vector3){
 							chunk_size,
 							max_height - min_height,
 							chunk_size
@@ -748,6 +655,11 @@ generateChunks(Heightmap *map)
 
 	return chunks;
 }
+
+
+/**********************
+	SCENE CALLBACKS
+**********************/
 
 Scene * 
 HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
@@ -761,8 +673,8 @@ HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 	
 	heightmap.heightmap  = genHeightmapDiamondSquare(
 			heightmap.cells_wide,
-			0.7, 
-			0.5,
+			1.0f, 
+			0.5f,
 			69
 		);
 	
@@ -774,6 +686,7 @@ HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 			engine
 		);
 }
+
 
 void
 heightmapSceneSetup(Scene *scene, void *map_data)
@@ -792,14 +705,30 @@ heightmapSceneSetup(Scene *scene, void *map_data)
         GenTextureMipmaps(&data->texture);
 		SetTextureFilter(  data->texture, TEXTURE_FILTER_TRILINEAR);
     }
+
+    for (int lod = 0; lod < MAX_LOD_LEVELS; lod++) {
+    	int 
+			step  = 1 <<lod,
+			cells = data->chunk_cells / step;
+
+		map->lod_info[lod].step           = step;
+		map->lod_info[lod].cells_per_edge = cells;
+		map->lod_info[lod].vertex_count   = (cells + 1) * (cells + 1);
+		map->lod_info[lod].triangle_count = cells * cells * 2;
+    	
+    }
 }
+
 
 void 
 heightmapSceneRender(Scene *scene, Head *head)
 {
-	Renderer      *renderer = Engine_getRenderer(Scene_getEngine(scene));
-	Heightmap     *map      = Scene_getMapData(scene);
-	HeightmapData *data     = &map->data;
+	Renderer      *renderer   = Engine_getRenderer(Scene_getEngine(scene));
+	Heightmap     *map        = Scene_getMapData(scene);
+	HeightmapData *data       = &map->data;
+	Camera        *camera     = Head_getCamera(head);
+	Vector3        camera_pos = camera->position;
+	size_t         num_chunks = data->chunks_wide * data->chunks_wide;
 	
 	DBG_EXPR( 
 			float half_width = map->world_size/2.0f;
@@ -819,18 +748,26 @@ heightmapSceneRender(Scene *scene, Head *head)
 			DrawCubeWires((Vector3){0.0f,        data->height_scale, -half_width}, 5.0f, 5.0f, 5.0f, BLUE);
 		);
 //*/
-	size_t num_chunks = data->chunks_wide * data->chunks_wide;
-	for (int i = 0; i < num_chunks; i++) 
-		Renderer_submitGeometry(
-				renderer, 
-				&map->chunks[i].renderable, 
-				map->chunks[i].position,
-				map->chunks[i].bounds
-			);
+	for (int i = 0; i < num_chunks; i++) {
+		ChunkData *chunk   = &map->chunks[i];
+		float      dist_sq = Vector3DistanceSqr(chunk->position, camera_pos);
+
+		if (isAABBInFrustum(
+				chunk->position,
+				Vector3Scale(chunk->bounds, 0.5f),
+				Head_getFrustum(head),
+				dist_sq,
+				Head_getRendererSettings(head)->max_render_distance
+			)
+		) {
+			RenderHeightmapChunk(chunk, map, camera);
+		}
+	}
 	EntityList *ent_list = Scene_getEntityList(scene);
 	for (int i = 0; i < ent_list->count; i++) 
 		Renderer_submitEntity(renderer, ent_list->entities[i]);
 }
+
 
 CollisionResult
 heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
@@ -906,6 +843,7 @@ heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
         NULL,
     };
 }
+
 
 CollisionResult 
 heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
@@ -1011,6 +949,7 @@ heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
     
     return result;
 }
+
 
 void 
 heightmapSceneFree(Scene *scene, void *map_data)

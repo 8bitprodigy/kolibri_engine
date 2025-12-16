@@ -51,6 +51,10 @@ testHeadSetup(Head *head)
 		ERR_OUT("Failed to allocate TestHeadData.");
 		return;
 	}
+	char 
+		sky_path[256],
+		weapon_path[256],
+		weapon_texture_path[256];
 
 	user_data->viewport_scale = 1;
 	user_data->target         = NULL;
@@ -60,9 +64,11 @@ testHeadSetup(Head *head)
 
 	user_data->current_weapon = 0;
 
+	snprintf(sky_path, sizeof(sky_path), "%s%s", PATH_PREFIX, SKY_PATH);
+
 	for (int i = 0; i < 6; i++) {
 		static char filename[256];
-		snprintf(filename, sizeof(filename), PATH_PREFIX SKY_PATH, SkyBox_names[i]);
+		snprintf(filename, sizeof(filename), sky_path, SkyBox_names[i]);
 		DBG_OUT("Sky Texture loaded: %s", filename);
 		user_data->skybox_textures[i] = LoadTexture(filename);
 		SetTextureFilter(user_data->skybox_textures[i], TEXTURE_FILTER_BILINEAR);
@@ -73,8 +79,10 @@ testHeadSetup(Head *head)
 		Handle HUD Weapons
 	*/
 	Model *weapons = &user_data->weapons[0];
-	weapons[0] = LoadModel(PATH_PREFIX "resources/models/weapons/weapon5.obj");
-	Texture2D weaponTexture = LoadTexture(PATH_PREFIX "resources/models/weapons/weapon5.png");
+	snprintf(weapon_path, sizeof(weapon_path), "%s%s", PATH_PREFIX, "resources/models/weapons/weapon5.obj");
+	weapons[0] = LoadModel(weapon_path);
+	snprintf(weapon_path, sizeof(weapon_path), "%s%s", PATH_PREFIX, "resources/models/weapons/weapon5.png");
+	Texture2D weaponTexture = LoadTexture(weapon_path);
 	SetMaterialTexture(&weapons->materials[0], MATERIAL_MAP_ALBEDO, weaponTexture);
 	SetTextureFilter(weaponTexture, TEXTURE_FILTER_BILINEAR);
 
