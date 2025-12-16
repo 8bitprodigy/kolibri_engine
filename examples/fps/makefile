@@ -1,4 +1,4 @@
-CC      = gcc-14
+CC      = gcc
 CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0  -DDEBUG#-DHEAD_USE_RENDER_TEXTURE
 LIBS    = -lraylib -lGL -lm
 INCLUDE = -I../../include -I/usr/local/include -I../

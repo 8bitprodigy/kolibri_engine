@@ -74,7 +74,8 @@ runEngine(void *data, void *value)
 	snprintf(
 			texture_path, 
 			sizeof(texture_path),
-			"%s%s", path_prefix, 
+			"%s%s", 
+			path_prefix, 
 			"resources/textures/grass/00.png"
 		);
 	DBG_OUT("\n\tTEXTURE PATH: %s\n", texture_path);
@@ -168,7 +169,7 @@ setupPathPrefix()
 	path_prefix = PATH_PREFIX;
 
 /*
-	Thanks, Darc, for the help with this.
+	Thanks Darc, for the help with this.
 */
 #ifdef __DREAMCAST__
 	DBG_OUT("Checking for a valid drive...");

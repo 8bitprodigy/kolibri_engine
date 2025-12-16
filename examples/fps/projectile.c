@@ -86,12 +86,22 @@ Blast_Template = (Entity){
 void
 Projectile_MediaInit(void)
 {
-	blast_model   = LoadModel(  PATH_PREFIX "resources/models/projectiles/blast.obj");
-	blast_texture = LoadTexture(PATH_PREFIX "resources/models/projectiles/blast.png");
-	blast_sprite  = LoadTexture(PATH_PREFIX "resources/sprites/green_blast.png");
+	char
+		*model_path,
+		*texture_path,
+		*sprite_path;
+
+	snprintf(model_path, sizeof(model_path), "%s%s", path_prefix, "resources/models/projectiles/blast.obj");
+	snprintf(texture_path, sizeof(texture_path), "%s%s", path_prefix, "resources/models/projectiles/blast.png");
+	snprintf(sprite_path, sizeof(sprite_path), "%s%s", path_prefix,  "resources/sprites/green_blast.png");
+	
+	//blast_model   = LoadModel(  model_path);
+	blast_texture = LoadTexture(texture_path);
+	blast_sprite  = LoadTexture(sprite_path);
+	
 	
 	SetTextureFilter(blast_sprite, TEXTURE_FILTER_BILINEAR);
-	SetMaterialTexture(&blast_model.materials[0], MATERIAL_MAP_ALBEDO, blast_texture);
+	//SetMaterialTexture(&blast_model.materials[0], MATERIAL_MAP_ALBEDO, blast_texture);
 	SetTextureFilter(blast_texture, TEXTURE_FILTER_BILINEAR);
 
 	blast_sprite_info = CreateRegularSprite(
