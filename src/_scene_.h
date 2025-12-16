@@ -38,7 +38,7 @@ Scene
         };
     };
 
-    unsigned char data[];
+    __attribute__((aligned(8))) unsigned char data[];
 } 
 Scene;
 
