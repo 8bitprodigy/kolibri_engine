@@ -168,12 +168,7 @@ setupPathPrefix()
 	path_prefix = PATH_PREFIX;
 
 /*
-	So APPARENTLY, with the DC having MULTIPLE possible forms of media a game
-	could load assets from, it's now incumbent upon me that I handle the path
-	prefix at runtime, instead of baking it in.
-	
-	Go figure.
-	Something new to learn!
+	Thanks, Darc, for the help with this.
 */
 #ifdef __DREAMCAST__
 	DBG_OUT("Checking for a valid drive...");
@@ -181,14 +176,14 @@ setupPathPrefix()
 	FILE *path_test;
 	path_test = fopen("/pc/resources/textures/dev/xor.gif", "rb");
 	if (path_test) {
-		path_prefix = "/pc";
+		path_prefix = "/pc/";
 		DBG_OUT("PATH PREFIX: \"/pc\"");
 		goto path_found;
 	}
 
 	path_test = fopen("/cd/resources/textures/dev/xor.gif", "rb");
 	if (path_test) {
-		path_prefix = "/cd";
+		path_prefix = "/cd/";
 		DBG_OUT("PATH PREFIX: \"/cd\"");
 		goto path_found;
 	}

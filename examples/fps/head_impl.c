@@ -64,7 +64,7 @@ testHeadSetup(Head *head)
 
 	user_data->current_weapon = 0;
 
-	snprintf(sky_path, sizeof(sky_path), "%s%s", PATH_PREFIX, SKY_PATH);
+	snprintf(sky_path, sizeof(sky_path), "%s%s", path_prefix, SKY_PATH);
 
 	for (int i = 0; i < 6; i++) {
 		static char filename[256];
@@ -79,9 +79,9 @@ testHeadSetup(Head *head)
 		Handle HUD Weapons
 	*/
 	Model *weapons = &user_data->weapons[0];
-	snprintf(weapon_path, sizeof(weapon_path), "%s%s", PATH_PREFIX, "resources/models/weapons/weapon5.obj");
+	snprintf(weapon_path, sizeof(weapon_path), "%s%s", path_prefix, "resources/models/weapons/weapon5.obj");
 	weapons[0] = LoadModel(weapon_path);
-	snprintf(weapon_path, sizeof(weapon_path), "%s%s", PATH_PREFIX, "resources/models/weapons/weapon5.png");
+	snprintf(weapon_path, sizeof(weapon_path), "%s%s", path_prefix, "resources/models/weapons/weapon5.png");
 	Texture2D weaponTexture = LoadTexture(weapon_path);
 	SetMaterialTexture(&weapons->materials[0], MATERIAL_MAP_ALBEDO, weaponTexture);
 	SetTextureFilter(weaponTexture, TEXTURE_FILTER_BILINEAR);
