@@ -87,9 +87,9 @@ void
 Projectile_MediaInit(void)
 {
 	char
-		*model_path,
-		*texture_path,
-		*sprite_path;
+		model_path[256],
+		texture_path[256],
+		sprite_path[256];
 
 	snprintf(model_path, sizeof(model_path), "%s%s", path_prefix, "resources/models/projectiles/blast.obj");
 	snprintf(texture_path, sizeof(texture_path), "%s%s", path_prefix, "resources/models/projectiles/blast.png");
