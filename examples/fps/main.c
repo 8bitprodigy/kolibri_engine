@@ -78,7 +78,7 @@ runEngine(void *data, void *value)
 			path_prefix, 
 			"resources/textures/grass/00.png"
 		);
-	DBG_OUT("\n\tTEXTURE PATH: %s\n", texture_path);
+		
 	/*scene = Scene_new(&infinite_Plane_Scene_Callbacks, NULL, NULL, 0, engine); // */
 	HeightmapData heightmap = (HeightmapData){
 			.sun_angle     = (Vector3){0.0f, -0.4f, -0.6f},
@@ -91,7 +91,7 @@ runEngine(void *data, void *value)
 			.hi_color      = WHITE,
 			.lo_color      = WHITE,
 			.texture       = LoadTexture(texture_path),
-			.lod_distances = {48.0f, 64.0f, 128.0f, 192.0f},
+			.lod_distances = {48.0f, 96.0f, 144.0f, 192.0f},
 		};
 	scene = HeightmapScene_new(&heightmap, engine);
 	// */

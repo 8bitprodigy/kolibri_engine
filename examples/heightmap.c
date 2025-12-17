@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -104,7 +105,7 @@ getChunkLOD(float dist_sq, HeightmapData *data)
 
 
 void
-RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera)
+RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera, int lod)
 {
 	Heightmap     *map   = (Heightmap*)chunk->heightmap;
 	HeightmapData *data  = (HeightmapData*)&map->data;
@@ -112,13 +113,11 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera)
 	Vector3 cam_pos = camera->position;
 	
 	float 
-		dist_sq      = Vector3DistanceSqr(chunk->position, cam_pos),
 		offset       = data->offset,
 		height_scale = data->height_scale,
 		cell_size    = data->cell_size;
 		
 	int
-		lod  = getChunkLOD(dist_sq, data),
 		step = map->lod_info[lod].step,
 		
 		chunk_cells = data->chunk_cells,
@@ -131,7 +130,61 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera)
 		total_cells    = data->chunks_wide * data->chunk_cells,
 		heightmap_grid = total_cells + 1;
 
-	float (*heightmap)[heightmap_grid]   = (float(*)[heightmap_grid])map->heightmap;
+	float
+		lod_threshold_sq = data->lod_distances[lod] * data->lod_distances[lod],
+		chunk_size = data->chunk_cells * data->cell_size,
+		(*heightmap)[heightmap_grid]   = (float(*)[heightmap_grid])map->heightmap;
+
+	bool cam_above = cam_pos.y > chunk->position.y;
+
+	float corner_y = cam_above 
+			? chunk->position.y 
+			+ chunk->bounds.y*0.5f 
+			: chunk->position.y - chunk->bounds.y*0.5f;
+	
+	bool
+		nw_outside = Vector3DistanceSqr(
+				(Vector3){
+						chunk->position.x - chunk_size*0.5f, 
+						corner_y, 
+						chunk->position.z - chunk_size*0.5f
+					}, 
+				cam_pos
+			) 
+			> lod_threshold_sq,
+		ne_outside = Vector3DistanceSqr(
+				(Vector3){
+						chunk->position.x + chunk_size*0.5f, 
+						corner_y, 
+						chunk->position.z - chunk_size*0.5f
+					}, 
+				cam_pos
+			) 
+			> lod_threshold_sq,
+		sw_outside = Vector3DistanceSqr(
+				(Vector3){
+						chunk->position.x - chunk_size*0.5f, 
+						corner_y, 
+						chunk->position.z + chunk_size*0.5f
+					}, 
+				cam_pos
+			) 
+			> lod_threshold_sq,
+		se_outside = Vector3DistanceSqr(
+				(Vector3){
+						chunk->position.x + chunk_size*0.5f, 
+						corner_y, 
+						chunk->position.z + chunk_size*0.5f
+					}, 
+				cam_pos
+			) 
+			> lod_threshold_sq,
+			
+		stitch_north = nw_outside || ne_outside,  // Change && to ||
+		stitch_south = sw_outside || se_outside,
+		stitch_west  = nw_outside || sw_outside,
+		stitch_east  = ne_outside || se_outside;
+	
 	Color (*colormap)[heightmap_grid]    = (Color(*)[heightmap_grid])map->colormap;
 	Vector3 (*normalmap)[heightmap_grid] = (Vector3(*)[heightmap_grid])map->normalmap;
 
@@ -171,25 +224,129 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera)
 				hm_next_x = start_x + next_x,
 				hm_next_z = start_z + next_z;
 
+			float
+				y_tl = heightmap[hm_z][hm_x] * height_scale + offset,
+				y_tr = heightmap[hm_z][hm_next_x] * height_scale + offset,
+				y_bl = heightmap[hm_next_z][hm_x] * height_scale + offset,
+				y_br = heightmap[hm_next_z][hm_next_x] * height_scale + offset;
+			
+			if ((x % (step * 2)) == step) {
+				if (
+					z == 0 
+					&& stitch_north 
+					&& hm_x >= step 
+					&& hm_x + step <= map->cells_wide
+				) {
+					y_tl = (
+							heightmap[hm_z][hm_x - step] 
+							+ heightmap[hm_z][hm_x + step]
+						) * 0.5f * height_scale + offset;
+				}
+				if (next_z == chunk_cells 
+					&& stitch_south 
+					&& hm_x >= step 
+					&& hm_x + step <= map->cells_wide
+				) {
+					y_bl = (
+							heightmap[hm_next_z][hm_x - step] 
+							+ heightmap[hm_next_z][hm_x + step]
+						) * 0.5f * height_scale + offset;
+				}
+			}
+			if ((z % (step * 2)) == step) {
+				if (
+					x == 0 
+					&& stitch_west 
+					&& hm_z >= step 
+					&& hm_z + step <= map->cells_wide
+				) {
+					y_tl = (
+							heightmap[hm_z - step][hm_x] 
+							+ heightmap[hm_z + step][hm_x]
+						) * 0.5f * height_scale + offset;
+				}
+				if (
+					next_x == chunk_cells 
+					&& stitch_east 
+					&& hm_z >= step 
+					&& hm_z + step <= map->cells_wide
+				) {
+					y_tr = (
+							heightmap[hm_z - step][hm_next_x] 
+							+ heightmap[hm_z + step][hm_next_x]
+						) * 0.5f * height_scale + offset;
+				}
+			}
+
+			// ADD THIS - stitch the other vertices on edges too
+			if ((next_x % (step * 2)) == step) {
+				if (
+					z == 0 
+					&& stitch_north 
+					&& hm_next_x >= step 
+					&& hm_next_x + step <= map->cells_wide
+				) {
+					y_tr = (
+							heightmap[hm_z][hm_next_x - step] 
+							+ heightmap[hm_z][hm_next_x + step]
+						) * 0.5f * height_scale + offset;
+				}
+				if (
+					next_z == chunk_cells 
+					&& stitch_south 
+					&& hm_next_x >= step 
+					&& hm_next_x + step <= map->cells_wide
+				) {
+					y_br = (
+							heightmap[hm_next_z][hm_next_x - step] 
+							+ heightmap[hm_next_z][hm_next_x + step]
+						) * 0.5f * height_scale + offset;
+				}
+			}
+			if ((next_z % (step * 2)) == step) {
+				if (
+					x == 0 
+					&& stitch_west 
+					&& hm_next_z >= step 
+					&& hm_next_z + step <= map->cells_wide
+				) {
+					y_bl = (
+							heightmap[hm_next_z - step][hm_x] 
+							+ heightmap[hm_next_z + step][hm_x]
+						) * 0.5f * height_scale + offset;
+				}
+				if (
+					next_x == chunk_cells 
+					&& stitch_east 
+					&& hm_next_z >= step 
+					&& hm_next_z + step <= map->cells_wide
+				) {
+					y_br = (
+							heightmap[hm_next_z - step][hm_next_x] 
+							+ heightmap[hm_next_z + step][hm_next_x]
+						) * 0.5f * height_scale + offset;
+				}
+			}
+			
 			Vector3
 				v_tl = {
 					x * cell_size + chunk_offset_x,
-					heightmap[hm_z][hm_x] * height_scale + offset,
+					y_tl,
 					z * cell_size + chunk_offset_z
 				},
 				v_tr = {
 					next_x * cell_size + chunk_offset_x,
-					heightmap[hm_z][hm_next_x] * height_scale + offset,
+					y_tr,
 					z * cell_size + chunk_offset_z
 				},
 				v_bl = {
 					x * cell_size + chunk_offset_x,
-					heightmap[hm_next_z][hm_x] * height_scale + offset,
+					y_bl,
 					next_z * cell_size + chunk_offset_z
 				},
 				v_br = {
 					next_x * cell_size + chunk_offset_x,
-					heightmap[hm_next_z][hm_next_x] * height_scale + offset,
+					y_br,
 					next_z * cell_size + chunk_offset_z
 				};
 
@@ -207,9 +364,9 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera)
 
 			Vector2
 				uv_tl = {0.0f, 0.0f},
-				uv_tr = {1.0f, 0.0f},
-				uv_bl = {0.0f, 1.0f},
-				uv_br = {1.0f, 1.0f};
+				uv_tr = {(float)step, 0.0f},
+				uv_bl = {0.0f, (float)step},
+				uv_br = {(float)step, (float)step};
 
 			/* First triangle (top-left -> bottom-left -> top-right) */
             rlColor4ub(  c_tl.r,  c_tl.g, c_tl.b, c_tl.a);
@@ -750,8 +907,30 @@ heightmapSceneRender(Scene *scene, Head *head)
 //*/
 	for (int i = 0; i < num_chunks; i++) {
 		ChunkData *chunk   = &map->chunks[i];
-		float      dist_sq = Vector3DistanceSqr(chunk->position, camera_pos);
+		float
+			chunk_half  = (data->chunk_cells * data->cell_size) * 0.5f,
+			min_dist_sq = INFINITY;
 
+		int 
+			start_x = chunk->idx.x * data->chunk_cells,
+			start_z = chunk->idx.z * data->chunk_cells,
+			hm_grid = data->chunks_wide * data->chunk_cells + 1;
+
+		float (*heightmap)[hm_grid] = (float(*)[hm_grid])map->heightmap;
+
+		Vector3 corners[4] = {
+			{chunk->position.x - chunk_half, heightmap[start_z][start_x] * data->height_scale + data->offset, chunk->position.z - chunk_half},
+			{chunk->position.x + chunk_half, heightmap[start_z][start_x + data->chunk_cells] * data->height_scale + data->offset, chunk->position.z - chunk_half},
+			{chunk->position.x - chunk_half, heightmap[start_z + data->chunk_cells][start_x] * data->height_scale + data->offset, chunk->position.z + chunk_half},
+			{chunk->position.x + chunk_half, heightmap[start_z + data->chunk_cells][start_x + data->chunk_cells] * data->height_scale + data->offset, chunk->position.z + chunk_half}
+		};
+		for (int c = 0; c < 4; c++) {
+			float d = Vector3DistanceSqr(corners[c], camera_pos);
+			if (d < min_dist_sq) min_dist_sq = d;
+		}
+		float dist_sq = min_dist_sq;
+//*/
+		//float dist_sq = Vector3DistanceSqr(chunk->position, camera_pos);
 		if (isAABBInFrustum(
 				chunk->position,
 				Vector3Scale(chunk->bounds, 0.5f),
@@ -760,7 +939,7 @@ heightmapSceneRender(Scene *scene, Head *head)
 				Head_getRendererSettings(head)->max_render_distance
 			)
 		) {
-			RenderHeightmapChunk(chunk, map, camera);
+			RenderHeightmapChunk(chunk, map, camera, getChunkLOD(dist_sq, data));
 		}
 	}
 	EntityList *ent_list = Scene_getEntityList(scene);
