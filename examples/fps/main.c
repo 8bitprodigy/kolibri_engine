@@ -91,7 +91,7 @@ runEngine(void *data, void *value)
 			.hi_color      = WHITE,
 			.lo_color      = WHITE,
 			.texture       = LoadTexture(texture_path),
-			.lod_distances = {48.0f, 96.0f, 144.0f, 192.0f},
+			.lod_distances = {64.0f, 128.0f, 192.0f, 240.0f},
 		};
 	scene = HeightmapScene_new(&heightmap, engine);
 	// */
@@ -292,7 +292,7 @@ main(int argc, char **argv)
 							KEY_UP
 						),
 					0, 0,
-					GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
+					GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN, KEY_ENTER)
 				);
 		EndDrawing();
 	}

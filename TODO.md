@@ -6,7 +6,9 @@
 	- Projectiles now move and disappear after a set amount of time.
 	- Needs to have them either despawn or be part of a pool that recycles them.
 - [ ] Implement enemy AI
-- [ ] Implement heightmap terrain Scene type
+- [X] Implement heightmap terrain Scene type
+	- Got most of it implemented.
+	- Need to implement terrain stitching that works worth a damn.
 - [ ] Figure out why the Heightmap Scene segfaults on exit to main menu
 
 ## General/Unknown:

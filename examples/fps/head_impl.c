@@ -280,13 +280,13 @@ Vector2 look_delta;
         mouse_look = look_delta,
         move_dir   = GET_KEY_OR_BUTTON_VECTOR(
 				controller_num, 
-				GAMEPAD_BUTTON_RIGHT_FACE_UP,
+				GAMEPAD_BUTTON_LEFT_FACE_UP,
 				KEY_W, 
-				GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
+				GAMEPAD_BUTTON_LEFT_FACE_DOWN,
 				KEY_S, 
-				GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
+				GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
 				KEY_D, 
-				GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
+				GAMEPAD_BUTTON_LEFT_FACE_LEFT,
 				KEY_A
 			);
     UpdateCameraPro(
@@ -317,7 +317,7 @@ Vector2 look_delta;
 	if (
 		GET_KEY_OR_BUTTON_PRESSED(
 			controller_num, 
-			GAMEPAD_BUTTON_LEFT_TRIGGER_1, 
+			GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, 
 			KEY_SPACE
 		)
 	)
@@ -345,8 +345,7 @@ Vector2 look_delta;
 	
 	if (
 		IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
-		|| IsGamepadButtonPressed(controller_num, GAMEPAD_BUTTON_RIGHT_TRIGGER_1)
-		|| IsGamepadButtonPressed(controller_num, GAMEPAD_BUTTON_RIGHT_TRIGGER_2)
+		|| IsGamepadButtonPressed(controller_num, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)
 	) {
 		Projectile_new(
 				camera->target,

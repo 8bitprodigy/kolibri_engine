@@ -35,6 +35,7 @@ typedef struct
 	Vector3
 		position,
 		bounds;
+	float *corners[4];
 }
 ChunkData;
 
@@ -105,17 +106,16 @@ getChunkLOD(float dist_sq, HeightmapData *data)
 
 
 void
-RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera, int lod)
+RenderHeightmapChunk(ChunkData *chunk, void *_data_, Vector3 cam_pos, int lod)
 {
 	Heightmap     *map   = (Heightmap*)chunk->heightmap;
 	HeightmapData *data  = (HeightmapData*)&map->data;
-
-	Vector3 cam_pos = camera->position;
 	
 	float 
 		offset       = data->offset,
 		height_scale = data->height_scale,
-		cell_size    = data->cell_size;
+		cell_size    = data->cell_size,
+		**corners     = chunk->corners;
 		
 	int
 		step = map->lod_info[lod].step,
@@ -126,9 +126,8 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera, int lod)
 		chunk_x = chunk->idx.x,
 		chunk_z = chunk->idx.z,
 
-		grid_size      = data->chunk_cells + 1,
-		total_cells    = data->chunks_wide * data->chunk_cells,
-		heightmap_grid = total_cells + 1;
+		grid_size      = data->chunk_cells,
+		heightmap_grid = data->chunks_wide * data->chunk_cells;
 
 	float
 		lod_threshold_sq = data->lod_distances[lod] * data->lod_distances[lod],
@@ -136,54 +135,60 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera, int lod)
 		(*heightmap)[heightmap_grid]   = (float(*)[heightmap_grid])map->heightmap;
 
 	bool cam_above = cam_pos.y > chunk->position.y;
-
 	float corner_y = cam_above 
 			? chunk->position.y 
 			+ chunk->bounds.y*0.5f 
 			: chunk->position.y - chunk->bounds.y*0.5f;
-	
 	bool
-		nw_outside = Vector3DistanceSqr(
-				(Vector3){
-						chunk->position.x - chunk_size*0.5f, 
-						corner_y, 
-						chunk->position.z - chunk_size*0.5f
-					}, 
-				cam_pos
-			) 
-			> lod_threshold_sq,
-		ne_outside = Vector3DistanceSqr(
-				(Vector3){
-						chunk->position.x + chunk_size*0.5f, 
-						corner_y, 
-						chunk->position.z - chunk_size*0.5f
-					}, 
-				cam_pos
-			) 
-			> lod_threshold_sq,
-		sw_outside = Vector3DistanceSqr(
-				(Vector3){
-						chunk->position.x - chunk_size*0.5f, 
-						corner_y, 
-						chunk->position.z + chunk_size*0.5f
-					}, 
-				cam_pos
-			) 
-			> lod_threshold_sq,
-		se_outside = Vector3DistanceSqr(
-				(Vector3){
-						chunk->position.x + chunk_size*0.5f, 
-						corner_y, 
-						chunk->position.z + chunk_size*0.5f
-					}, 
-				cam_pos
-			) 
-			> lod_threshold_sq,
-			
-		stitch_north = nw_outside || ne_outside,  // Change && to ||
-		stitch_south = sw_outside || se_outside,
-		stitch_west  = nw_outside || sw_outside,
-		stitch_east  = ne_outside || se_outside;
+		stitch_north = false,
+		stitch_south = false,
+		stitch_west  = false,
+		stitch_east  = false;
+
+	if (lod < MAX_LOD_LEVELS - 1) {
+		bool
+			nw_outside = Vector3DistanceSqr(
+					(Vector3){
+							chunk->position.x - chunk_size*0.5f, 
+							*corners[0] * height_scale + offset, 
+							chunk->position.z - chunk_size*0.5f
+						}, 
+					cam_pos
+				) 
+				> lod_threshold_sq,
+			ne_outside = Vector3DistanceSqr(
+					(Vector3){
+							chunk->position.x + chunk_size*0.5f, 
+							*corners[1] * height_scale + offset, 
+							chunk->position.z - chunk_size*0.5f
+						}, 
+					cam_pos
+				) 
+				> lod_threshold_sq,
+			sw_outside = Vector3DistanceSqr(
+					(Vector3){
+							chunk->position.x - chunk_size*0.5f, 
+							*corners[2] * height_scale + offset, 
+							chunk->position.z + chunk_size*0.5f
+						}, 
+					cam_pos
+				) 
+				> lod_threshold_sq,
+			se_outside = Vector3DistanceSqr(
+					(Vector3){
+							chunk->position.x + chunk_size*0.5f, 
+							*corners[3] * height_scale + offset, 
+							chunk->position.z + chunk_size*0.5f
+						}, 
+					cam_pos
+				) 
+				> lod_threshold_sq;
+		
+		stitch_north = (nw_outside && ne_outside),
+		stitch_south = (sw_outside && se_outside),
+		stitch_west  = (nw_outside && sw_outside),
+		stitch_east  = (ne_outside && se_outside);
+	}
 	
 	Color (*colormap)[heightmap_grid]    = (Color(*)[heightmap_grid])map->colormap;
 	Vector3 (*normalmap)[heightmap_grid] = (Vector3(*)[heightmap_grid])map->normalmap;
@@ -217,117 +222,151 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera, int lod)
 	for (int z = 0; z < chunk_cells; z += step) {
 		for (int x = 0; x < chunk_cells; x += step) {
 			int 
-				hm_x = start_x + x,
-				hm_z = start_z + z,
+				hm_x = (start_x + x) % heightmap_grid,
+				hm_z = (start_z + z) % heightmap_grid,
 				next_x = (x + step <= chunk_cells) ? x + step : chunk_cells,
 				next_z = (z + step <= chunk_cells) ? z + step : chunk_cells,
-				hm_next_x = start_x + next_x,
-				hm_next_z = start_z + next_z;
+				hm_next_x = (start_x + next_x) % heightmap_grid,
+				hm_next_z = (start_z + next_z) % heightmap_grid;
 
 			float
 				y_tl = heightmap[hm_z][hm_x] * height_scale + offset,
 				y_tr = heightmap[hm_z][hm_next_x] * height_scale + offset,
 				y_bl = heightmap[hm_next_z][hm_x] * height_scale + offset,
 				y_br = heightmap[hm_next_z][hm_next_x] * height_scale + offset;
-			
-			if ((x % (step * 2)) == step) {
-				if (
-					z == 0 
-					&& stitch_north 
-					&& hm_x >= step 
-					&& hm_x + step <= map->cells_wide
-				) {
-					y_tl = (
-							heightmap[hm_z][hm_x - step] 
-							+ heightmap[hm_z][hm_x + step]
-						) * 0.5f * height_scale + offset;
+
+			Color 
+				c_tl = colormap[hm_z][hm_x],
+				c_tr = colormap[hm_z][hm_next_x],
+				c_bl = colormap[hm_next_z][hm_x],
+				c_br = colormap[hm_next_z][hm_next_x];
+
+			if (lod < MAX_LOD_LEVELS - 1) {
+				// North edge (z == 0)
+				if (stitch_north && z == 0) {
+					// TL vertex
+					if ((x % (step * 2)) == step) {
+						y_tl = 0.5f * (
+							heightmap[hm_z][hm_x - step] +
+							heightmap[hm_z][hm_x + step]
+						) * height_scale + offset;
+						
+						c_tl = ColorLerp(
+							colormap[hm_z][hm_x - step],
+							colormap[hm_z][hm_x + step],
+							0.5f
+						);
+					}
+
+					// TR vertex
+					if ((next_x % (step * 2)) == step) {
+						y_tr = 0.5f * (
+							heightmap[hm_z][hm_next_x - step] +
+							heightmap[hm_z][hm_next_x + step]
+						) * height_scale + offset;
+						
+						c_tr = ColorLerp(
+							colormap[hm_z][hm_next_x - step],
+							colormap[hm_z][hm_next_x + step],
+							0.5f
+						);
+					}
 				}
-				if (next_z == chunk_cells 
-					&& stitch_south 
-					&& hm_x >= step 
-					&& hm_x + step <= map->cells_wide
-				) {
-					y_bl = (
-							heightmap[hm_next_z][hm_x - step] 
-							+ heightmap[hm_next_z][hm_x + step]
-						) * 0.5f * height_scale + offset;
+
+				// South edge (next_z == chunk_cells)
+				if (stitch_south && next_z == chunk_cells) {
+					// BL vertex
+					if ((x % (step * 2)) == step) {
+						y_bl = 0.5f * (
+							heightmap[hm_next_z][hm_x - step] +
+							heightmap[hm_next_z][hm_x + step]
+						) * height_scale + offset;
+						
+						c_bl = ColorLerp(
+							colormap[hm_next_z][hm_x - step],
+							colormap[hm_next_z][hm_x + step],
+							0.5f
+						);
+					}
+
+					// BR vertex
+					if ((next_x % (step * 2)) == step) {
+						y_br = 0.5f * (
+							heightmap[hm_next_z][hm_next_x - step] +
+							heightmap[hm_next_z][hm_next_x + step]
+						) * height_scale + offset;
+						
+						c_br = ColorLerp(
+							colormap[hm_next_z][hm_next_x - step],
+							colormap[hm_next_z][hm_next_x + step],
+							0.5f
+						);
+					}
 				}
-			}
-			if ((z % (step * 2)) == step) {
-				if (
-					x == 0 
-					&& stitch_west 
-					&& hm_z >= step 
-					&& hm_z + step <= map->cells_wide
-				) {
-					y_tl = (
-							heightmap[hm_z - step][hm_x] 
-							+ heightmap[hm_z + step][hm_x]
-						) * 0.5f * height_scale + offset;
+
+				// West edge (x == 0)
+				if (stitch_west && x == 0) {
+					// TL vertex
+					if ((z % (step * 2)) == step) {
+						y_tl = 0.5f * (
+							heightmap[hm_z - step][hm_x] +
+							heightmap[hm_z + step][hm_x]
+						) * height_scale + offset;
+						
+						c_tl = ColorLerp(
+							colormap[hm_z - step][hm_x],
+							colormap[hm_z + step][hm_x],
+							0.5f
+						);
+					}
+
+					// BL vertex
+					if ((next_z % (step * 2)) == step) {
+						y_bl = 0.5f * (
+							heightmap[hm_next_z - step][hm_x] +
+							heightmap[hm_next_z + step][hm_x]
+						) * height_scale + offset;
+						
+						c_bl = ColorLerp(
+							colormap[hm_next_z - step][hm_x],
+							colormap[hm_next_z + step][hm_x],
+							0.5f
+						);
+					}
 				}
-				if (
-					next_x == chunk_cells 
-					&& stitch_east 
-					&& hm_z >= step 
-					&& hm_z + step <= map->cells_wide
-				) {
-					y_tr = (
-							heightmap[hm_z - step][hm_next_x] 
-							+ heightmap[hm_z + step][hm_next_x]
-						) * 0.5f * height_scale + offset;
+
+				// East edge (next_x == chunk_cells)
+				if (stitch_east && next_x == chunk_cells) {
+					// TR vertex
+					if ((z % (step * 2)) == step) {
+						y_tr = 0.5f * (
+							heightmap[hm_z - step][hm_next_x] +
+							heightmap[hm_z + step][hm_next_x]
+						) * height_scale + offset;
+						
+						c_tr = ColorLerp(
+							colormap[hm_z - step][hm_next_x],
+							colormap[hm_z + step][hm_next_x],
+							0.5f
+						);
+					}
+
+					// BR vertex
+					if ((next_z % (step * 2)) == step) {
+						y_br = 0.5f * (
+							heightmap[hm_next_z - step][hm_next_x] +
+							heightmap[hm_next_z + step][hm_next_x]
+						) * height_scale + offset;
+						
+						c_br = ColorLerp(
+							colormap[hm_next_z - step][hm_next_x],
+							colormap[hm_next_z + step][hm_next_x],
+							0.5f
+						);
+					}
 				}
 			}
 
-			// ADD THIS - stitch the other vertices on edges too
-			if ((next_x % (step * 2)) == step) {
-				if (
-					z == 0 
-					&& stitch_north 
-					&& hm_next_x >= step 
-					&& hm_next_x + step <= map->cells_wide
-				) {
-					y_tr = (
-							heightmap[hm_z][hm_next_x - step] 
-							+ heightmap[hm_z][hm_next_x + step]
-						) * 0.5f * height_scale + offset;
-				}
-				if (
-					next_z == chunk_cells 
-					&& stitch_south 
-					&& hm_next_x >= step 
-					&& hm_next_x + step <= map->cells_wide
-				) {
-					y_br = (
-							heightmap[hm_next_z][hm_next_x - step] 
-							+ heightmap[hm_next_z][hm_next_x + step]
-						) * 0.5f * height_scale + offset;
-				}
-			}
-			if ((next_z % (step * 2)) == step) {
-				if (
-					x == 0 
-					&& stitch_west 
-					&& hm_next_z >= step 
-					&& hm_next_z + step <= map->cells_wide
-				) {
-					y_bl = (
-							heightmap[hm_next_z - step][hm_x] 
-							+ heightmap[hm_next_z + step][hm_x]
-						) * 0.5f * height_scale + offset;
-				}
-				if (
-					next_x == chunk_cells 
-					&& stitch_east 
-					&& hm_next_z >= step 
-					&& hm_next_z + step <= map->cells_wide
-				) {
-					y_br = (
-							heightmap[hm_next_z - step][hm_next_x] 
-							+ heightmap[hm_next_z + step][hm_next_x]
-						) * 0.5f * height_scale + offset;
-				}
-			}
-			
 			Vector3
 				v_tl = {
 					x * cell_size + chunk_offset_x,
@@ -350,11 +389,6 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Camera3D *camera, int lod)
 					next_z * cell_size + chunk_offset_z
 				};
 
-			Color 
-				c_tl = colormap[hm_z][hm_x],
-				c_tr = colormap[hm_z][hm_next_x],
-				c_bl = colormap[hm_next_z][hm_x],
-				c_br = colormap[hm_next_z][hm_next_x];
 
 			Vector3
 				n_tl = normalmap[hm_z][hm_x],
@@ -425,25 +459,24 @@ randomRange(float range)
 void 
 setHeight(float *heightmap_data, size_t cells_wide, int x, int y, float height) 
 {
-    size_t  grid_size = cells_wide + 1;
-    float (*heightmap)[grid_size] = (float(*)[grid_size])heightmap_data;
+    float (*heightmap)[cells_wide] = (float(*)[cells_wide])heightmap_data;
 	
-    if (x >= 0 && x <= cells_wide && y >= 0 && y <= cells_wide) {
-        heightmap[y][x] = height;
-    }
+    x = ((x % cells_wide) + cells_wide) % cells_wide;
+    y = ((y % cells_wide) + cells_wide) % cells_wide;
+
+    heightmap[y][x] = height;
 }
 
 // Get height at position with bounds checking
 float 
 getHeight(float *heightmap_data, size_t cells_wide, int x, int y) 
 {
-    size_t  grid_size = cells_wide + 1;
-    float (*heightmap)[grid_size] = (float(*)[grid_size])heightmap_data;
+    float (*heightmap)[cells_wide] = (float(*)[cells_wide])heightmap_data;
 	
-    if (x >= 0 && x <= cells_wide && y >= 0 && y <= cells_wide) {
-        return heightmap[y][x];
-    }
-    return 0.0f;
+    x = ((x % cells_wide) + cells_wide) % cells_wide;
+    y = ((y % cells_wide) + cells_wide) % cells_wide;
+
+    return heightmap[y][x];
 }
 
 
@@ -500,8 +533,7 @@ diamondSquareSeeded(
 	size_t  Seed
 )
 {
-	int     grid_size               = cells_wide + 1;
-	float (*heightmap)[grid_size] = (float(*)[grid_size])heightmap_data;
+	float (*heightmap)[cells_wide] = (float(*)[cells_wide])heightmap_data;
 	
 	srand(Seed);
 
@@ -522,8 +554,8 @@ diamondSquareSeeded(
 			}
 		}
 
-		for (int y = 0; y <= cells_wide; y += half) {
-			for (int x = (y + half) % size; x <= cells_wide; x += size) {
+		for (int y = 0; y < cells_wide; y += half) {
+			for (int x = (y + half) % size; x < cells_wide; x += size) {
 				square(heightmap_data, cells_wide, x, y, size, roughness);
 			}
 		}
@@ -536,8 +568,8 @@ diamondSquareSeeded(
 		min_height = heightmap[0][0],
 		max_height = heightmap[0][0];
 
-	for (int y = 0; y <= cells_wide; y++) {
-		for (int x = 0; x <= cells_wide; x++) {
+	for (int y = 0; y < cells_wide; y++) {
+		for (int x = 0; x < cells_wide; x++) {
 			if (heightmap[y][x] < min_height) min_height  = heightmap[y][x];
 			if (max_height < heightmap[y][x]) max_height = heightmap[y][x];
 		}
@@ -548,8 +580,8 @@ diamondSquareSeeded(
 		return; 
 	}
 
-	for (int y = 0; y <= cells_wide; y++) {
-		for (int x = 0; x <= cells_wide; x++) {
+	for (int y = 0; y < cells_wide; y++) {
+		for (int x = 0; x < cells_wide; x++) {
 			heightmap[y][x]= (heightmap[y][x]- min_height) / range;
 		}
 	}
@@ -587,7 +619,7 @@ calculateVertexNormal(
 	float  height_scale
 )
 {
-	int     grid_size               = map->cells_wide + 1;
+	int     grid_size               = map->cells_wide;
 	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
 	
 	float 
@@ -625,7 +657,7 @@ getLightingFactor(Vector3 normal, Vector3 sun_angle, float ambient)
 float
 getTerrainHeight(Heightmap *map, Vector3 position)
 {
-	int     grid_size               = map->cells_wide + 1;
+	int     grid_size               = map->cells_wide;
 	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
 	
 	float
@@ -646,13 +678,15 @@ getTerrainHeight(Heightmap *map, Vector3 position)
 	}
 	HeightmapData *data = (HeightmapData*)&map->data;
 	
+	int 
+		x1 = (x + 1) % map->cells_wide,
+		z1 = (z + 1) % map->cells_wide;
+	
 	float
 		x_frac = float_x - x,
 		z_frac = float_z - z,
-		// Interpolate bottom edge (z row) along x
-		lower = Lerp(heightmap[z][x], heightmap[z][x+1], x_frac),
-		// Interpolate top edge (z+1 row) along x
-		upper = Lerp(heightmap[z+1][x], heightmap[z+1][x+1], x_frac);
+		lower = Lerp(heightmap[z][x], heightmap[z][x1], x_frac),
+		upper = Lerp(heightmap[z1][x], heightmap[z1][x1], x_frac);
 	
 	// Interpolate between bottom and top edges along z
 	return Lerp(lower, upper, z_frac) * data->height_scale;
@@ -681,8 +715,8 @@ genHeightmapDiamondSquare(
 	size_t seed
 )
 {
-    size_t size = cells_wide + 1;
-	float *heightmap = DynamicArray(float, size * size);
+	DBG_OUT("CELLS WIDE: %d", cells_wide);
+	float *heightmap = DynamicArray(float, cells_wide * cells_wide);
 	
 	diamondSquareSeeded(heightmap, cells_wide, roughness,decay, seed);
 
@@ -694,7 +728,7 @@ Vector3 *
 generateNormalMap(Heightmap *map)
 {
 	HeightmapData  *data                  = &map->data;
-	int             grid_size             = map->cells_wide + 1;
+	int             grid_size             = map->cells_wide;
 	float         (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
 
 	Vector3
@@ -721,7 +755,7 @@ Color *
 generateColorMap(Heightmap *map)
 {
 	HeightmapData  *data                  = &map->data;
-	int             grid_size             = map->cells_wide + 1;
+	int             grid_size             = map->cells_wide;
 	float         (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
 	Vector3       (*normalmap)[grid_size] = (Vector3(*)[grid_size])map->normalmap;
 	
@@ -758,7 +792,7 @@ ChunkData *
 generateChunks(Heightmap *map)
 {
 	HeightmapData  *data                  = &map->data;
-	int             grid_size             = map->cells_wide + 1;
+	int             grid_size             = map->cells_wide;
 	float         (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
 
 	int        num_chunks = data->chunks_wide * data->chunks_wide;
@@ -775,7 +809,9 @@ generateChunks(Heightmap *map)
 
 			int
 				start_x = chunk_x * data->chunk_cells,
-				start_z = chunk_z * data->chunk_cells;
+				start_z = chunk_z * data->chunk_cells,
+				hm_x,
+				hm_z;
 
 			float 
 				min_height = INFINITY,
@@ -783,10 +819,12 @@ generateChunks(Heightmap *map)
 
 			for (int z = 0; z <= data->chunk_cells; z++) {
 				for (int x = 0; x <= data->chunk_cells; x++) {
-					int 
-						hm_x = start_x + x,
-						hm_z = start_z + z;
+					
+					hm_x = start_x + x % map->cells_wide;
+					hm_z = start_z + z % map->cells_wide;
+						
 					float h  = heightmap[hm_z][hm_x] * data->height_scale + data->offset;
+					
 					if (h < min_height) min_height = h;
 					if (h > max_height) max_height = h;
 				}
@@ -806,6 +844,12 @@ generateChunks(Heightmap *map)
 							max_height - min_height,
 							chunk_size
 						},
+					.corners   = {
+							&heightmap[start_z][start_x],
+							&heightmap[start_z][hm_x],
+							&heightmap[hm_z][start_x],
+							&heightmap[hm_z][hm_x],
+						},
 				};
 		}
 	}
@@ -824,15 +868,14 @@ HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 	Heightmap heightmap;
 	
 	heightmap.cells_wide = heightmap_data->chunks_wide * heightmap_data->chunk_cells;
-	int grid_size        = heightmap.cells_wide + 1;
-	heightmap.world_size = heightmap.cells_wide       * heightmap_data->cell_size;
+	heightmap.world_size = heightmap.cells_wide        * heightmap_data->cell_size;
 	heightmap.data       = *heightmap_data;
 	
 	heightmap.heightmap  = genHeightmapDiamondSquare(
 			heightmap.cells_wide,
 			1.0f, 
 			0.5f,
-			69
+			0
 		);
 	
 	return Scene_new(
@@ -886,7 +929,14 @@ heightmapSceneRender(Scene *scene, Head *head)
 	Camera        *camera     = Head_getCamera(head);
 	Vector3        camera_pos = camera->position;
 	size_t         num_chunks = data->chunks_wide * data->chunks_wide;
-	
+
+	float chunk_size = data->chunk_cells * data->cell_size;
+	Vector3 snapped_cam = {
+		roundf(camera_pos.x / chunk_size) * chunk_size,
+		camera_pos.y,
+		roundf(camera_pos.z / chunk_size) * chunk_size
+	};
+		
 	DBG_EXPR( 
 			float half_width = map->world_size/2.0f;
 			
@@ -895,6 +945,8 @@ heightmapSceneRender(Scene *scene, Head *head)
 					{half_width, data->height_scale, half_width}
 				};
 			DrawBoundingBox(bbox, MAGENTA);
+
+			//DrawSphereWires(snapped_cam, 1.0f, 3, 8, ORANGE);
 
 			/* Solid are positive axes, wireframe are negative axes. */
 			DrawCube(     (Vector3){ half_width, data->height_scale, 0.0f},        5.0f, 5.0f, 5.0f, RED);
@@ -914,18 +966,24 @@ heightmapSceneRender(Scene *scene, Head *head)
 		int 
 			start_x = chunk->idx.x * data->chunk_cells,
 			start_z = chunk->idx.z * data->chunk_cells,
-			hm_grid = data->chunks_wide * data->chunk_cells + 1;
+			hm_grid = data->chunks_wide * data->chunk_cells;  // Remove + 1
 
 		float (*heightmap)[hm_grid] = (float(*)[hm_grid])map->heightmap;
 
+		// Wrap the corner accesses
+		int
+			end_x = (start_x + data->chunk_cells) % hm_grid,
+			end_z = (start_z + data->chunk_cells) % hm_grid;
+
 		Vector3 corners[4] = {
 			{chunk->position.x - chunk_half, heightmap[start_z][start_x] * data->height_scale + data->offset, chunk->position.z - chunk_half},
-			{chunk->position.x + chunk_half, heightmap[start_z][start_x + data->chunk_cells] * data->height_scale + data->offset, chunk->position.z - chunk_half},
-			{chunk->position.x - chunk_half, heightmap[start_z + data->chunk_cells][start_x] * data->height_scale + data->offset, chunk->position.z + chunk_half},
-			{chunk->position.x + chunk_half, heightmap[start_z + data->chunk_cells][start_x + data->chunk_cells] * data->height_scale + data->offset, chunk->position.z + chunk_half}
+			{chunk->position.x + chunk_half, heightmap[start_z][end_x] * data->height_scale + data->offset, chunk->position.z - chunk_half},
+			{chunk->position.x - chunk_half, heightmap[end_z][start_x] * data->height_scale + data->offset, chunk->position.z + chunk_half},
+			{chunk->position.x + chunk_half, heightmap[end_z][end_x] * data->height_scale + data->offset, chunk->position.z + chunk_half}
 		};
+		
 		for (int c = 0; c < 4; c++) {
-			float d = Vector3DistanceSqr(corners[c], camera_pos);
+			float d = Vector3DistanceSqr(corners[c], snapped_cam);
 			if (d < min_dist_sq) min_dist_sq = d;
 		}
 		float dist_sq = min_dist_sq;
@@ -939,7 +997,7 @@ heightmapSceneRender(Scene *scene, Head *head)
 				Head_getRendererSettings(head)->max_render_distance
 			)
 		) {
-			RenderHeightmapChunk(chunk, map, camera, getChunkLOD(dist_sq, data));
+			RenderHeightmapChunk(chunk, map, snapped_cam, getChunkLOD(dist_sq, data));
 		}
 	}
 	EntityList *ent_list = Scene_getEntityList(scene);
@@ -1030,7 +1088,7 @@ heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
     Heightmap     *map  = Scene_getMapData(scene);
     HeightmapData *data = &map->data;
     
-	int     grid_size             = map->cells_wide + 1;
+	int     grid_size             = map->cells_wide;
 	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
 	
     CollisionResult result = NO_COLLISION;
