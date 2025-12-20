@@ -30,7 +30,7 @@ ProjectileInfo
 	blast_Info = {
 			.damage  =  0.0f,
 			.speed   = 25.0f,
-			.timeout =  3.5f,
+			.timeout =  5.5f,
 		};
 
 SpriteInfo blast_sprite_info;/* = {

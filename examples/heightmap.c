@@ -1,4 +1,6 @@
 #include <math.h>
+#include <raylib.h>
+#include <raymath.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
@@ -10,6 +12,7 @@
 #include "head.h"
 #include "heightmap.h"
 #include "renderer.h"
+#include "skybox.h"
 
 
 #define INDEX(array, width, x, y) (array[y * width + x])
@@ -44,7 +47,9 @@ Heightmap
 {
 	HeightmapData data;
 
-	float      world_size;
+	float      
+		       lod_distances[MAX_LOD_LEVELS],
+		       world_size;
 	size_t     cells_wide;
 	struct {
 		size_t vertex_count;
@@ -53,7 +58,9 @@ Heightmap
 		size_t step;
 	} lod_info[MAX_LOD_LEVELS];
 	float     *heightmap;
-	Color     *colormap;
+	Color     
+		      *shadowmap,
+		      *colormap;
 	Vector3   *normalmap;
 	ChunkData *chunks;
 }
@@ -92,10 +99,11 @@ const Vector3 SUN_ANGLE = (Vector3){0.3f, -0.8f, 0.3f};
 
 
 int
-getChunkLOD(float dist_sq, HeightmapData *data)
+getChunkLOD(float dist_sq, Heightmap *map)
 {
+	HeightmapData *data = &map->data;
 	for (int lod = 0; lod < MAX_LOD_LEVELS; lod++) {
-		float threshold = data->lod_distances[lod];
+		float threshold = map->lod_distances[lod];
 		if (dist_sq < threshold * threshold) {
 			return lod;
 		}
@@ -130,7 +138,7 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Vector3 cam_pos, int lod)
 		heightmap_grid = data->chunks_wide * data->chunk_cells;
 
 	float
-		lod_threshold_sq = data->lod_distances[lod] * data->lod_distances[lod],
+		lod_threshold_sq = map->lod_distances[lod] * map->lod_distances[lod],
 		chunk_size = data->chunk_cells * data->cell_size,
 		(*heightmap)[heightmap_grid]   = (float(*)[heightmap_grid])map->heightmap;
 
@@ -146,47 +154,25 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Vector3 cam_pos, int lod)
 		stitch_east  = false;
 
 	if (lod < MAX_LOD_LEVELS - 1) {
-		bool
-			nw_outside = Vector3DistanceSqr(
-					(Vector3){
-							chunk->position.x - chunk_size*0.5f, 
-							*corners[0] * height_scale + offset, 
-							chunk->position.z - chunk_size*0.5f
-						}, 
-					cam_pos
-				) 
-				> lod_threshold_sq,
-			ne_outside = Vector3DistanceSqr(
-					(Vector3){
-							chunk->position.x + chunk_size*0.5f, 
-							*corners[1] * height_scale + offset, 
-							chunk->position.z - chunk_size*0.5f
-						}, 
-					cam_pos
-				) 
-				> lod_threshold_sq,
-			sw_outside = Vector3DistanceSqr(
-					(Vector3){
-							chunk->position.x - chunk_size*0.5f, 
-							*corners[2] * height_scale + offset, 
-							chunk->position.z + chunk_size*0.5f
-						}, 
-					cam_pos
-				) 
-				> lod_threshold_sq,
-			se_outside = Vector3DistanceSqr(
-					(Vector3){
-							chunk->position.x + chunk_size*0.5f, 
-							*corners[3] * height_scale + offset, 
-							chunk->position.z + chunk_size*0.5f
-						}, 
-					cam_pos
-				) 
-				> lod_threshold_sq;
+		float 
+			dx_nw = (chunk->position.x - chunk_size*0.5f) - cam_pos.x,
+			dz_nw = (chunk->position.z - chunk_size*0.5f) - cam_pos.z,
+			dx_ne = (chunk->position.x + chunk_size*0.5f) - cam_pos.x,
+			dz_ne = (chunk->position.z - chunk_size*0.5f) - cam_pos.z,
+			dx_sw = (chunk->position.x - chunk_size*0.5f) - cam_pos.x,
+			dz_sw = (chunk->position.z + chunk_size*0.5f) - cam_pos.z,
+			dx_se = (chunk->position.x + chunk_size*0.5f) - cam_pos.x,
+			dz_se = (chunk->position.z + chunk_size*0.5f) - cam_pos.z;
 		
-		stitch_north = (nw_outside && ne_outside),
-		stitch_south = (sw_outside && se_outside),
-		stitch_west  = (nw_outside && sw_outside),
+		bool
+			nw_outside = (dx_nw*dx_nw + dz_nw*dz_nw) > lod_threshold_sq,
+			ne_outside = (dx_ne*dx_ne + dz_ne*dz_ne) > lod_threshold_sq,
+			sw_outside = (dx_sw*dx_sw + dz_sw*dz_sw) > lod_threshold_sq,
+			se_outside = (dx_se*dx_se + dz_se*dz_se) > lod_threshold_sq;
+		
+		stitch_north = (nw_outside && ne_outside);
+		stitch_south = (sw_outside && se_outside);
+		stitch_west  = (nw_outside && sw_outside);
 		stitch_east  = (ne_outside && se_outside);
 	}
 	
@@ -200,7 +186,7 @@ RenderHeightmapChunk(ChunkData *chunk, void *_data_, Vector3 cam_pos, int lod)
 	float
 		chunk_offset_x = (chunk_x - chunks_wide / 2.0f) * chunk_cells * cell_size,
 		chunk_offset_z = (chunk_z - chunks_wide / 2.0f) * chunk_cells * cell_size;
-/*	
+/*
 	DBG_EXPR(
 			DrawCubeWires(
 					chunk->position, 
@@ -619,14 +605,20 @@ calculateVertexNormal(
 	float  height_scale
 )
 {
-	int     grid_size               = map->cells_wide;
-	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+	int     cells_wide             = map->cells_wide;
+	float (*heightmap)[cells_wide] = (float(*)[cells_wide])map->heightmap;
 	
+	int 
+		x_left  = ((x - 1) + cells_wide) % cells_wide,
+		x_right = (x + 1) % cells_wide,
+		z_up    = ((z - 1) + cells_wide) % cells_wide,
+		z_down  = (z + 1) % cells_wide;
+
 	float 
-		left   = (x > 0) ? heightmap[z-1][x]               : heightmap[z][x],
-		right  = (x < map->cells_wide) ? heightmap[z+1][x] : heightmap[z][x],
-		up     = (z > 0) ? heightmap[z][x-1]               : heightmap[z][x],
-		down   = (z < map->cells_wide) ? heightmap[z][x+1] : heightmap[z][x];
+		left  = heightmap[z_up][x],
+		right = heightmap[z_down][x],
+		up    = heightmap[z][x_left], 
+		down  = heightmap[z][x_right];
 
 	Vector3 tangent_x = {
         2.0f * scale,                    // Step in X direction
@@ -647,49 +639,54 @@ calculateVertexNormal(
 
 
 float
-getLightingFactor(Vector3 normal, Vector3 sun_angle, float ambient) 
+getLightingFactor(Vector3 normal, Vector3 sun_angle) 
 {
-	float dot = -Vector3DotProduct(normal, Vector3Normalize(sun_angle));
-	return  ambient + (dot * (1.0f - ambient));
+	return  -Vector3DotProduct(normal, Vector3Normalize(sun_angle));
 }
 
+static inline 
+struct TerrainSample {int x0, z0, x1, z1; float x_frac, z_frac;}
+getTerrainSample(float world_size, size_t cells_wide, Vector3 position)
+{
+	
+	float
+		normalized_x = (position.x / world_size) + 0.5f,
+		normalized_z = (position.z / world_size) + 0.5f,
+		float_x = normalized_x * cells_wide,
+		float_z = normalized_z * cells_wide;
+
+	int
+		x0 = (int)floorf(float_x) % cells_wide,
+		z0 = (int)floorf(float_z) % cells_wide,
+		x1 = (x0 + 1) % cells_wide,
+		z1 = (z0 + 1) % cells_wide;
+    
+    return (struct TerrainSample) { 
+			.x0 = x0,
+			.z0 = z0,
+			.x1 = x1,
+			.z1 = z1,
+			
+			.x_frac = float_x - x0,
+			.z_frac = float_z - z0,
+		};
+}
 
 float
 getTerrainHeight(Heightmap *map, Vector3 position)
 {
-	int     grid_size               = map->cells_wide;
-	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
-	
-	float
-		normalized_x = (position.x / map->world_size) + 0.5f,
-		normalized_z = (position.z / map->world_size) + 0.5f,
-		float_x = normalized_x * map->cells_wide,
-		float_z = normalized_z * map->cells_wide;
-    
-    int 
-		x = (int)floorf(float_x),
-		z = (int)floorf(float_z);
+	HeightmapData  *data                  = (HeightmapData*)&map->data;
+	size_t          grid_size             = map->cells_wide;
+	float         (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
 
-	if (x < 0 || z < 0 
-		|| map->cells_wide <= x 
-		|| map->cells_wide <= z
-	) {
-		return 0.0f;
-	}
-	HeightmapData *data = (HeightmapData*)&map->data;
-	
-	int 
-		x1 = (x + 1) % map->cells_wide,
-		z1 = (z + 1) % map->cells_wide;
+	struct TerrainSample sample = getTerrainSample(map->world_size, grid_size, position);
 	
 	float
-		x_frac = float_x - x,
-		z_frac = float_z - z,
-		lower = Lerp(heightmap[z][x], heightmap[z][x1], x_frac),
-		upper = Lerp(heightmap[z1][x], heightmap[z1][x1], x_frac);
+		lower = Lerp(heightmap[sample.z0][sample.x0], heightmap[sample.z0][sample.x1], sample.x_frac),
+		upper = Lerp(heightmap[sample.z1][sample.x0], heightmap[sample.z1][sample.x1], sample.x_frac);
 	
 	// Interpolate between bottom and top edges along z
-	return Lerp(lower, upper, z_frac) * data->height_scale;
+	return Lerp(lower, upper, sample.z_frac) * data->height_scale;
 }
 
 
@@ -757,34 +754,79 @@ generateColorMap(Heightmap *map)
 	HeightmapData  *data                  = &map->data;
 	int             grid_size             = map->cells_wide;
 	float         (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
-	Vector3       (*normalmap)[grid_size] = (Vector3(*)[grid_size])map->normalmap;
+	Vector3       
+		            sun_angle             = data->sun_angle,
+		          (*normalmap)[grid_size] = (Vector3(*)[grid_size])map->normalmap;
 	
 	Color
 	 	*colormap           = DynamicArray(Color, grid_size * grid_size),
-		(*colors)[grid_size] = (Color(*)[grid_size])colormap;
+		(*colors)[grid_size] = (Color(*)[grid_size])colormap,
+
+		  sun_color     = data->sun_color,
+		  ambient_color = data->ambient_color,
+		  hi_color      = data->hi_color,
+		  lo_color      = data->lo_color;
 
 	for (int z = 0; z < grid_size; z++) {
 		for (int x = 0; x < grid_size; x++) {
 			float lighting_factor = getLightingFactor(
 					normalmap[z][x],
-					data->sun_angle,
-					data->ambient_value
+					sun_angle
 				);
 
 			Color
-				hi_color = data->hi_color,
-				lo_color = data->lo_color;
+				terrain_color = ColorLerp(
+						lo_color,
+						hi_color,
+						heightmap[z][x]
+					),
+				light_color = ColorLerp(
+						ambient_color,
+						sun_color,
+						lighting_factor
+					);
 			
-			colors[z][x] = (Color){
-				(unsigned char)(Lerp(lo_color.r, hi_color.r, heightmap[z][x]) * lighting_factor),
-				(unsigned char)(Lerp(lo_color.g, hi_color.g, heightmap[z][x]) * lighting_factor),
-				(unsigned char)(Lerp(lo_color.b, hi_color.b, heightmap[z][x]) * lighting_factor),
+			colors[z][x] = (Color) {
+				(unsigned char)((terrain_color.r / 255.0f) * (light_color.r / 255.0f) * 255.0f),
+				(unsigned char)((terrain_color.g / 255.0f) * (light_color.g / 255.0f) * 255.0f),
+				(unsigned char)((terrain_color.b / 255.0f) * (light_color.b / 255.0f) * 255.0f),
 				255
 			};
 		}
 	}
 
 	return colormap;
+}
+
+Color *
+generateShadowMap(Heightmap *map)
+{
+	HeightmapData  *data                  = &map->data;
+	int             cells_wide            = map->cells_wide;
+	float         
+		          (*heightmap)[cells_wide] = (float(*)[cells_wide])map->heightmap,
+		            ambient               = data->ambient_value;
+	Vector3       
+		          (*normalmap)[cells_wide] = (Vector3(*)[cells_wide])map->normalmap,
+		            sun_angle             = data->sun_angle;
+
+	Color
+		  sun_color     = data->sun_color,
+		  ambient_color = data->ambient_color,
+		 *shadowmap     = DynamicArray(Color, cells_wide * cells_wide),
+		(*shadows)[cells_wide] = (float(*)[cells_wide])shadowmap;
+
+	for (int z = 0; z < cells_wide; z++) {
+		for (int x = 0; x < cells_wide; x++) {
+			shadows[z][x] = ColorLerp(
+					ambient_color,
+					sun_color,
+					getLightingFactor(normalmap[z][x], sun_angle)
+				);
+		}
+	}
+
+	return shadowmap;
 }
 
 
@@ -862,32 +904,6 @@ generateChunks(Heightmap *map)
 	SCENE CALLBACKS
 **********************/
 
-Scene * 
-HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
-{
-	Heightmap heightmap;
-	
-	heightmap.cells_wide = heightmap_data->chunks_wide * heightmap_data->chunk_cells;
-	heightmap.world_size = heightmap.cells_wide        * heightmap_data->cell_size;
-	heightmap.data       = *heightmap_data;
-	
-	heightmap.heightmap  = genHeightmapDiamondSquare(
-			heightmap.cells_wide,
-			1.0f, 
-			0.5f,
-			0
-		);
-	
-	return Scene_new(
-			&heightmap_Scene_Callbacks, 
-			NULL, 
-			&heightmap, 
-			sizeof(Heightmap), 
-			engine
-		);
-}
-
-
 void
 heightmapSceneSetup(Scene *scene, void *map_data)
 {
@@ -899,6 +915,7 @@ heightmapSceneSetup(Scene *scene, void *map_data)
 
 	map->normalmap = generateNormalMap(map);
 	map->colormap  = generateColorMap(map);
+	map->shadowmap = generateShadowMap(map);
 	map->chunks    = generateChunks(map);
 	
 	if (data->texture.id != 0) {
@@ -930,12 +947,18 @@ heightmapSceneRender(Scene *scene, Head *head)
 	Vector3        camera_pos = camera->position;
 	size_t         num_chunks = data->chunks_wide * data->chunks_wide;
 
-	float chunk_size = data->chunk_cells * data->cell_size;
+	float 
+		world_size   = map->world_size,
+		chunk_size   = data->chunk_cells * data->cell_size,
+		half_world   = map->world_size * 0.5f,
+		max_distance = Head_getRendererSettings(head)->max_render_distance;
+		
 	Vector3 snapped_cam = {
 		roundf(camera_pos.x / chunk_size) * chunk_size,
 		camera_pos.y,
 		roundf(camera_pos.z / chunk_size) * chunk_size
 	};
+	snapped_cam.y = getTerrainHeight(map, snapped_cam) + data->offset;
 		
 	DBG_EXPR( 
 			float half_width = map->world_size/2.0f;
@@ -946,19 +969,24 @@ heightmapSceneRender(Scene *scene, Head *head)
 				};
 			DrawBoundingBox(bbox, MAGENTA);
 
-			//DrawSphereWires(snapped_cam, 1.0f, 3, 8, ORANGE);
+			DrawSphereWires(snapped_cam, 1.0f, 3, 8, ORANGE);
 
 			/* Solid are positive axes, wireframe are negative axes. */
-			DrawCube(     (Vector3){ half_width, data->height_scale, 0.0f},        5.0f, 5.0f, 5.0f, RED);
-			DrawCubeWires((Vector3){-half_width, data->height_scale, 0.0f},        5.0f, 5.0f, 5.0f, RED);
-			DrawCube(     (Vector3){ 0.0f,       data->height_scale, 0.0f},        5.0f, 5.0f, 5.0f, GREEN);
-			DrawCubeWires((Vector3){ 0.0f,       data->offset,       0.0f},        5.0f, 5.0f, 5.0f, GREEN);
-			DrawCube(     (Vector3){0.0f,        data->height_scale,  half_width}, 5.0f, 5.0f, 5.0f, BLUE);
-			DrawCubeWires((Vector3){0.0f,        data->height_scale, -half_width}, 5.0f, 5.0f, 5.0f, BLUE);
+			DrawCube(     (Vector3){ half_width, data->height_scale,  0.0f},       5.0f, 5.0f, 5.0f, RED);
+			DrawCubeWires((Vector3){-half_width, data->height_scale,  0.0f},       5.0f, 5.0f, 5.0f, RED);
+			DrawCube(     (Vector3){ 0.0f,       data->height_scale,  0.0f},       5.0f, 5.0f, 5.0f, GREEN);
+			DrawCubeWires((Vector3){ 0.0f,       data->offset,        0.0f},       5.0f, 5.0f, 5.0f, GREEN);
+			DrawCube(     (Vector3){ 0.0f,       data->height_scale,  half_width}, 5.0f, 5.0f, 5.0f, BLUE);
+			DrawCubeWires((Vector3){ 0.0f,       data->height_scale, -half_width}, 5.0f, 5.0f, 5.0f, BLUE);
 		);
 //*/
 	for (int i = 0; i < num_chunks; i++) {
 		ChunkData *chunk   = &map->chunks[i];
+
+		float 
+			chunk_pos_x = chunk->position.x,
+			chunk_pos_z = chunk->position.z;
+		
 		float
 			chunk_half  = (data->chunk_cells * data->cell_size) * 0.5f,
 			min_dist_sq = INFINITY;
@@ -966,7 +994,7 @@ heightmapSceneRender(Scene *scene, Head *head)
 		int 
 			start_x = chunk->idx.x * data->chunk_cells,
 			start_z = chunk->idx.z * data->chunk_cells,
-			hm_grid = data->chunks_wide * data->chunk_cells;  // Remove + 1
+			hm_grid = data->chunks_wide * data->chunk_cells;
 
 		float (*heightmap)[hm_grid] = (float(*)[hm_grid])map->heightmap;
 
@@ -976,33 +1004,92 @@ heightmapSceneRender(Scene *scene, Head *head)
 			end_z = (start_z + data->chunk_cells) % hm_grid;
 
 		Vector3 corners[4] = {
-			{chunk->position.x - chunk_half, heightmap[start_z][start_x] * data->height_scale + data->offset, chunk->position.z - chunk_half},
-			{chunk->position.x + chunk_half, heightmap[start_z][end_x] * data->height_scale + data->offset, chunk->position.z - chunk_half},
-			{chunk->position.x - chunk_half, heightmap[end_z][start_x] * data->height_scale + data->offset, chunk->position.z + chunk_half},
-			{chunk->position.x + chunk_half, heightmap[end_z][end_x] * data->height_scale + data->offset, chunk->position.z + chunk_half}
+			{chunk_pos_x - chunk_half, heightmap[start_z][start_x] * data->height_scale + data->offset, chunk->position.z - chunk_half},
+			{chunk_pos_x + chunk_half, heightmap[start_z][end_x] * data->height_scale + data->offset, chunk->position.z - chunk_half},
+			{chunk_pos_x - chunk_half, heightmap[end_z][start_x] * data->height_scale + data->offset, chunk->position.z + chunk_half},
+			{chunk_pos_x + chunk_half, heightmap[end_z][end_x] * data->height_scale + data->offset, chunk->position.z + chunk_half}
 		};
 		
-		for (int c = 0; c < 4; c++) {
-			float d = Vector3DistanceSqr(corners[c], snapped_cam);
-			if (d < min_dist_sq) min_dist_sq = d;
-		}
-		float dist_sq = min_dist_sq;
+		Frustum *frustum      = Head_getFrustum(head);
 //*/
-		//float dist_sq = Vector3DistanceSqr(chunk->position, camera_pos);
-		if (isAABBInFrustum(
-				chunk->position,
-				Vector3Scale(chunk->bounds, 0.5f),
-				Head_getFrustum(head),
-				dist_sq,
-				Head_getRendererSettings(head)->max_render_distance
-			)
-		) {
-			RenderHeightmapChunk(chunk, map, snapped_cam, getChunkLOD(dist_sq, data));
+		// Check all possible wrap positions (including original at 0,0)
+		for (int offset_x = -1; offset_x <= 1; offset_x++) {
+			for (int offset_z = -1; offset_z <= 1; offset_z++) {
+				Vector3 wrap_offset = {offset_x * world_size, 0, offset_z * world_size};
+				Vector3 test_pos = Vector3Add(chunk->position, wrap_offset);
+				
+				// Calculate distance for this wrap position
+				float test_dist_sq = INFINITY;
+				for (int c = 0; c < 4; c++) {
+					Vector3 test_corner = Vector3Add(corners[c], wrap_offset);
+					float 
+						dx = test_corner.x - snapped_cam.x,
+						dz = test_corner.z - snapped_cam.z,
+						d  = dx*dx + dz*dz;
+					if (d < test_dist_sq) test_dist_sq = d;
+				}
+				
+				// Frustum cull and render if visible
+				if (isAABBInFrustum(
+						test_pos,
+						Vector3Scale(chunk->bounds, 0.5f),
+						frustum,
+						test_dist_sq,
+						max_distance
+					)
+				) {
+					if (offset_x != 0 || offset_z != 0) {
+						rlPushMatrix();
+						rlTranslatef(wrap_offset.x, wrap_offset.y, wrap_offset.z);
+
+						Vector3 adjusted_cam = Vector3Subtract(snapped_cam, wrap_offset);
+						RenderHeightmapChunk(chunk, map, adjusted_cam, getChunkLOD(test_dist_sq, map));
+						rlPopMatrix();
+					}
+					else {
+						RenderHeightmapChunk(chunk, map, snapped_cam, getChunkLOD(test_dist_sq, map));
+					}
+				}
+			}
 		}
+		
 	}
 	EntityList *ent_list = Scene_getEntityList(scene);
-	for (int i = 0; i < ent_list->count; i++) 
-		Renderer_submitEntity(renderer, ent_list->entities[i]);
+	
+	for (int i = 0; i < ent_list->count; i++) {
+		Entity *entity = ent_list->entities[i];
+		
+		// Always submit at actual position
+		Renderer_submitEntity(renderer, entity);
+		
+		// Check all 8 wrap offsets
+		for (int ox = -1; ox <= 1; ox++) {
+			for (int oz = -1; oz <= 1; oz++) {
+				if (ox == 0 && oz == 0) continue;
+				
+				Vector3 test_pos = {
+					entity->position.x + (ox * world_size),
+					entity->position.y,
+					entity->position.z + (oz * world_size)
+				};
+				
+				float dx = test_pos.x - camera_pos.x;
+				float dz = test_pos.z - camera_pos.z;
+				float dist_sq = dx*dx + dz*dz;
+				
+				if (dist_sq < max_distance * max_distance) {
+					DBG_OUT("Entity %d: actual=(%.1f,%.1f,%.1f) wrapped=(%.1f,%.1f,%.1f) dist=%.1f",
+							i, entity->position.x, entity->position.y, entity->position.z,
+							test_pos.x, test_pos.y, test_pos.z, sqrtf(dist_sq));
+					
+					Vector3 orig = entity->position;
+					entity->position = test_pos;
+					Renderer_submitEntity(renderer, entity);
+					entity->position = orig;
+				}
+			}
+		}
+	}
 }
 
 
@@ -1012,6 +1099,31 @@ heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
     Heightmap     *map  = Scene_getMapData(scene);
     HeightmapData *data = &map->data;
     Vector3 from = entity->position;
+    
+    // Wrap the 'to' position if it goes outside world bounds
+    float half_world = map->world_size * 0.5f;
+    Vector3 wrap_offset = {0, 0, 0};
+    
+    if (to.x > half_world) {
+        wrap_offset.x = -map->world_size;
+    } else if (to.x < -half_world) {
+        wrap_offset.x = map->world_size;
+    }
+    
+    if (to.z > half_world) {
+        wrap_offset.z = -map->world_size;
+    } else if (to.z < -half_world) {
+        wrap_offset.z = map->world_size;
+    }
+    
+    // Apply wrap offset to both positions for consistent collision check
+    to = Vector3Add(to, wrap_offset);
+    from = Vector3Add(from, wrap_offset);
+    
+    // After collision is resolved, wrap entity position
+    if (wrap_offset.x != 0.0f || wrap_offset.z != 0.0f) {
+       Entity_teleport(entity, Vector3Add(entity->position, wrap_offset));
+    }
     
 	if (to.y > from.y) {
         return NO_COLLISION;
@@ -1088,15 +1200,43 @@ heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
     Heightmap     *map  = Scene_getMapData(scene);
     HeightmapData *data = &map->data;
     
-	int     grid_size             = map->cells_wide;
-	float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
-	
+	// Wrap positions if they're outside world bounds
+    float   half_world  = map->world_size * 0.5f;
+    Vector3 wrap_offset = {0, 0, 0};
+    
+    // Check if 'to' is outside bounds
+    if (to.x > half_world) {
+        wrap_offset.x = -map->world_size;
+    } else if (to.x < -half_world) {
+        wrap_offset.x = map->world_size;
+    }
+    
+    if (to.z > half_world) {
+        wrap_offset.z = -map->world_size;
+    } else if (to.z < -half_world) {
+        wrap_offset.z = map->world_size;
+    }
+    
+    // Apply wrap offset to both positions
+    from = Vector3Add(from, wrap_offset);
+    to   = Vector3Add(to, wrap_offset);
+    
+    // Check if the raycast crosses a wrap boundary (huge distance)
+    float ray_length = Vector3Distance(from, to);
+    if (ray_length > half_world) {
+        // Ray crosses wrap boundary - no collision
+        return NO_COLLISION;
+    }
+    
+    int     grid_size             = map->cells_wide;
+    float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
+    
     CollisionResult result = NO_COLLISION;
     
     K_Ray ray = (K_Ray){
         .position  = from,
         .direction = Vector3Normalize(Vector3Subtract(to, from)),
-        .length    = Vector3Distance(from, to),
+        .length    = ray_length,
     };
     
     // Convert world positions to heightmap grid coordinates
@@ -1199,3 +1339,111 @@ heightmapSceneFree(Scene *scene, void *map_data)
 	DynamicArray_free(map->chunks);
 }
 
+
+/*********************
+	PUBLIC METHODS    
+*********************/
+
+Scene * 
+HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
+{
+	Heightmap heightmap;
+	
+	heightmap.cells_wide = heightmap_data->chunks_wide * heightmap_data->chunk_cells;
+	heightmap.world_size = heightmap.cells_wide        * heightmap_data->cell_size;
+	heightmap.data       = *heightmap_data;
+
+	DBG_OUT("=== Heightmap Setup ===");
+	DBG_OUT("chunks_wide=%d, chunk_cells=%d", 
+	        heightmap_data->chunks_wide, heightmap_data->chunk_cells);
+	DBG_OUT("cells_wide=%zu, world_size=%.1f, half_world=%.1f",
+	        heightmap.cells_wide, heightmap.world_size, heightmap.world_size * 0.5f);
+
+	float 
+		lod_scalar     = ( DEFAULT_MAX_RENDER_DISTANCE 
+				/ (
+					MAX_LOD_LEVELS 
+					* heightmap_data->chunk_cells 
+					* heightmap_data->cell_size
+				)
+			),
+		lod_increment  = lod_scalar * sqrtf(
+				pow(
+						(heightmap_data->chunk_cells / 2) 
+							* heightmap_data->cell_size,
+						2
+					) 
+				* 2
+			);
+	for (int i = 0; i < MAX_LOD_LEVELS; i++) 
+		heightmap.lod_distances[i] = lod_increment * (i+1);
+	
+	heightmap.heightmap  = genHeightmapDiamondSquare(
+			heightmap.cells_wide,
+			1.0f, 
+			0.5f,
+			0
+		);
+	
+	DBG_OUT("=== End Heightmap Setup ===\n");
+	
+	return Scene_new(
+			&heightmap_Scene_Callbacks, 
+			NULL, 
+			&heightmap, 
+			sizeof(Heightmap), 
+			engine
+		);
+}
+
+
+HeightmapData *
+HeightmapScene_getData(Scene *scene)
+{
+	Heightmap *map = (Heightmap*)scene;
+	return &map->data;
+}
+
+
+Color
+HeightmapScene_sampleShadow(Scene *scene, Vector3 pos)
+{
+	Heightmap      *map                   = Scene_getMapData(scene);
+	HeightmapData  *data                  = &map->data;
+	size_t          cells_wide            = map->cells_wide;
+	float           world_size            = map->world_size;
+	Color         (*shadowmap)[cells_wide] = (float(*)[cells_wide])map->shadowmap;
+	
+
+	struct TerrainSample sample = getTerrainSample(world_size, cells_wide, pos);
+
+	Color
+		sun_color     = data->sun_color,
+		ambient_color = data->ambient_color,
+		
+		c_nw  = shadowmap[sample.z0][sample.x0],
+		c_ne  = shadowmap[sample.z0][sample.x1],
+		c_sw  = shadowmap[sample.z1][sample.x0],
+		c_se  = shadowmap[sample.z1][sample.x1],
+		
+		lower = ColorLerp(c_nw, c_ne, sample.x_frac),
+		upper = ColorLerp(c_sw, c_se, sample.x_frac);
+	
+	return ColorLerp(lower, upper, sample.z_frac);
+}
+
+
+float
+HeightmapScene_getWorldSize(Scene *scene)
+{
+	Heightmap *map = Scene_getMapData(scene);
+	return map->world_size;
+}
+
+
+float
+HeightmapScene_getHeight(Scene *scene, Vector3 pos)
+{
+	Heightmap *map = Scene_getMapData(scene);
+	return getTerrainHeight(map, pos);
+}

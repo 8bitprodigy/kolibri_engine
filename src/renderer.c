@@ -29,6 +29,7 @@ Renderer
 	bool         dirty;
 
 	RenderableWrapper  *wrapper_pool;
+    RenderableWrapper **all_wrappers;
 	Renderable        **transparent_renderables;
 	void              **transparent_render_data; 
 	float              *transparent_distances;
@@ -56,10 +57,11 @@ Renderer__new(Engine *engine)
 	renderer->visibility_hash   = SpatialHash_new();
 	renderer->dirty             = true;
 
-    renderer->wrapper_pool            = DynamicArray(RenderableWrapper, 512);
-	renderer->transparent_renderables = DynamicArray(Renderable*,       256);
-	renderer->transparent_render_data = DynamicArray(void*,             256);
-	renderer->transparent_distances   = DynamicArray(float,             256);
+    renderer->wrapper_pool            = DynamicArray(RenderableWrapper,  512);
+    renderer->all_wrappers            = DynamicArray(RenderableWrapper*, 512);
+	renderer->transparent_renderables = DynamicArray(RenderableWrapper*, 256);
+	renderer->transparent_render_data = DynamicArray(void*,              256);
+	renderer->transparent_distances   = DynamicArray(float,              256);
     
 	if (!renderer->transparent_renderables 
         || !renderer->transparent_distances
@@ -69,6 +71,7 @@ Renderer__new(Engine *engine)
 	    ERR_OUT("Failed to allocate memory for transparent rendering.");
 	    SpatialHash_free( renderer->visibility_hash);
 	    DynamicArray_free(renderer->wrapper_pool);
+        DynamicArray_free(renderer->all_wrappers); 
 	    DynamicArray_free(renderer->transparent_renderables);
 	    DynamicArray_free(renderer->transparent_render_data);
 	    DynamicArray_free(renderer->transparent_distances);
@@ -85,6 +88,7 @@ Renderer__free(Renderer *renderer)
 {
 	SpatialHash_free(renderer->visibility_hash);
 	DynamicArray_free(renderer->wrapper_pool);
+    DynamicArray_free(renderer->all_wrappers);
     DynamicArray_free(renderer->transparent_renderables);
 	DynamicArray_free(renderer->transparent_render_data);
     DynamicArray_free(renderer->transparent_distances);
@@ -253,7 +257,7 @@ Renderer__render(Renderer *renderer, Head *head)
 
     /* Clear everything */
     DynamicArray_clear(renderer->wrapper_pool);
-	//DynamicArray_clear(renderer->visibility_hash);
+    DynamicArray_clear(renderer->all_wrappers); 
     DynamicArray_clear(renderer->transparent_renderables);
     DynamicArray_clear(renderer->transparent_render_data);
 	DynamicArray_clear(renderer->transparent_distances);
@@ -265,40 +269,52 @@ Renderer__render(Renderer *renderer, Head *head)
     }
 
     /* Step 2: Insert stable pointers into spatial hash */
-    size_t wrapper_count = DynamicArray_length(renderer->wrapper_pool);
-    
-    for (size_t i = 0; i < wrapper_count; i++) {
-        RenderableWrapper *wrapper       = &renderer->wrapper_pool[i];
-        Vector3            render_center = wrapper->position;
+    size_t              wrapper_count    = DynamicArray_length(renderer->wrapper_pool);
+	size_t              visible_count    = 0;
+	RenderableWrapper **visible_wrappers = NULL;
 
-        if (wrapper->is_entity && 0 < wrapper->entity->lod_count) {
-            render_center = Vector3Add(
-                    wrapper->position,
-                    wrapper->entity->renderable_offset
+    if (settings->frustum_culling) {
+        for (size_t i = 0; i < wrapper_count; i++) {
+            RenderableWrapper *wrapper       = &renderer->wrapper_pool[i];
+            Vector3            render_center = wrapper->position;
+
+            if (wrapper->is_entity && 0 < wrapper->entity->lod_count) {
+                render_center = Vector3Add(
+                        wrapper->position,
+                        wrapper->entity->renderable_offset
+                    );
+            }
+
+            SpatialHash_insert(
+                    renderer->visibility_hash,
+                    wrapper,
+                    render_center,
+                    wrapper->bounds
                 );
         }
-
-        SpatialHash_insert(
-                renderer->visibility_hash,
-                wrapper,
-                render_center,
-                wrapper->bounds
+    
+        /* Get items visible in frustum */
+        visible_wrappers = Renderer__queryFrustum(
+                renderer,
+                head, 
+                settings->max_render_distance, 
+                &visible_count
             );
     }
+    else {
+        /* Build pointer array for all wrappers */
+        for (size_t i = 0; i < wrapper_count; i++) {
+            RenderableWrapper *wrapper = &renderer->wrapper_pool[i];
+            DynamicArray_add((void**)&renderer->all_wrappers, &wrapper);
+        }
+        visible_wrappers = renderer->all_wrappers;
+        visible_count    = DynamicArray_length(renderer->wrapper_pool);
+    }
     
-	/* Step 3: Get items visible in frustum */
-	int                 visible_count;
-	RenderableWrapper **visible_wrappers = Renderer__queryFrustum(
-            renderer,
-            head, 
-            settings->max_render_distance, 
-            &visible_count
-        );
-
     /* PASS 1: Render opaque stuff, collect transparent */
-	for (int i = 0; i < visible_count; i++) {
-	    RenderableWrapper *wrapper = visible_wrappers[i];
-
+    for (int i = 0; i < visible_count; i++) {
+        RenderableWrapper *wrapper = visible_wrappers[i];
+        
         if (wrapper->is_entity && !wrapper->entity->visible) continue;
 
         Renderable *renderable  = NULL;
@@ -309,7 +325,6 @@ Renderer__render(Renderer *renderer, Head *head)
             Entity *entity = wrapper->entity;
             renderable     = Entity_getLODRenderable(entity, camera_pos);
             render_data    = entity;
-            render_pos     = entity->position;
         }
         else {
             renderable  = wrapper->renderable;
@@ -320,12 +335,12 @@ Renderer__render(Renderer *renderer, Head *head)
 
         if (renderable->transparent) {
             float dist = Vector3Distance(render_pos, camera_pos);
-            DynamicArray_add((void**)&renderer->transparent_renderables, &renderable);
+            DynamicArray_add((void**)&renderer->transparent_renderables, &wrapper);
             DynamicArray_add((void**)&renderer->transparent_distances,   &dist);
-            DynamicArray_add((void**)&renderer->transparent_render_data,          &render_data);  
+            DynamicArray_add((void**)&renderer->transparent_render_data, &render_data);  
         }
         else if (renderable->Render) {
-            renderable->Render(renderable, render_data, camera);
+            renderable->Render(renderable, render_data, render_pos, camera);
         }
 	}
 
@@ -336,10 +351,22 @@ Renderer__render(Renderer *renderer, Head *head)
     Renderer__sortTransparent(renderer);
 
 	for (size_t i = 0; i < transparent_count; i++) {
-	    Renderable *renderable  = renderer->transparent_renderables[i];
-        void       *render_data = renderer->transparent_render_data[i];
+	    RenderableWrapper *wrapper     = renderer->transparent_renderables[i];
+        void              *render_data;
+        Renderable        *renderable;
+        
+        if (wrapper->is_entity) {
+            Entity *entity = wrapper->entity;
+            renderable     = Entity_getLODRenderable(entity, camera_pos);
+            render_data    = entity;
+        }
+        else {
+            renderable  = wrapper->renderable;
+            render_data = renderable->data;
+        }
+        
 	    if (renderable->Render) {
-	        renderable->Render(renderable, render_data, camera);
+	        renderable->Render(renderable, render_data, wrapper->position, camera);
 	    }
 	}
 }

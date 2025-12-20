@@ -55,8 +55,8 @@ SpriteInfo CreateIrrecularSprite(
 		SpriteAlignment  sprite_alignment
 	);
 
-size_t AnimateSprite(  SpriteInfo *info,       SpriteData *data,        float     age,   size_t num_frames);
-void   RenderBillboard(Renderable *renderable, void       *render_data, Camera3D *camera);
+size_t AnimateSprite(  SpriteInfo *info,       SpriteData *data,        float   age,      size_t    num_frames);
+void   RenderBillboard(Renderable *renderable, void       *render_data, Vector3 position, Camera3D *camera);
 
 
 #endif /* SPRITE_H */

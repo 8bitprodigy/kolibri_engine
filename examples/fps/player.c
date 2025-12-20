@@ -26,6 +26,7 @@ player_Callbacks = (EntityVTable){
 	.Render      = NULL,
 	.OnCollision = NULL,
 	.OnCollided  = NULL,
+	.Teleport    = teleportHead,
 	.Exit        = NULL,
 	.Free        = NULL
 };

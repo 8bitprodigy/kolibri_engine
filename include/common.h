@@ -44,6 +44,15 @@
 	#define ENGINE_SINGLE_HEAD_ONLY 1
 #endif
 /* Head-related settings */
+#ifndef DEFAULT_MAX_RENDER_DISTANCE
+	#define DEFAULT_MAX_RENDER_DISTANCE 1024.0f
+#endif
+#ifndef DEFAULT_MAX_ENTITIES_PER_FRAME
+	#define DEFAULT_MAX_ENTITIES_PER_FRAME 1024
+#endif
+#ifndef DEFAULT_RENDER_FLAGS
+	#define DEFAULT_RENDER_FLAGS 7
+#endif
 #ifdef HEAD_USE_RENDER_TEXTURE
 	/* 
 		If defined, Viewports will be rendered to render Textures instead of
@@ -51,6 +60,7 @@
 	*/
 	#define HEAD_USE_RENDER_TEXTURE 1
 #endif
+
 /* Renderable-related constants */
 #ifndef MAX_LOD_LEVELS
 	#define MAX_LOD_LEVELS 4
@@ -294,7 +304,7 @@ typedef struct
 Renderable
 {
     void  *data;
-    void (*Render)(struct Renderable *renderable, void *data, Camera3D *camera);
+    void (*Render)(struct Renderable *renderable, void *data, Vector3 position, Camera3D *camera);
 	union {
 		uint8 flags;
 		struct {
@@ -336,49 +346,12 @@ Vector2i;
 /*
 	Utility Functions
 */
-static int 
-nextPrime(int n) {
-    if (n <= 1) return 2;
-    if (n <= 3) return n;
-    if (n % 2 == 0) n++;
-    
-    while (true) {
-        bool is_prime = true;
-        for (int i = 3; i * i <= n; i += 2) {
-            if (n % i == 0) {
-                is_prime = false;
-                break;
-            }
-        }
-        if (is_prime) return n;
-        n += 2;
-    }
-}
 
-static inline float
-invLerp(float a, float b, float value)
-{
-	if (a==b) return 0.0f;
-	return (value - a) / (b - a);
-}
-
-static inline void
-moveCamera(Camera *cam, Vector3 new_position)
-{
-	Vector3 diff  = Vector3Normalize(Vector3Subtract(cam->target, cam->position));
-	cam->position = new_position;
-	cam->target   = Vector3Add(new_position, diff);
-}
-
-static inline float
-sig(float x) {
-    return 1.0f / (1.0f + expf(-x));
-}
-
-static inline float
-sig_fast(float x) {
-	return 0.5f * (x / (1.0f + fabsf(x))) + 0.5f;;
-}
+int   nextPrime(int n);
+float invLerp(float a, float b, float value);
+void  moveCamera(Camera *cam, Vector3 new_position);
+float sig(float x);
+float sig_fast(float x);
 
 
 #endif /* COMMON_H */

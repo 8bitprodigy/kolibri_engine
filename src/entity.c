@@ -258,6 +258,16 @@ Entity_moveAndSlide(Entity *self, Vector3 movement)
     }
     return result;
 }
+
+
+void 
+Entity_teleport(Entity *entity, Vector3  to)
+{
+	EntityVTable *vtable = entity->vtable;
+	if (vtable && vtable->Teleport) vtable->Teleport(entity, entity->position, to);
+	entity->position = to;
+}
+
 /*
 void
 Entity_render(Entity *entity, Head *head)

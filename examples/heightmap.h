@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "scene.h"
+#include <raylib.h>
 
 
 #ifndef TERRAIN_NUM_SQUARES
@@ -29,7 +30,6 @@ typedef struct
 	float     
 			  ambient_value,
 			  offset,
-			  lod_distances[MAX_LOD_LEVELS],
 			  height_scale,
 			  cell_size;
 	size_t      
@@ -38,17 +38,30 @@ typedef struct
 	union {
 		struct {
 			Color
+				sun_color,
+				ambient_color;
+		};
+		Color light_colors[2];
+	};
+	union {
+		struct {
+			Color
 				hi_color,
 				lo_color;
 		};
-		Color colors[2];
+		Color terrain_colors[2];
 	};
 	Texture2D texture;
 }
 HeightmapData;
 
 
-Scene *HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine);
+Scene *HeightmapScene_new(         HeightmapData *heightmap_data, Engine  *engine);
+
+HeightmapData *HeightmapScene_getData(     Scene *scene);
+Color          HeightmapScene_sampleShadow(Scene *scene,          Vector3  pos);
+float          HeightmapScene_getWorldSize(Scene *scene);
+float          HeightmapScene_getHeight(   Scene *scene,          Vector3  pos);
 
 
 #endif /* HEIGHTMAP_H */

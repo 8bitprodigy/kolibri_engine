@@ -81,6 +81,7 @@ void
 RenderBillboard(
 	Renderable *renderable,
 	void       *render_data, 
+	Vector3     position,
 	Camera3D   *camera
 )
 {
@@ -96,7 +97,7 @@ RenderBillboard(
 	scale = (scale == 0.0f)? 1.0f : scale;
 	
 	Vector3 
-		pos     = Vector3Add(entity->position, entity->renderable_offset),
+		pos     = Vector3Add(position, entity->renderable_offset),
 		forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position)),
 		right   = Vector3Normalize(Vector3CrossProduct(forward, (Vector3){0, 1, 0})),
 		up;
@@ -127,7 +128,7 @@ RenderBillboard(
 			*camera, 
 			texture, 
 			region,
-			entity->position,
+			pos,
 			up,
 			size,
 			Vector2Scale(size, 0.5f),

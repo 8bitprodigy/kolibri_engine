@@ -2,6 +2,7 @@
 #include <raylib.h>
 #include <raymath.h>
 
+#include "../heightmap.h"
 #include "../reticle.h"
 #include "game.h"
 #include "../skybox.h"
@@ -40,6 +41,21 @@ HeadVTable head_Callbacks = {
 };
 
 
+void
+teleportHead(Entity *entity, Vector3 from, Vector3 to)
+{
+	PlayerData *data = entity->user_data;
+	Head       *head = data->head;
+	Camera     *cam  = Head_getCamera(head);
+
+	Vector3 
+		player_offset = Vector3Subtract(from, data->prev_position),
+		cam_offset    = Vector3Subtract(cam->position, from),
+		new_cam_pos   = Vector3Add(to, cam_offset);
+	data->prev_position = Vector3Add(to, player_offset);
+	moveCamera(cam, new_cam_pos);
+}
+
 /*
 	Callback Definitions
 */
@@ -51,6 +67,9 @@ testHeadSetup(Head *head)
 		ERR_OUT("Failed to allocate TestHeadData.");
 		return;
 	}
+	RendererSettings *settings = Head_getRendererSettings(head);
+	settings->frustum_culling = false;
+	
 	char 
 		sky_path[256],
 		weapon_path[256],
@@ -109,9 +128,11 @@ testHeadPostRender(Head *head)
 	*/
 	TestHeadData *data        = Head_getUserData(head);
 	PlayerData   *target_data = data->target_data;
-	Camera3D     *cam  = Head_getCamera(head);
+	Camera3D     *cam         = Head_getCamera(head);
 	Region        region      = Head_getRegion(head);
 	Engine       *engine      = Head_getEngine(head);
+	Scene        *scene       = Engine_getScene(engine);
+	
 	BeginMode3D(*cam);
 		rlPushMatrix();
 			glClear(GL_DEPTH_BUFFER_BIT);   
@@ -133,7 +154,7 @@ testHeadPostRender(Head *head)
 					data->weapons[0], 
 					V3_ZERO, 
 					0.25f, 
-					WHITE
+					HeightmapScene_sampleShadow(scene, cam_pos)
 				);
 		rlPopMatrix();
 	EndMode3D();
@@ -261,7 +282,7 @@ PLAYER_INPUT:
 		Engine_pause(engine, true);
 	}
 	
-Vector2 look_delta;
+	Vector2 look_delta;
 #ifndef ON_CONSOLE
 	look_delta = GetMouseDelta();
 #else

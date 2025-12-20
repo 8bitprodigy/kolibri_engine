@@ -19,6 +19,7 @@ void
 RenderModel(
 	Renderable *renderable,
 	void       *render_data, 
+	Vector3     position,
 	Camera3D   *camera
 );
 
@@ -26,6 +27,7 @@ void
 testRenderableBoxCallback(
 	Renderable *renderable,
 	void       *render_data, 
+	Vector3     position,
 	Camera3D   *camera
 );
 
@@ -33,6 +35,7 @@ void
 testRenderableBoxWiresCallback(
 	Renderable *renderable,
 	void       *render_data, 
+	Vector3     position,
 	Camera3D   *camera
 );
 
@@ -40,6 +43,7 @@ void
 testRenderableCylinderWiresCallback(
 	Renderable *renderable,
 	void       *render_data, 
+	Vector3     position,
 	Camera3D   *camera
 );
 

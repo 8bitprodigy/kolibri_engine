@@ -63,7 +63,7 @@ runEngine(void *data, void *value)
 		);
 		
 	RendererSettings *settings = Head_getRendererSettings(head);
-//	settings->frustum_culling = false;
+	settings->frustum_culling = false;
 	Camera3D *cam = Head_getCamera(head);
 	cam->fovy     = 45.0f;
 	cam->up       = V3_UP;
@@ -84,20 +84,23 @@ runEngine(void *data, void *value)
 			.sun_angle     = (Vector3){0.0f, -0.4f, -0.6f},
 			.ambient_value = 0.6f,
 			.offset        = 0.0f,
-			.height_scale  = 200.0f,
+			.height_scale  = 50.0f,
 			.cell_size     = 4.0f,
 			.chunk_cells   = 16,
 			.chunks_wide   = 32,
+			.sun_color     = (Color){255, 255, 245, 255},
+			.ambient_color = (Color){115, 115, 153, 255},
 			.hi_color      = WHITE,
 			.lo_color      = WHITE,
 			.texture       = LoadTexture(texture_path),
-			.lod_distances = {64.0f, 128.0f, 192.0f, 240.0f},
 		};
 	scene = HeightmapScene_new(&heightmap, engine);
 	// */
 	
 	player = Entity_new(&playerTemplate, scene, 0);
-	player->position = (Vector3){0.0f, 8.0f, 0.0f};
+	PlayerData *player_data = player->user_data;
+	player_data->head       = head;
+	player->position        = (Vector3){0.0f, 8.0f, 0.0f};
 	
 	head_data = (TestHeadData*)Head_getUserData(head);
 	head_data->controller  = 0;
@@ -116,6 +119,7 @@ runEngine(void *data, void *value)
 						(z * 5.0f),
 						(y * 5.0f) - 50.0
 					};
+				position.z = HeightmapScene_getHeight(scene, position) + 0.5f;
 				if (Vector3Equals(position, V3_ZERO)) continue;
 				ents[x][y][z]           = Entity_new(&entityTemplate, scene, 0);
 				ents[x][y][z]->visible  = true;

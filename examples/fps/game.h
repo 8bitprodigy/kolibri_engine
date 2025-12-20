@@ -9,6 +9,7 @@
 
 #include "assman.h"
 #include "infinite_plane_scene.h"
+#include "common.h"
 #include "kolibri.h"
 #include "sprite.h"
 #include "utils.h"
@@ -116,6 +117,7 @@ typedef struct
 TestHeadData;
 
 extern HeadVTable head_Callbacks;
+void   teleportHead(Entity *entity, Vector3 from, Vector3 to);
 
 /* 
 	player.c
@@ -123,6 +125,7 @@ extern HeadVTable head_Callbacks;
 /* Player data */
 typedef struct
 {
+	Head *head;
 	Vector3
 		prev_position,
 		prev_velocity,

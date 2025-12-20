@@ -48,13 +48,14 @@ void
 RenderModel(
 	Renderable *renderable,
 	void       *render_data, 
+	Vector3     position,
 	Camera3D    *camera
 )
 {
 	Model  *model  = (Model*)renderable->data;
 	Entity *entity = (Entity*)render_data;
 	Vector3          
-		    pos    = Vector3Add(entity->position, entity->renderable_offset),
+		    pos    = Vector3Add(position, entity->renderable_offset),
 		    scale  = entity->scale;
 	Matrix  matrix = QuaternionToMatrix(entity->orientation);
 	
@@ -76,6 +77,7 @@ void
 testRenderableBoxCallback(
 	Renderable *renderable,
 	void       *render_data, 
+	Vector3     position,
 	Camera3D   *camera
 )
 {
@@ -83,7 +85,7 @@ testRenderableBoxCallback(
 	Color  *color  = (Color*)renderable->data;
 	if (!color) return;
 	DrawCubeV(
-		Vector3Add(entity->position, entity->renderable_offset),
+		Vector3Add(position, entity->renderable_offset),
 		entity->bounds,
 		*color
 	);
@@ -94,6 +96,7 @@ void
 testRenderableBoxWiresCallback(
 	Renderable *renderable,
 	void       *render_data, 
+	Vector3     position,
 	Camera3D   *camera
 )
 {
@@ -101,7 +104,7 @@ testRenderableBoxWiresCallback(
 	Color  *color  = (Color*)renderable->data;
 	if (!color) return;
 	DrawCubeWiresV(
-		Vector3Add(entity->position, entity->renderable_offset),
+		Vector3Add(position, entity->renderable_offset),
 		entity->bounds,
 		*color
 	);
@@ -111,6 +114,7 @@ void
 testRenderableCylinderWiresCallback(
 	Renderable *renderable,
 	void       *render_data, 
+	Vector3     position,
 	Camera3D   *camera
 )
 {
@@ -119,7 +123,7 @@ testRenderableCylinderWiresCallback(
 	float               radius = entity->bounds.x;
 	if (!color) return;
 	DrawCylinderWires(
-		entity->position,
+		position,
 		radius,
 		radius,
 		entity->bounds.y,

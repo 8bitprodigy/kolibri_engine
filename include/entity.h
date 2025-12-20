@@ -7,6 +7,7 @@
 
 typedef void (*EntityCallback)(         Entity *entity);
 typedef void (*EntityCollisionCallback)(Entity *entity, CollisionResult collision);
+typedef void (*EntityTeleportCallback)( Entity *entity, Vector3         from,      Vector3 to);
 typedef void (*EntityUpdateCallback)(   Entity *entity, float           delta);
 
 typedef struct
@@ -18,6 +19,7 @@ EntityVTable
     EntityUpdateCallback    Render;      /* Called once every frame prior to rendering the Entity */
     EntityCollisionCallback OnCollision; /* Called when the Entity collides with something while moving */
     EntityCollisionCallback OnCollided;  /* Called when another Entity collides with this Entity */
+    EntityTeleportCallback  Teleport;    /* Called when the entity is teleported. Useful when camera interpolation is being used. */
     EntityCallback          Exit;        /* Called upon Entity exiting the scene */
     EntityCallback          Free;        /* Called upon freeing Entity from memory */
 }
@@ -133,8 +135,9 @@ bool         Entity_isOnCeiling(     Entity *entity);
 /*
     Methods
 */
-CollisionResult Entity_move(        Entity *entity, Vector3 movement);
-CollisionResult Entity_moveAndSlide(Entity *entity, Vector3 movement);
-void            Entity_render(      Entity *entity, Head *head);
+CollisionResult Entity_move(        Entity *entity, Vector3  movement);
+CollisionResult Entity_moveAndSlide(Entity *entity, Vector3  movement);
+void            Entity_render(      Entity *entity, Head    *head);
+void            Entity_teleport(    Entity *entity, Vector3  to);
 
 #endif /* ENTITY_H */
