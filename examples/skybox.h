@@ -1,8 +1,33 @@
+/*
+	SKYBOX.H
+
+	A simple, single-header library based on Raylib to draw a skybox.
+
+	LICENSE:
+		Copyright (C) 2025 by chrisxdeboy@gmail.com
+
+		Permission to use, copy, modify, and/or distribute this software for
+		any purpose with or without fee is hereby granted.
+
+		THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+		WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+		OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE
+		FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
+		DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+		AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+		OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+
+	USAGE:
+		1. Create an array of 6 Texture2Ds (note the order laid out in SkyboxSides)
+		2. For best results, set filtering to TEXTURE_FILTER_BILINEAR and wrap to TEXTURE_WRAP_CLAMP, as that will eliminate the appearance of seams
+		2. Call SkyBos_draw() before rendering anything else, then clear the depth buffer
+*/
+
 #ifndef SKYBOX_H
 #define SKYBOX_H
 
 
-#include <GL/gl.h>
 #include <raymath.h>
 #include <rlgl.h>
 

@@ -55,7 +55,7 @@
 
 /* Player Constants */
 #define GRAVITY             32.0f
-#define MAX_SPEED           20.0f
+#define MAX_SPEED           50.0f
 
 #define JUMP_HEIGHT          3.5f
 #define JUMP_TIME_TO_PEAK    0.5f
@@ -66,7 +66,7 @@
 #define JUMP_VELOCITY     ( 1.5f * JUMP_HEIGHT) / JUMP_TIME_TO_PEAK
 #define TERMINAL_VELOCITY FALL_GRAVITY * 5
 
-#define MAX_ACCEL 150.0f
+#define MAX_ACCEL 250.0f
 
 #define FRICTION    0.86f
 #define AIR_DRAG    0.98f
@@ -144,24 +144,13 @@ extern Entity       playerTemplate;
 */
 typedef struct
 {
+	SpriteInfo sprite_info;
 	float 
 		damage,
 		speed,
 		timeout;
 }
 ProjectileInfo;
-
-typedef struct
-{
-	SpriteData   sprite_data;
-	Entity
-				*source,
-				*target;
-	Vector3
-				 prev_offset;
-	float        elapsed_time;
-}
-ProjectileData;
 
 void   Projectile_MediaInit(void);
 void   Projectile_new(      Vector3 position, Vector3 direction, Entity *template, Scene *scene);

@@ -107,7 +107,7 @@ Entity
         };
     };
 
-    char *local_data[];
+    unsigned char *local_data[];
 } 
 Entity;
 
@@ -122,7 +122,7 @@ void     Entity_free(       Entity *entity);
 */
 double       Entity_getAge(          Entity *entity);
 BoundingBox  Entity_getBoundingBox(  Entity *entity);
-Renderable  *Entity_getLODRenderable(Entity *entity,  Vector3 camera_position);
+Renderable  *Entity_getLODRenderable(Entity *entity,  Vector3 position, Vector3 camera_position);
 Engine      *Entity_getEngine(       Entity *entity);
 Entity      *Entity_getNext(         Entity *entity);
 Entity      *Entity_getPrev(         Entity *entity);

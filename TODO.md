@@ -9,6 +9,10 @@
 - [X] Implement heightmap terrain Scene type
 	- Got most of it implemented.
 	- Need to implement terrain stitching that works worth a damn.
+- [ ] Implement wraparound for heightmap scene type
+	- Mostly working, just buggy, making the effect not seamless:
+		- projectiles can disappear upon collision with world boundaries for some reason
+		- Crossing world boundaries cause the terrain to flicker out of existence for exactly 1 frame
 - [ ] Figure out why the Heightmap Scene segfaults on exit to main menu
 
 ## General/Unknown:

@@ -712,7 +712,6 @@ genHeightmapDiamondSquare(
 	size_t seed
 )
 {
-	DBG_OUT("CELLS WIDE: %d", cells_wide);
 	float *heightmap = DynamicArray(float, cells_wide * cells_wide);
 	
 	diamondSquareSeeded(heightmap, cells_wide, roughness,decay, seed);
@@ -1062,7 +1061,7 @@ heightmapSceneRender(Scene *scene, Head *head)
 		// Always submit at actual position
 		Renderer_submitEntity(renderer, entity);
 		
-		// Check all 8 wrap offsets
+		// Check all 8 possible wrap positions
 		for (int ox = -1; ox <= 1; ox++) {
 			for (int oz = -1; oz <= 1; oz++) {
 				if (ox == 0 && oz == 0) continue;
@@ -1073,17 +1072,18 @@ heightmapSceneRender(Scene *scene, Head *head)
 					entity->position.z + (oz * world_size)
 				};
 				
-				float dx = test_pos.x - camera_pos.x;
-				float dz = test_pos.z - camera_pos.z;
-				float dist_sq = dx*dx + dz*dz;
+				float 
+					dx = test_pos.x - camera_pos.x,
+					dz = test_pos.z - camera_pos.z,
+					dist_sq = dx*dx + dz*dz;
+					
+				float dy = test_pos.y - camera_pos.y;
+				float dist_sq_3d = dx*dx + dy*dy + dz*dz;
 				
 				if (dist_sq < max_distance * max_distance) {
-					DBG_OUT("Entity %d: actual=(%.1f,%.1f,%.1f) wrapped=(%.1f,%.1f,%.1f) dist=%.1f",
-							i, entity->position.x, entity->position.y, entity->position.z,
-							test_pos.x, test_pos.y, test_pos.z, sqrtf(dist_sq));
-					
 					Vector3 orig = entity->position;
 					entity->position = test_pos;
+					
 					Renderer_submitEntity(renderer, entity);
 					entity->position = orig;
 				}
@@ -1100,88 +1100,88 @@ heightmapSceneCollision(Scene *scene, Entity *entity, Vector3 to)
     HeightmapData *data = &map->data;
     Vector3 from = entity->position;
     
-    // Wrap the 'to' position if it goes outside world bounds
     float half_world = map->world_size * 0.5f;
-    Vector3 wrap_offset = {0, 0, 0};
     
-    if (to.x > half_world) {
-        wrap_offset.x = -map->world_size;
-    } else if (to.x < -half_world) {
-        wrap_offset.x = map->world_size;
-    }
+    // Normalize positions to world bounds for terrain sampling only
+    Vector3 from_normalized = {
+        fmodf(from.x + half_world * 3.0f, map->world_size) - half_world,
+        from.y,
+        fmodf(from.z + half_world * 3.0f, map->world_size) - half_world
+    };
     
-    if (to.z > half_world) {
-        wrap_offset.z = -map->world_size;
-    } else if (to.z < -half_world) {
-        wrap_offset.z = map->world_size;
-    }
-    
-    // Apply wrap offset to both positions for consistent collision check
-    to = Vector3Add(to, wrap_offset);
-    from = Vector3Add(from, wrap_offset);
-    
-    // After collision is resolved, wrap entity position
-    if (wrap_offset.x != 0.0f || wrap_offset.z != 0.0f) {
-       Entity_teleport(entity, Vector3Add(entity->position, wrap_offset));
-    }
+    Vector3 to_normalized = {
+        fmodf(to.x + half_world * 3.0f, map->world_size) - half_world,
+        to.y,
+        fmodf(to.z + half_world * 3.0f, map->world_size) - half_world
+    };
     
 	if (to.y > from.y) {
         return NO_COLLISION;
     }
-    // Calculate entity half height for centering
+    
     float entity_half_height = 0.0f;
     if (entity->collision_shape == COLLISION_CYLINDER || 
         entity->collision_shape == COLLISION_SPHERE) {
         entity_half_height = entity->height * 0.5f;
     }
     
-    // Get terrain surface heights (where entity center should be)
     float 
-		terrain_at_from = getTerrainHeight(map, from) + data->offset + entity_half_height,
-		terrain_at_to   = getTerrainHeight(map, to)   + data->offset + entity_half_height;
+		terrain_at_from = getTerrainHeight(map, from_normalized) + data->offset + entity_half_height,
+		terrain_at_to   = getTerrainHeight(map, to_normalized)   + data->offset + entity_half_height;
     
-    // If both positions above terrain, no collision (like infinite plane)
     if (from.y > terrain_at_from && to.y > terrain_at_to) {
+        // Check wrapping BEFORE returning no collision
+        if (to.x > half_world || to.x < -half_world || to.z > half_world || to.z < -half_world) {
+            Vector3 wrapped = to;
+            while (wrapped.x > half_world) wrapped.x -= map->world_size;
+            while (wrapped.x < -half_world) wrapped.x += map->world_size;
+            while (wrapped.z > half_world) wrapped.z -= map->world_size;
+            while (wrapped.z < -half_world) wrapped.z += map->world_size;
+            Entity_teleport(entity, wrapped);
+        }
         return NO_COLLISION;
     }
     
-    // Calculate hit point and distance
     Vector3 hit_floor_point;
     float distance;
     
     if (from.y > terrain_at_from && to.y <= terrain_at_to) {
-        // Crossing from above to terrain - interpolate to find hit point
         float t = invLerp(from.y, to.y, terrain_at_to);
         hit_floor_point = Vector3Lerp(from, to, t);
-        hit_floor_point.y = terrain_at_to;  // Snap to exact terrain height
+        hit_floor_point.y = terrain_at_to;
         distance = Vector3Distance(from, hit_floor_point);
 	} else {
-		// Already at/below terrain
 		hit_floor_point = (Vector3){to.x, terrain_at_to, to.z};
-		
-		// Return distance as the FULL intended movement, not just vertical adjustment
-		// This allows horizontal movement while correcting Y
 		Vector3 intended_move = Vector3Subtract(to, from);
-		distance = Vector3Length(intended_move);  // Full movement distance
+		distance = Vector3Length(intended_move);
 	}
     
-    // Calculate normal
     float 
-		normalized_x = (to.x / map->world_size) + 0.5f,
-		normalized_z = (to.z / map->world_size) + 0.5f;
+		normalized_x = (to_normalized.x / map->world_size) + 0.5f,
+		normalized_z = (to_normalized.z / map->world_size) + 0.5f;
     int 
-		grid_x = CLAMP((int)(normalized_x * map->cells_wide), 0, map->cells_wide),
-		grid_z = CLAMP((int)(normalized_z * map->cells_wide), 0, map->cells_wide);
+		grid_x = CLAMP((int)(normalized_x * map->cells_wide), 0, map->cells_wide - 1),
+		grid_z = CLAMP((int)(normalized_z * map->cells_wide), 0, map->cells_wide - 1);
     Vector3 normal = calculateVertexNormal(map, grid_x, grid_z, 1.0f, data->height_scale);
-    // Check if this is a walkable floor
+    
 	float 
 		dot_up = Vector3DotProduct(normal, V3_UP),
 		floor_threshold = cosf(entity->floor_max_angle * DEG2RAD);
 
-	// If it's a walkable floor, return vertical normal so slide doesn't deflect horizontally
 	if (dot_up > floor_threshold) {
 		normal = V3_UP;
 	}
+    
+    // Wrap entity after collision is resolved
+    if (to.x > half_world || to.x < -half_world || to.z > half_world || to.z < -half_world) {
+        Vector3 wrapped = to;
+        while (wrapped.x > half_world) wrapped.x -= map->world_size;
+        while (wrapped.x < -half_world) wrapped.x += map->world_size;
+        while (wrapped.z > half_world) wrapped.z -= map->world_size;
+        while (wrapped.z < -half_world) wrapped.z += map->world_size;
+        Entity_teleport(entity, wrapped);
+    }
+    
     return (CollisionResult){
         true,
         distance,
@@ -1200,33 +1200,28 @@ heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
     Heightmap     *map  = Scene_getMapData(scene);
     HeightmapData *data = &map->data;
     
-	// Wrap positions if they're outside world bounds
-    float   half_world  = map->world_size * 0.5f;
-    Vector3 wrap_offset = {0, 0, 0};
+    float half_world = map->world_size * 0.5f;
     
-    // Check if 'to' is outside bounds
-    if (to.x > half_world) {
-        wrap_offset.x = -map->world_size;
-    } else if (to.x < -half_world) {
-        wrap_offset.x = map->world_size;
-    }
+    // Calculate shortest path considering wrapping
+    Vector3 delta = Vector3Subtract(to, from);
     
-    if (to.z > half_world) {
-        wrap_offset.z = -map->world_size;
-    } else if (to.z < -half_world) {
-        wrap_offset.z = map->world_size;
-    }
+    // Wrap delta components to shortest path
+    if (delta.x > half_world) delta.x -= map->world_size;
+    else if (delta.x < -half_world) delta.x += map->world_size;
     
-    // Apply wrap offset to both positions
-    from = Vector3Add(from, wrap_offset);
-    to   = Vector3Add(to, wrap_offset);
+    if (delta.z > half_world) delta.z -= map->world_size;
+    else if (delta.z < -half_world) delta.z += map->world_size;
     
-    // Check if the raycast crosses a wrap boundary (huge distance)
+    // Recalculate 'to' using shortest path
+    to = Vector3Add(from, delta);
+    
+    // Now wrap both positions into world bounds for grid traversal
+    from.x = fmodf(from.x + half_world + map->world_size, map->world_size) - half_world;
+    from.z = fmodf(from.z + half_world + map->world_size, map->world_size) - half_world;
+    to.x = fmodf(to.x + half_world + map->world_size, map->world_size) - half_world;
+    to.z = fmodf(to.z + half_world + map->world_size, map->world_size) - half_world;
+    
     float ray_length = Vector3Distance(from, to);
-    if (ray_length > half_world) {
-        // Ray crosses wrap boundary - no collision
-        return NO_COLLISION;
-    }
     
     int     grid_size             = map->cells_wide;
     float (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
@@ -1353,12 +1348,6 @@ HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 	heightmap.world_size = heightmap.cells_wide        * heightmap_data->cell_size;
 	heightmap.data       = *heightmap_data;
 
-	DBG_OUT("=== Heightmap Setup ===");
-	DBG_OUT("chunks_wide=%d, chunk_cells=%d", 
-	        heightmap_data->chunks_wide, heightmap_data->chunk_cells);
-	DBG_OUT("cells_wide=%zu, world_size=%.1f, half_world=%.1f",
-	        heightmap.cells_wide, heightmap.world_size, heightmap.world_size * 0.5f);
-
 	float 
 		lod_scalar     = ( DEFAULT_MAX_RENDER_DISTANCE 
 				/ (
@@ -1384,8 +1373,6 @@ HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 			0.5f,
 			0
 		);
-	
-	DBG_OUT("=== End Heightmap Setup ===\n");
 	
 	return Scene_new(
 			&heightmap_Scene_Callbacks, 

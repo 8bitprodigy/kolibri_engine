@@ -30,7 +30,7 @@ Renderer
 
 	RenderableWrapper  *wrapper_pool;
     RenderableWrapper **all_wrappers;
-	Renderable        **transparent_renderables;
+	RenderableWrapper **transparent_renderables;
 	void              **transparent_render_data; 
 	float              *transparent_distances;
 }
@@ -173,7 +173,7 @@ Renderer__queryFrustum(
 	Renderer *renderer,
 	Head     *head,
 	float     max_distance,
-	int      *visible_count
+	size_t   *visible_count
 )
 {
     static RenderableWrapper *frustum_results[VIS_QUERY_SIZE];
@@ -323,14 +323,14 @@ Renderer__render(Renderer *renderer, Head *head)
 
         if (wrapper->is_entity) {
             Entity *entity = wrapper->entity;
-            renderable     = Entity_getLODRenderable(entity, camera_pos);
+            renderable     = Entity_getLODRenderable(entity, render_pos, camera_pos);
             render_data    = entity;
         }
         else {
             renderable  = wrapper->renderable;
             render_data = renderable->data;
         }
-
+        
         if (!renderable) continue;
 
         if (renderable->transparent) {
@@ -357,15 +357,15 @@ Renderer__render(Renderer *renderer, Head *head)
         
         if (wrapper->is_entity) {
             Entity *entity = wrapper->entity;
-            renderable     = Entity_getLODRenderable(entity, camera_pos);
+            renderable     = Entity_getLODRenderable(entity, wrapper->position, camera_pos);
             render_data    = entity;
         }
         else {
             renderable  = wrapper->renderable;
             render_data = renderable->data;
         }
-        
 	    if (renderable->Render) {
+            //DrawSphereWires(wrapper->position, 1.0f, 3, 8, YELLOW);
 	        renderable->Render(renderable, render_data, wrapper->position, camera);
 	    }
 	}
@@ -378,7 +378,7 @@ swap_transparent(Renderer *renderer, int i, int j)
     renderer->transparent_distances[i] = renderer->transparent_distances[j];
     renderer->transparent_distances[j] = temp_dist;
 
-    Renderable *temp_rend = renderer->transparent_renderables[i];
+    RenderableWrapper *temp_rend = renderer->transparent_renderables[i];
     renderer->transparent_renderables[i] = renderer->transparent_renderables[j];
     renderer->transparent_renderables[j] = temp_rend;
 

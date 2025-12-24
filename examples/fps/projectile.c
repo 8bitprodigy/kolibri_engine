@@ -5,8 +5,21 @@
 #include <raymath.h>
 
 
+typedef struct
+{
+	SpriteData   sprite_data;
+	Entity
+				*source,
+				*target;
+	Vector3
+				 prev_offset;
+	float        elapsed_time;
+}
+ProjectileData;
+
+
 /*
-	Media forward declarations
+	Media forward declarations (To be removed later)
 */
 Model
 	blast_model;
@@ -22,6 +35,7 @@ void projectileSetup(    Entity *self);
 void projectileUpdate(   Entity *self, float           delta);
 void projectileRender(   Entity *self, float           delta);
 void projectileCollision(Entity *self, CollisionResult collision);
+
 
 /*
 	Template declarations
@@ -109,7 +123,9 @@ Projectile_MediaInit(void)
 			1.0f/15.0f,
 			blast_sprite,
 			4, 4,
-			SPRITE_ALIGN_CAMERA
+			SPRITE_ALIGN_CAMERA,
+			SPRITE_DIR_RANDOM,
+			SPRITE_PLAY_LOOP
 		);
 	
 	DBG_OUT("Projectile_MediaInit() ran.");
@@ -127,9 +143,10 @@ Projectile_new(Vector3 position, Vector3 direction, Entity *template, Scene *sce
 	ProjectileData *data = (ProjectileData*)&projectile->local_data;
 
 	size_t start_frame = rand() % 16;
-	data->sprite_data       = (SpriteData){
+	data->sprite_data      = (SpriteData){
 			.start_frame   = start_frame,
 			.current_frame = start_frame,
+			.playing       = true,
 		};
 	data->prev_offset       = V3_ZERO;
 	data->elapsed_time      = 0.0f;
@@ -207,11 +224,10 @@ projectileRender(Entity *self, float delta)
 	
 	SpriteInfo *sinfo = (SpriteInfo*)self->renderables[0]->data;
 	SpriteData *sdata = &data->sprite_data;
-	sdata->current_frame = AnimateSprite(
+	AnimateSprite(
 			sinfo,
 			sdata,
-			Entity_getAge(self),
-			16
+			Entity_getAge(self)
 		);
 }
 

@@ -113,9 +113,9 @@ Entity_getBoundingBox(Entity *entity)
 }
 
 Renderable *
-Entity_getLODRenderable(Entity *entity,  Vector3 camera_position)
+Entity_getLODRenderable(Entity *entity, Vector3 position, Vector3 camera_position)
 {
-	float distance = Vector3Distance(entity->position, camera_position);
+	float distance = Vector3Distance(position, camera_position);
 	
 	int lod_level  = -1;
 	for (int i = 0; i < entity->lod_count; i++) {
