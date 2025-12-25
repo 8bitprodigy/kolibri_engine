@@ -16,26 +16,26 @@
 	#define EXPLOSION_DEFAULT_FALLOFF 0.1f
 #endif
 
-
-typedef struct
-{
-	float
-		radius,
-		falloff,
-		damage;
-	SpriteInfo sprite_info;
-}
-ExplosionInfo;
+typedef struct ExplosionInfo ExplosionInfo;
 
 typedef struct
 {
 	SpriteData sprite_data;
-	float      elapsed_time;
 }
 ExplosionData;
 
+ExplosionInfo *ExplosionInfo_new(
+	float     radius, 
+	float     falloff, 
+	float     damage, 
+	float     scale,
+	float     time_per_frame,
+	Texture2D atlas,
+	size_t    x_num_frames,
+	size_t    y_num_frames
+);
 
-void Explosion_new(ExplosionInfo *info, Vector3 position, Scene *scene);
-
+void Explosion_new(    ExplosionInfo *info, Vector3     position, Scene *scene);
+void ExplosionComplete(SpriteInfo    *info, SpriteData *data);
 
 #endif /* EXPLOSION_H */

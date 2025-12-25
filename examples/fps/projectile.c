@@ -47,7 +47,7 @@ ProjectileInfo
 			.timeout =  5.5f,
 		};
 
-SpriteInfo blast_sprite_info;/* = {
+SpriteInfo *blast_sprite_info;/* = {
 		.scale            = 1.0f,
 		.time_per_frame   = 1.0f/12.0f,
 		.num_frames       = 16,
@@ -57,7 +57,7 @@ SpriteInfo blast_sprite_info;/* = {
 
 Renderable
 	blast_Renderable = (Renderable){
-			.data        = &blast_sprite_info,
+			.data        = NULL,
 			.Render      = RenderBillboard,
 			.transparent = true,
 		};
@@ -68,7 +68,7 @@ projectile_Callbacks = (EntityVTable){
 	.Enter       = NULL,
 	.Update      = projectileUpdate,
 	.Render      = projectileRender,
-	.OnCollision = projectileCollision,
+	.OnCollision = NULL,
 	.OnCollided  = projectileCollision,
 	.Exit        = NULL,
 	.Free        = NULL,
@@ -118,17 +118,19 @@ Projectile_MediaInit(void)
 	//SetMaterialTexture(&blast_model.materials[0], MATERIAL_MAP_ALBEDO, blast_texture);
 	SetTextureFilter(blast_texture, TEXTURE_FILTER_BILINEAR);
 
-	blast_sprite_info = CreateRegularSprite(
+	blast_sprite_info = SpriteInfo_newRegular(
 			1.0f,
-			1.0f/15.0f,
+			1.0f/24.0f,
 			blast_sprite,
 			4, 4,
 			SPRITE_ALIGN_CAMERA,
 			SPRITE_DIR_RANDOM,
-			SPRITE_PLAY_LOOP
+			SPRITE_PLAY_LOOP,
+			NULL,
+			NULL
 		);
-	
-	DBG_OUT("Projectile_MediaInit() ran.");
+
+	blast_Renderable.data = blast_sprite_info;
 }
 
 void
@@ -199,6 +201,11 @@ projectileUpdate(   Entity *self, float delta)
 	if (collision.hit) {
 		self->visible = false;
 		self->active = false;
+		Explosion_new(
+				explosion_Info, 
+				collision.position, 
+				Entity_getScene(self)
+			);
 		Entity_free(self);
 	}
 }
@@ -236,6 +243,12 @@ projectileCollision(Entity *self, CollisionResult collision)
 {
 	self->visible = false;
 	self->active  = false;
+	Explosion_new(
+			explosion_Info, 
+			collision.position, 
+			Entity_getScene(self)
+		);
+	Entity_free(self);
 }
 
 void

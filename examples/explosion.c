@@ -1,8 +1,23 @@
-#include "explosion.h"
+#include <stddef.h>
+#include <stdlib.h>
+
 #include "entity.h"
+#include "explosion.h"
+/* MUST COME LAST */
 #include <raymath.h>
 
 
+typedef struct
+ExplosionInfo
+{
+	float
+		radius,
+		falloff,
+		damage;
+	SpriteInfo *sprite_info;
+	Renderable  renderable;
+}
+ExplosionInfo;
 /*
 	Callback forward delcarations
 */
@@ -24,10 +39,10 @@ Renderable
 
 EntityVTable 
 Explosion_Callbacks = (EntityVTable){
-	.Setup       = NULL,
+	.Setup       = explosionSetup,
 	.Enter       = NULL,
 	.Update      = NULL,
-	.Render      = NULL,
+	.Render      = explosionRender,
 	.OnCollision = NULL,
 	.OnCollided  = NULL,
 	.Exit        = NULL,
@@ -79,15 +94,6 @@ explosionSetup(Entity *self)
 
 
 void 
-explosionUpdate(Entity *self, float delta)
-{
-	SpriteData *data = (SpriteData*)&self->local_data;
-
-	if (!data->playing) Entity_free(self);
-}
-
-
-void 
 explosionRender(Entity *self, float delta)
 {
 	
@@ -114,6 +120,60 @@ explosionCollision(Entity *self, CollisionResult collision)
 	PUBLIC METHODS
 */
 
+void
+ExplosionComplete(SpriteInfo *info, SpriteData *data) 
+{
+	ExplosionData *edata   = (ExplosionData*)((char*)data - offsetof(ExplosionData, sprite_data));
+	Entity        *entity = (Entity*)((char*)edata - offsetof(Entity, local_data));
+	Entity_free(entity);
+}
+
+
+ExplosionInfo *
+ExplosionInfo_new(
+	float     radius, 
+	float     falloff, 
+	float     damage, 
+	float     scale,
+	float     time_per_frame,
+	Texture2D atlas,
+	size_t    x_num_frames,
+	size_t    y_num_frames
+)
+{
+	ExplosionInfo *info;
+	if (!(info = malloc(sizeof(ExplosionInfo)))) {
+		ERR_OUT("Failed to allocate memory for ExplosionInfo.");
+		return NULL;
+	}
+
+	SpriteInfo *sprite_info = SpriteInfo_newRegular(
+			scale,
+			time_per_frame,
+			atlas,
+			x_num_frames,
+			y_num_frames,
+			SPRITE_ALIGN_CAMERA,
+			SPRITE_DIR_FORWARD,
+			SPRITE_PLAY_ONESHOT,
+			ExplosionComplete,
+			NULL
+		);
+	
+	info->radius                   = radius;
+	info->falloff                  = falloff;
+	info->damage                   = damage;
+	info->sprite_info              = sprite_info;
+	info->renderable               = (Renderable){
+			.data        = sprite_info,
+			.Render      = RenderBillboard,
+			.transparent = true,
+		};
+
+	return info;
+}
+
+
 void 
 Explosion_new(
 	ExplosionInfo *info, 
@@ -127,17 +187,27 @@ Explosion_new(
 			sizeof(ExplosionData)
 		);
 
-	ExplosionData *data = (ExplosionData*)&explosion->local_data;
+	if (!explosion) {
+		ERR_OUT("Failed to construct Explosion.");
+		return;
+	}
 
-	size_t start_frame = 0;
-	data->sprite_data      = (SpriteData){
-			.start_frame   = start_frame,
-			.current_frame = start_frame,
-		};
-	data->elapsed_time      = 0.0f;
+	ExplosionData *data = (ExplosionData*)&explosion->local_data;
 	
-	explosion->position    = position;
-	explosion->visible     = true;
-	explosion->active      = true;
-	explosion->orientation = QuaternionIdentity();
+	data->sprite_data      = (SpriteData){
+			.start_frame   = 0,
+			.current_frame = 0,
+			.playing       = true,
+		};
+
+	info->renderable.Render = RenderBillboard;
+	
+	explosion->renderables[0] = &info->renderable;
+	explosion->user_data      = info;
+	explosion->position       = position;
+	explosion->visible        = true;
+	explosion->active         = true;
+	explosion->solid          = false;
+	explosion->orientation    = QuaternionIdentity();
 }
+

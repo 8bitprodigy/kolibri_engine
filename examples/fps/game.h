@@ -10,6 +10,7 @@
 #include "assman.h"
 #include "infinite_plane_scene.h"
 #include "common.h"
+#include "explosion.h"
 #include "kolibri.h"
 #include "sprite.h"
 #include "utils.h"
@@ -74,6 +75,12 @@
 #define MAX_SLIDES  3
 
 
+
+/* 
+	game.c
+*/
+extern ExplosionInfo *explosion_Info;
+void Game_mediaInit();
 /*
 	main.c
 */
@@ -144,7 +151,7 @@ extern Entity       playerTemplate;
 */
 typedef struct
 {
-	SpriteInfo sprite_info;
+	SpriteInfo *sprite_info;
 	float 
 		damage,
 		speed,

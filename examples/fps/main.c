@@ -76,7 +76,7 @@ runEngine(void *data, void *value)
 			sizeof(texture_path),
 			"%s%s", 
 			path_prefix, 
-			"resources/textures/grass/00.png"
+			"resources/textures/grass/00_bw.png"
 		);
 		
 	/*scene = Scene_new(&infinite_Plane_Scene_Callbacks, NULL, NULL, 0, engine); // */
@@ -90,8 +90,8 @@ runEngine(void *data, void *value)
 			.chunks_wide   = 32,
 			.sun_color     = (Color){255, 255, 250, 255},
 			.ambient_color = (Color){115, 115, 155, 255},
-			.hi_color      = WHITE,
-			.lo_color      = WHITE,
+			.hi_color      = (Color){110, 141,  70, 255},
+			.lo_color      = BEIGE,
 			.texture       = LoadTexture(texture_path),
 		};
 	scene = HeightmapScene_new(&heightmap, engine);
@@ -258,6 +258,7 @@ main(int argc, char **argv)
 	HandleMouse();
 	
 	Projectile_MediaInit();
+	Game_mediaInit();
 
 	mainMenu = Menu( "Main Menu",
 			MENU_WIDTH,

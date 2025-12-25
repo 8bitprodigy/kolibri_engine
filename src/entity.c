@@ -49,16 +49,17 @@ Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
 		ERR_OUT("Failed to allocate memory for EntityNode.");
 		return NULL;
 	}
+	Entity *entity = NODE_TO_ENTITY(node);
+	Engine *engine = scene->engine;
 
 	node->next   = node;
 	node->prev   = node;
-	node->engine = scene->engine;
+	node->engine = engine;
 	node->size   = sizeof(EntityNode) + user_data_size;
 	node->on_floor   = false;
 	node->on_wall    = false;
 	node->on_ceiling = false;
 
-	Entity *entity = NODE_TO_ENTITY(node);
 	entity->user_data =  NULL;
 	*entity           = *template;
 
@@ -67,10 +68,10 @@ Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
 	Scene__insertEntity(scene, node);
 	node->scene  = scene;
 
+	node->creation_time = Engine_getTime(engine);
+	
 	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Setup) vtable->Setup(entity);
-
-	node->creation_time = GetTime();
 	
 	return entity;
 }

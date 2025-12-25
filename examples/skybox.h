@@ -1,7 +1,8 @@
 /*
 	SKYBOX.H
 
-	A simple, single-header library based on Raylib to draw a skybox.
+	DESCRIPTION:
+		A simple, single-header library based on Raylib to draw a skybox.
 
 	LICENSE:
 		Copyright (C) 2025 by chrisxdeboy@gmail.com
@@ -19,9 +20,13 @@
 
 
 	USAGE:
-		1. Create an array of 6 Texture2Ds (note the order laid out in SkyboxSides)
-		2. For best results, set filtering to TEXTURE_FILTER_BILINEAR and wrap to TEXTURE_WRAP_CLAMP, as that will eliminate the appearance of seams
-		2. Call SkyBos_draw() before rendering anything else, then clear the depth buffer
+		1. Create an array of 6 Texture2Ds (note the order laid out in 
+			SkyboxSides)
+		2. For best results, set filtering to TEXTURE_FILTER_BILINEAR and wrap 
+			to TEXTURE_WRAP_CLAMP, as that will eliminate the appearance of 
+			seams
+		2. Call SkyBos_draw() before rendering anything else, then clear the 
+			depth buffer
 */
 
 #ifndef SKYBOX_H
@@ -43,6 +48,7 @@ typedef enum
 }
 SkyboxSides;
 
+#ifndef SKYBOX_NAMES_OVERRIDDEN
 static const char *SkyBox_names[6] = {
 		"UP",
 		"DOWN",
@@ -51,10 +57,11 @@ static const char *SkyBox_names[6] = {
 		"EAST",
 		"WEST"
 	};
+#endif /* SKYBOX_NAMES_OVERRIDDEN */
 
 static const Vector3 SkyBox_verts[8] = {
 		/* Top (+Y) */
-		(Vector3){-1.0f,  1.0f, -1.0f}, /* 0  NW (north-west) */
+		(Vector3){-1.0f,  1.0f, -1.0f}, /* 0  NW */
 		(Vector3){ 1.0f,  1.0f, -1.0f}, /* 1  NE */
 		(Vector3){ 1.0f,  1.0f,  1.0f}, /* 2  SE */
 		(Vector3){-1.0f,  1.0f,  1.0f}, /* 3  SW */
