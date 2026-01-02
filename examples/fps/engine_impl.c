@@ -34,6 +34,7 @@ Menu
 void
 unPause(void *data, void *value)
 {
+	(void)value;
 	paused = false;
 	Engine_pause((Engine*)data, false);
 }
@@ -41,6 +42,7 @@ unPause(void *data, void *value)
 void
 exitToMain(void *data, void *value)
 {
+	(void)value;
 	paused = false;
 	Engine_requestExit((Engine*)data);
 	Engine_pause((Engine*)data, paused);
@@ -49,12 +51,14 @@ exitToMain(void *data, void *value)
 void
 engineRun(Engine *engine)
 {
+	(void)engine;
 	DisableCursor();
 }
 
 void
 engineRender(Engine *engine)
 {
+	(void)engine;
 	DrawFPS(10, 10);
 }
 
@@ -111,12 +115,14 @@ enginePause(Engine *engine)
 void
 engineUnpause(Engine *engine)
 {
+	(void)engine;
 	DisableCursor();
 }
 
 void
 engineExit(Engine *engine)
 {
+	(void)engine;
 	Engine_free(engine);
 	EnableCursor();
 	HandleMouse();

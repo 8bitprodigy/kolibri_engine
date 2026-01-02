@@ -110,14 +110,9 @@ bool
 isSphereInFrustum(
 	Vector3  center, 
 	float    radius, 
-	Frustum *frustum,
-	float    dist_sq,
-	float    max_distance
+	Frustum *frustum
 )
 { 
-	/* Quick distance check using pre-calculated distance */
-    float max_dist_check = max_distance + radius;
-
     /* Test against frustum planes efficiently */
     for (int i = FRUSTUM_LEFT; i <= FRUSTUM_FAR; i++) {
         const Plane *plane = &frustum->planes[i];
@@ -234,9 +229,7 @@ Renderer__queryFrustum(
                 wrapper->is_entity 
                     ?  wrapper->entity->visibility_radius 
                     : wrapper->bounds.x,
-                frustum,
-                dist_sq,
-                max_distance
+                frustum
             )) {
             frustum_results[*visible_count] = wrapper;
             (*visible_count)++;
@@ -312,7 +305,7 @@ Renderer__render(Renderer *renderer, Head *head)
     }
     
     /* PASS 1: Render opaque stuff, collect transparent */
-    for (int i = 0; i < visible_count; i++) {
+    for (size_t i = 0; i < visible_count; i++) {
         RenderableWrapper *wrapper = visible_wrappers[i];
         
         if (wrapper->is_entity && !wrapper->entity->visible) continue;
@@ -431,8 +424,7 @@ Renderer_submitEntity(Renderer *renderer, Entity *entity) {
     wrapper.position  = entity->position;
     wrapper.bounds    = entity->bounds;
     wrapper.is_entity = true;
-
-    size_t index = DynamicArray_length(renderer->wrapper_pool);
+    
     DynamicArray_add((void**)&renderer->wrapper_pool, &wrapper);
 }
 
@@ -448,7 +440,6 @@ void Renderer_submitGeometry(
     wrapper.position   = position;
     wrapper.bounds     = bounds;
     wrapper.is_entity  = false;
-
-    size_t index = DynamicArray_length(renderer->wrapper_pool);
+    
     DynamicArray_add((void**)&renderer->wrapper_pool, &wrapper);
 }

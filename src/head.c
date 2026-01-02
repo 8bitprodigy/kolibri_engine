@@ -342,9 +342,7 @@ Head__updateAll(Head *head, float delta)
 	Head *starting_head = head;
 	
 	do {
-		HeadVTable *vtable = head->vtable;
 		Head_update(head, delta);
-
 		head = head->next;
 	} while (head != starting_head);
 }

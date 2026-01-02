@@ -16,13 +16,9 @@
 	#define EXPLOSION_DEFAULT_FALLOFF 0.1f
 #endif
 
+
 typedef struct ExplosionInfo ExplosionInfo;
 
-typedef struct
-{
-	SpriteData sprite_data;
-}
-ExplosionData;
 
 ExplosionInfo *ExplosionInfo_new(
 	float     radius, 

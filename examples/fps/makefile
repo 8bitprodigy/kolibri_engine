@@ -1,7 +1,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0  -DDEBUG#-DHEAD_USE_RENDER_TEXTURE
 LIBS    = -lraylib -lGL -lm
-INCLUDE = -I../../include -I/usr/local/include -I../
+INCLUDE = -I../../include -I/usr/local/include 
 LIBDIR  = -L/usr/local/lib
 
 PROJECTNAME = fps_example
@@ -39,7 +39,7 @@ EXAMPLES_SRC = $(wildcard $(EXAMPLESDIR)/*.c)
 GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
 
 ENGINE_OBJS   = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
-EXAMPLES_OBJS = $(EXAMPLES_SRC:$(EXAMPLESDIR)/%.c=$(OBJDIR)/game/%.o)
+EXAMPLES_OBJS = $(EXAMPLES_SRC:$(EXAMPLESDIR)/%.c=$(OBJDIR)/examples/%.o)
 GAME_OBJS     = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
 
 OBJS = $(ENGINE_OBJS) $(EXAMPLES_OBJS) $(GAME_OBJS)
@@ -57,12 +57,13 @@ rm-elf:
 prepare:
 	mkdir -p $(OBJDIR)
 	mkdir -p $(OBJDIR)/engine
+	mkdir -p $(OBJDIR)/examples
 	mkdir -p $(OBJDIR)/game
 
 $(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
 	
-$(OBJDIR)/game/%.o: $(EXAMPLESDIR)/%.c
+$(OBJDIR)/examples/%.o: $(EXAMPLESDIR)/%.c
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
 
 $(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c

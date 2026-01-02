@@ -43,6 +43,7 @@ SpriteInfo_newRegular(
 	Texture2D        atlas, 
 	size_t           x_num_frames, 
 	size_t           y_num_frames, 
+	size_t           total_frames,
 	SpriteAlignment  sprite_alignment,
 	SpriteDirection  sprite_direction,
 	SpritePlayback   sprite_playback,
@@ -51,13 +52,11 @@ SpriteInfo_newRegular(
 )
 {
 	SpriteInfo *result = SpriteInfo_new();
-
-	size_t num_frames = x_num_frames * y_num_frames;
 	
 	result->scale            = scale;
 	result->time_per_frame   = time_per_frame;
 	result->atlas            = atlas;
-	result->num_frames       = num_frames;
+	result->num_frames       = total_frames;
 	result->sprite_alignment = sprite_alignment;
 	result->sprite_playback  = sprite_playback;
 	result->sprite_direction = sprite_direction;
@@ -67,9 +66,9 @@ SpriteInfo_newRegular(
 	float
 		frame_width   = atlas.width  / x_num_frames,
 		frame_height  = atlas.height / y_num_frames;
-	Rectangle *frames = DynamicArray(Region, num_frames);
-	for (int y = 0; y < y_num_frames; y++) { 
-		for (int x = 0; x < x_num_frames; x++) {
+	Rectangle *frames = DynamicArray(Region, x_num_frames * y_num_frames);
+	for (size_t y = 0; y < y_num_frames; y++) { 
+		for (size_t x = 0; x < x_num_frames; x++) {
 			frames[y * x_num_frames + x] = (Rectangle){
 					.x      = x * frame_width,
 					.y      = y * frame_height,
@@ -80,7 +79,7 @@ SpriteInfo_newRegular(
 	}
 	result->frames = frames;
 
-	result->renderable       = (Renderable){
+	result->renderable      = (Renderable){
 			.data        = result,
 			.transparent = true,
 			.Render      = RenderBillboard,
@@ -123,6 +122,12 @@ SpriteInfo_newIrregular(
 		};
 
 	return result;
+}
+
+Renderable *
+SpriteInfo_getRenderable(SpriteInfo *self)
+{
+	return &self->renderable;
 }
 
 
@@ -221,7 +226,7 @@ RenderBillboard(
 {
 	SpriteInfo *info    = (SpriteInfo*)renderable->data;
 	Entity     *entity  = (Entity*)render_data;
-	SpriteData *data   = (SpriteData*)entity->local_data;
+	SpriteData *data    = (SpriteData*)entity->local_data;
 	Texture2D   texture = info->atlas;
 	Rectangle   region  = info->frames[data->current_frame];
 	float       

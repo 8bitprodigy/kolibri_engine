@@ -7,7 +7,7 @@
 #include "_scene_.h"
 #include "common.h"
 #define RMEM_IMPLEMENTATION
-#include "rmem.h"
+#include "../examples/rmem.h"
 
 
 #define PUSH_OUT_DISTANCE  0.1f
@@ -52,17 +52,14 @@ Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
 	Entity *entity = NODE_TO_ENTITY(node);
 	Engine *engine = scene->engine;
 
-	node->next   = node;
-	node->prev   = node;
-	node->engine = engine;
-	node->size   = sizeof(EntityNode) + user_data_size;
-	node->on_floor   = false;
-	node->on_wall    = false;
-	node->on_ceiling = false;
-
-	entity->user_data =  NULL;
 	*entity           = *template;
-
+	entity->user_data =  NULL;
+	
+	node->next      = node;
+	node->prev      = node;
+	node->engine    = engine;
+	node->size      = sizeof(EntityNode) + user_data_size;
+	node->flags     = 0;
 	node->unique_ID = Latest_ID++;
 	
 	Scene__insertEntity(scene, node);
@@ -79,7 +76,8 @@ Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
 void
 Entity_free(Entity *self)
 {
-	EntityNode__free(ENTITY_TO_NODE(self));
+	//EntityNode__free(ENTITY_TO_NODE(self));
+	ENTITY_TO_NODE(self)->to_delete = true;
 }
 
 
@@ -269,28 +267,6 @@ Entity_teleport(Entity *entity, Vector3  to)
 	entity->position = to;
 }
 
-/*
-void
-Entity_render(Entity *entity, Head *head)
-{
-	if (!entity->visible) return;
-	
-	Camera3D *camera   = &head->camera;
-	float     distance = Vector3Distance(entity->position, camera->position);
-
-	int lod_level = -1;
-	for (int i = 0; i < entity->lod_count; i++) {
-		if (entity->lod_distances[i] < distance) continue;
-		lod_level = i;
-		break;
-	}
-	if (lod_level < 0) return; /* Distance is greater than max renderable LOD level, so don't render it. */
-	/*
-	Renderable *renderable = entity->renderables[lod_level];
-
-	if (renderable && renderable->Render) renderable->Render(renderable, (void*)entity);
-}
-*/
 
 /*
 	Private Methods
@@ -346,6 +322,12 @@ EntityNode__updateAll(EntityNode *node, float delta)
 	
 	do {
 		Entity *entity = NODE_TO_ENTITY(node);
+		if (node->to_delete) {
+			EntityNode *deleted = node;
+			node = node->next;
+			EntityNode__free(deleted);
+			continue;
+		}
 		if (entity->active) {
 			EntityVTable *vtable = entity->vtable;
 			if (vtable && vtable->Update) vtable->Update(entity, delta);
@@ -364,7 +346,7 @@ EntityNode__renderAll(EntityNode *node, float delta)
 	
 	do {
 		Entity *entity = NODE_TO_ENTITY(node);
-		if (entity->active) {
+		if (entity->visible) {
 			EntityVTable *vtable = entity->vtable;
 			if (vtable && vtable->Render) vtable->Render(entity, delta);
 		}

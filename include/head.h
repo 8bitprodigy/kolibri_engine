@@ -6,9 +6,9 @@
 
 
 #define DEFAULT_RENDERERSETTINGS ((RendererSettings){ \
-		DEFAULT_MAX_RENDER_DISTANCE, \
-		DEFAULT_MAX_ENTITIES_PER_FRAME, \
-		DEFAULT_RENDER_FLAGS \
+		.max_render_distance    = DEFAULT_MAX_RENDER_DISTANCE, \
+		.max_entities_per_frame = DEFAULT_MAX_ENTITIES_PER_FRAME, \
+		.flags                  = DEFAULT_RENDER_FLAGS \
 	})
 
 

@@ -25,7 +25,7 @@ KOS_ROMDISK_DIR = resources
 include $(KOS_BASE)/Makefile.rules
 
 # KOS-specific flags and libraries
-KOSCCFLAGS += -Iinclude -I../../include -I/usr/local/include -I../
+KOSCCFLAGS += -Iinclude -I../../include -I/usr/local/include -I..
 KOSCCFLAGS += -lraylib -lGL -lkosutils -O3 -flto #-g3
 KOSCCFLAGS += -DSCREEN_HEIGHT=480 -DSCREEN_WIDTH=640
 KOSCCFLAGS += -DPATH_PREFIX='"/cd/"' 

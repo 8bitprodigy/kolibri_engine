@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include "game.h"
-#include "heightmap.h"
+#include "../heightmap.h"
 #define RAYGUI_IMPLEMENTATION
 #define MENU_IMPLEMENTATION
 #include "../menu.h"
@@ -47,6 +47,7 @@ char *path_prefix;
 void
 switchMenu(void *data, void *value)
 {
+	(void)value;
 	currentMenu = (Menu*)data;
 	currentMenu->selection   = -1;
 }
@@ -54,6 +55,8 @@ switchMenu(void *data, void *value)
 void 
 runEngine(void *data, void *value)
 {
+	(void)data;
+	(void)value;
 	engine = Engine_new(&engine_Callbacks, tick_rate);
 	Head *head = Head_new(
 			(Region){0,0,screen_width, screen_height}, 
@@ -63,7 +66,7 @@ runEngine(void *data, void *value)
 		);
 		
 	RendererSettings *settings = Head_getRendererSettings(head);
-	settings->frustum_culling = false;
+	settings->frustum_culling = true;
 	Camera3D *cam = Head_getCamera(head);
 	cam->fovy     = 45.0f;
 	cam->up       = V3_UP;
@@ -135,6 +138,7 @@ runEngine(void *data, void *value)
 void 
 closeAll(void *data, void *value)
 {
+	(void)value;
 	if (data) Engine_requestExit(engine);
 	readyToClose = true;
 }
@@ -257,19 +261,26 @@ main(int argc, char **argv)
 	
 	HandleMouse();
 	
-	Projectile_MediaInit();
 	Game_mediaInit();
 
+#ifndef ON_CONSOLE
 	mainMenu = Menu( "Main Menu",
 			MENU_WIDTH,
 			MENU_ITEM_HEIGHT,
 			MENU_PADDING,
 			MenuButton( "Run",        runEngine,  engine),
 			MenuButton( "Options...", switchMenu, &optionsMenu),
-#ifndef ON_CONSOLE
 			MenuButton( "Exit",       closeAll,   engine)
-#endif
 		),
+#else
+	mainMenu = Menu( "Main Menu",
+			MENU_WIDTH,
+			MENU_ITEM_HEIGHT,
+			MENU_PADDING,
+			MenuButton( "Run",        runEngine,  engine),
+			MenuButton( "Options...", switchMenu, &optionsMenu)
+		),
+#endif
 	optionsMenu = Menu( "Options",
 			MENU_WIDTH,
 			MENU_ITEM_HEIGHT,

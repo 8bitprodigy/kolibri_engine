@@ -7,13 +7,13 @@
 #include <raymath.h>
 #include <string.h>
 
-#include "assman.h"
-#include "infinite_plane_scene.h"
-#include "common.h"
-#include "explosion.h"
 #include "kolibri.h"
-#include "sprite.h"
-#include "utils.h"
+#include "../assman.h"
+#include "../explosion.h"
+#include "../infinite_plane_scene.h"
+#include "../projectile.h"
+#include "../sprite.h"
+#include "../utils.h"
 
 
 #ifndef WINDOW_TITLE
@@ -75,12 +75,43 @@
 #define MAX_SLIDES  3
 
 
+typedef enum
+{
+	PROJECTILE_BLAST,
+	PROJECTILE_GOO,
+	PROJECTILE_ROCKET,
+	PROJECTILE_GRENADE,
+	PROJECTILE_PLASMA,
+	PROJECTILE_NUM_PROJECTILES
+}
+Projectiles;
+
+typedef enum
+{
+	WEAPON_MELEE,
+	WEAPON_BLASTER,
+	WEAPON_MINIGUN,
+	WEAPON_SHOTGUN,
+	WEAPON_GOOGUN,
+	WEAPON_ROCKET_LAUNCHER,
+	WEAPON_GRENADE_LAUNCHER,
+	WEAPON_RAILGUN,
+	WEAPON_LIGHTNING_GUN,
+	WEAPON_NUM_WEAPONS
+}
+Weapons;
 
 /* 
 	game.c
 */
-extern ExplosionInfo *explosion_Info;
-void Game_mediaInit();
+extern ExplosionInfo   *explosion_Info;
+extern Renderable      *projectile_renderables;
+extern Model           *projectile_models;
+extern Texture         *projectile_Sprite_or_Textures;
+extern SpriteInfo     **projectile_SpriteInfos;
+extern ProjectileInfo **projectile_Infos;
+
+void Game_mediaInit(      void);
 /*
 	main.c
 */
@@ -149,20 +180,7 @@ extern Entity       playerTemplate;
 /*
 	projectile.c
 */
-typedef struct
-{
-	SpriteInfo *sprite_info;
-	float 
-		damage,
-		speed,
-		timeout;
-}
-ProjectileInfo;
-
-void   Projectile_MediaInit(void);
-void   Projectile_new(      Vector3 position, Vector3 direction, Entity *template, Scene *scene);
 extern EntityVTable projectile_Callbacks;
-extern Entity       Blast_Template;
 
 /*
 	options.c

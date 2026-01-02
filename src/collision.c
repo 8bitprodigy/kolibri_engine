@@ -11,7 +11,7 @@
 #include "_spatialhash_.h"
 #include "common.h"
 #define RAY2D_COLLISION_IMPLEMENTATION
-#include "ray_collision_2d.h"
+#include "../examples/ray_collision_2d.h"
 
 
 #define CELL_ALIGN( value ) ((int)floorf( (value) / CELL_SIZE))
@@ -733,6 +733,8 @@ Collision_checkContinuous(Entity *a, Entity *b, Vector3 movement)
         break;
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_BOX):
 	case COLLIDERS(COLLISION_SPHERE,   COLLISION_CYLINDER):
+	default:
+		break;
 	}
 	
 	return NO_COLLISION;
@@ -897,9 +899,10 @@ Collision_checkRayCylinder(K_Ray ray, Entity *entity)
     /* Ray components */
     Vector3 
 		ray_start = ray.position,
-		ray_dir   = ray.direction,
+		ray_dir   = ray.direction;
     
 		/* Project ray onto XZ plane (ignore Y component for cylinder side collision) */
+	Vector2
 		ray_start_xz = {ray_start.x, ray_start.z},
 		ray_dir_xz = {ray_dir.x, ray_dir.z},
 		cylinder_center_xz = {cylinder_center.x, cylinder_center.z};

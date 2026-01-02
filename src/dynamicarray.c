@@ -26,7 +26,7 @@ DynamicArray_new( size_t datum_size, size_t capacity )
 {
 	DynamicArrayHeader *array   = malloc(sizeof(DynamicArrayHeader) + (datum_size * capacity));
 	if (!array) {
-		DBG_OUT("Failed to allocate DynamicArray.");
+		ERR_OUT("Failed to allocate DynamicArray.");
 		return NULL;
 	}
 	
@@ -49,19 +49,12 @@ void
 DynamicArray_grow(void **self)
 {
     DynamicArrayHeader *old_header = GET_HEADER(*self);
-
-	DBG_OUT("self=%p, *self=%p, old_header=%p", self, *self, old_header);
-    DBG_OUT("old_header: length=%zu, capacity=%zu, datum_size=%zu", 
-           old_header->length, old_header->capacity, old_header->datum_size);
     
     size_t new_capacity = DYNAMIC_ARRAY_GROWTH_FACTOR * old_header->capacity;
     size_t new_size = sizeof(DynamicArrayHeader) + (new_capacity * old_header->datum_size);
     
-    DBG_OUT("Calling realloc(old_header=%p, new_size=%zu)", old_header, new_size);
-    
     DynamicArrayHeader *new_header = realloc(old_header, new_size);
     if (!new_header) {
-        DBG_OUT("Failed to allocate new grown array.");
         return;
     }
     
@@ -83,7 +76,6 @@ DynamicArray_shrink(void *self)
 			) + sizeof(DynamicArrayHeader)
 		);
 	if (!new_arr) {
-		DBG_OUT("Failed to allocate new shrunk array.");
 		return;
 	}
 

@@ -54,7 +54,8 @@ SpriteInfo *SpriteInfo_newRegular(
 		float            time_per_frame, 
 		Texture2D        atlas, 
 		size_t           x_num_frames, 
-		size_t           y_num_frames, 
+		size_t           y_num_frames,
+		size_t           total_frames,
 		SpriteAlignment  sprite_alignment,
 		SpriteDirection  sprite_direction,
 		SpritePlayback   sprite_playback,
@@ -73,6 +74,7 @@ SpriteInfo *SpriteInfo_newIrregular(
 		SpriteCallback  sprite_callback,
 		void            *user_data
 	);
+Renderable *SpriteInfo_getRenderable(SpriteInfo *sprite_info);
 
 void AnimateSprite(  SpriteInfo *info,       SpriteData *data,        float   age);
 void RenderBillboard(Renderable *renderable, void       *render_data, Vector3 position, Camera3D *camera);

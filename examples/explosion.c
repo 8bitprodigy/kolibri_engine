@@ -18,11 +18,18 @@ ExplosionInfo
 	Renderable  renderable;
 }
 ExplosionInfo;
+
+typedef struct
+{
+	SpriteData sprite_data;
+}
+ExplosionData;
+
+
 /*
 	Callback forward delcarations
 */
 void explosionSetup(    Entity *self);
-void explosionUpdate(   Entity *self, float           delta);
 void explosionRender(   Entity *self, float           delta);
 void explosionCollision(Entity *self, CollisionResult collision);
 
@@ -31,44 +38,44 @@ void explosionCollision(Entity *self, CollisionResult collision);
 	Template declarations
 */
 Renderable
-	explosion_Renderable = (Renderable){
+	explosion_Renderable = {
 			.data        = NULL,
 			.Render      = RenderBillboard,
 			.transparent = true,
 		};
 
 EntityVTable 
-Explosion_Callbacks = (EntityVTable){
-	.Setup       = explosionSetup,
-	.Enter       = NULL,
-	.Update      = NULL,
-	.Render      = explosionRender,
-	.OnCollision = NULL,
-	.OnCollided  = NULL,
-	.Exit        = NULL,
-	.Free        = NULL,
-};
+Explosion_Callbacks = {
+		.Setup       = explosionSetup,
+		.Enter       = NULL,
+		.Update      = NULL,
+		.Render      = explosionRender,
+		.OnCollision = explosionCollision,
+		.OnCollided  = NULL,
+		.Exit        = NULL,
+		.Free        = NULL,
+	};
 
 Entity
-Explosion_Template = (Entity){
-	.renderables       = {&explosion_Renderable},
-	.lod_distances     = {1024.0f},
-	.lod_count         = 1,
-	.visibility_radius = 0.25f,
-	.bounds            = {0.1f, 0.1f, 0.1f},
-	.bounds_offset     = {0.0f, 0.0f, 0.0f},
-	.renderable_offset = {0.0f, 0.0f, 0.0f},
-	.vtable            = &Explosion_Callbacks,
-	.position          = V3_ZERO,
-	.orientation       = V4_ZERO,
-	.scale             = V3_ONE,
-	.velocity          = V3_ZERO,
-	.collision         = {.layers = 1, .masks = 1},
-	.active            = true,
-	.visible           = true,
-	.collision_shape   = COLLISION_NONE, 
-	.solid             = false
-};
+Explosion_Template = {
+		.renderables       = {&explosion_Renderable},
+		.lod_distances     = {1024.0f},
+		.lod_count         = 1,
+		.visibility_radius = 0.25f,
+		.bounds            = {0.1f, 0.1f, 0.1f},
+		.bounds_offset     = {0.0f, 0.0f, 0.0f},
+		.renderable_offset = {0.0f, 0.0f, 0.0f},
+		.vtable            = &Explosion_Callbacks,
+		.position          = V3_ZERO_INIT,
+		.orientation       = V3_ZERO_INIT,
+		.scale             = V3_ONE_INIT,
+		.velocity          = V3_ZERO_INIT,
+		.collision         = {.layers = 1, .masks = 1},
+		.active            = true,
+		.visible           = true,
+		.collision_shape   = COLLISION_NONE, 
+		.solid             = false
+	};
 
 
 /*
@@ -89,14 +96,14 @@ ease(float t)
 void 
 explosionSetup(Entity *self)
 {
-	
+	(void)self; /* Suppress warnings for unused arguments */
 }
 
 
 void 
 explosionRender(Entity *self, float delta)
 {
-	
+	(void)delta;
 	ExplosionData *data = (ExplosionData*)&self->local_data;
 	
 	SpriteInfo *sinfo = (SpriteInfo*)self->renderables[0]->data;
@@ -112,7 +119,8 @@ explosionRender(Entity *self, float delta)
 void 
 explosionCollision(Entity *self, CollisionResult collision)
 {
-	
+	(void)self;
+	(void)collision;
 }
 
 
@@ -123,6 +131,7 @@ explosionCollision(Entity *self, CollisionResult collision)
 void
 ExplosionComplete(SpriteInfo *info, SpriteData *data) 
 {
+	(void)info;
 	ExplosionData *edata   = (ExplosionData*)((char*)data - offsetof(ExplosionData, sprite_data));
 	Entity        *entity = (Entity*)((char*)edata - offsetof(Entity, local_data));
 	Entity_free(entity);
@@ -153,6 +162,7 @@ ExplosionInfo_new(
 			atlas,
 			x_num_frames,
 			y_num_frames,
+			x_num_frames * y_num_frames,
 			SPRITE_ALIGN_CAMERA,
 			SPRITE_DIR_FORWARD,
 			SPRITE_PLAY_ONESHOT,

@@ -4,7 +4,7 @@
 
 
 #define foreach_Head( head_ptr ) \
-	for (int i = 0; i < self->head_count && ((head_ptr) = &self->heads[i], 1); i++)
+	for (unsigned i = 0; i < self->head_count && ((head_ptr) = &self->heads[i], 1); i++)
 	
 #ifdef HEAD_USE_RENDER_TEXTURE
 	#define BeginRenderMode( head ) do { \
@@ -115,8 +115,6 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 	engine->vtable           = vtable;
 
 	if (vtable && vtable->Setup) vtable->Setup(engine);
-
-	DBG_OUT("Tick rate: %i ticks/second.", engine->tick_rate);
 	
 	return engine;
 }
@@ -151,7 +149,7 @@ Engine_getFrameNumber(Engine *self)
 float
 Engine_getTickElapsed(Engine *self)
 {
-	return self->tick_elapsed;
+    return self->tick_elapsed;
 }
 
 void
@@ -235,8 +233,8 @@ Engine_run(Engine *self)
 
 			/* Handle screen resolution changes */
 			Vector2i new_screen_size = (Vector2i){
-					GetScreenWidth(), 
-					GetScreenHeight()
+					.x = GetScreenWidth(), 
+					.y = GetScreenHeight()
 				};
 			if (
 				new_screen_size.w    != self->screen_size.w
@@ -245,9 +243,11 @@ Engine_run(Engine *self)
 				&& vtable->Resize
 			)
 				Engine_resize(self, new_screen_size.w, new_screen_size.h);
-			self->screen_size = new_screen_size;
 			
+			self->screen_size = new_screen_size;
 			Engine_update(self);
+			/* For extrapolation: how far into the next tick are we? */
+			self->tick_elapsed = (self->current_time - self->last_tick_time) / self->tick_length;
 			BeginDrawing();
 				Engine_render(self);
 			EndDrawing();
@@ -260,7 +260,8 @@ Engine_run(Engine *self)
 			self->request_exit = WindowShouldClose();
 
 			Engine_update(self);
-
+			/* For extrapolation: how far into the next tick are we? */
+			self->tick_elapsed = (self->current_time - self->last_tick_time) / self->tick_length;
 			self->frame_num++;
 		}
 	}
@@ -294,9 +295,6 @@ Engine_update(Engine *self)
 		self->last_tick_time += self->tick_length;
 		self->tick_num++;
 	}
-	
-	/* For extrapolation: how far into the next tick are we? */
-	self->tick_elapsed = (self->current_time - self->last_tick_time) / self->tick_length;
 }
 
 

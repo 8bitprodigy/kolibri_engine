@@ -30,7 +30,7 @@ SceneVTable
     SceneRaycastCallback         Raycast;        /* Called Every time a raycast is performed in order to check if has collided with the scene */
     SceneRenderCallback          Render;         /* Called once every frame in order to render the scene */
     SceneCallback                Exit;           /* Called upon Scene exiting the engine */
-    SceneDataCallback            Free;           /* Called upon freeing the Scene from memory */
+    SceneCallback                Free;           /* Called upon freeing the Scene from memory */
 }
 SceneVTable;
 
@@ -42,8 +42,8 @@ void            Scene_free(Scene      *scene);
 Engine         *Scene_getEngine(      Scene *scene);
 uint            Scene_getEntityCount( Scene *scene);
 EntityList     *Scene_getEntityList(  Scene *scene);
-void           *Scene_getMapData(     Scene *scene);
-void           *Scene_getMapInfo(     Scene *scene);
+void           *Scene_getData(        Scene *scene);
+void           *Scene_getInfo(        Scene *scene);
 
 /* Public Methods */
 void            Scene_enter(          Scene *scene);

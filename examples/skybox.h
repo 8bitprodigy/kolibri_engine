@@ -61,24 +61,24 @@ static const char *SkyBox_names[6] = {
 
 static const Vector3 SkyBox_verts[8] = {
 		/* Top (+Y) */
-		(Vector3){-1.0f,  1.0f, -1.0f}, /* 0  NW */
-		(Vector3){ 1.0f,  1.0f, -1.0f}, /* 1  NE */
-		(Vector3){ 1.0f,  1.0f,  1.0f}, /* 2  SE */
-		(Vector3){-1.0f,  1.0f,  1.0f}, /* 3  SW */
+		{-1.0f,  1.0f, -1.0f}, /* 0  NW */
+		{ 1.0f,  1.0f, -1.0f}, /* 1  NE */
+		{ 1.0f,  1.0f,  1.0f}, /* 2  SE */
+		{-1.0f,  1.0f,  1.0f}, /* 3  SW */
 		/* Bottom (-Y) */
-		(Vector3){-1.0f, -1.0f, -1.0f}, /* 4  NW */
-		(Vector3){ 1.0f, -1.0f, -1.0f}, /* 5  NE */
-		(Vector3){ 1.0f, -1.0f,  1.0f}, /* 6  SE */
-		(Vector3){-1.0f, -1.0f,  1.0f}, /* 7  SW */
+		{-1.0f, -1.0f, -1.0f}, /* 4  NW */
+		{ 1.0f, -1.0f, -1.0f}, /* 5  NE */
+		{ 1.0f, -1.0f,  1.0f}, /* 6  SE */
+		{-1.0f, -1.0f,  1.0f}, /* 7  SW */
 	};
 
 static const Vector3 SkyBox_normals[6] = {
-		(Vector3){ 0.0f, -1.0f,  0.0f}, /* Up */
-		(Vector3){ 0.0f,  1.0f,  0.0f}, /* Down */
-		(Vector3){ 0.0f,  0.0f,  1.0f}, /* North */
-		(Vector3){ 0.0f,  0.0f, -1.0f}, /* South */
-		(Vector3){-1.0f,  0.0f,  0.0f}, /* East */
-		(Vector3){ 1.0f,  0.0f,  0.0f}, /* West */
+		{ 0.0f, -1.0f,  0.0f}, /* Up */
+		{ 0.0f,  1.0f,  0.0f}, /* Down */
+		{ 0.0f,  0.0f,  1.0f}, /* North */
+		{ 0.0f,  0.0f, -1.0f}, /* South */
+		{-1.0f,  0.0f,  0.0f}, /* East */
+		{ 1.0f,  0.0f,  0.0f}, /* West */
 	};
 
 static const int SkyBox_faces[6][4] = {
@@ -93,8 +93,7 @@ static const int SkyBox_faces[6][4] = {
 static void
 SkyBox_draw(Camera *camera, Texture2D textures[6], Quaternion orientation)
 {
-	Vector3 forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
-	Matrix  rot     = QuaternionToMatrix(orientation);
+	Matrix  rot = QuaternionToMatrix(orientation);
 	
 	rlDisableDepthTest();
 	rlDisableDepthMask(); 

@@ -2,9 +2,9 @@
 #include <raylib.h>
 #include <raymath.h>
 
+#include "game.h"
 #include "../heightmap.h"
 #include "../reticle.h"
-#include "game.h"
 #include "../skybox.h"
 
 
@@ -100,8 +100,8 @@ testHeadSetup(Head *head)
 	Model *weapons = &user_data->weapons[0];
 	snprintf(weapon_path, sizeof(weapon_path), "%s%s", path_prefix, "resources/models/weapons/weapon5.obj");
 	weapons[0] = LoadModel(weapon_path);
-	snprintf(weapon_path, sizeof(weapon_path), "%s%s", path_prefix, "resources/models/weapons/weapon5.png");
-	Texture2D weaponTexture = LoadTexture(weapon_path);
+	snprintf(weapon_texture_path, sizeof(weapon_texture_path), "%s%s", path_prefix, "resources/models/weapons/weapon5.png");
+	Texture2D weaponTexture = LoadTexture(weapon_texture_path);
 	SetMaterialTexture(&weapons->materials[0], MATERIAL_MAP_ALBEDO, weaponTexture);
 	SetTextureFilter(weaponTexture, TEXTURE_FILTER_BILINEAR);
 
@@ -137,7 +137,6 @@ testHeadPostRender(Head *head)
 		rlPushMatrix();
 			glClear(GL_DEPTH_BUFFER_BIT);   
 			Vector3 
-				weap_offset = (Vector3){-0.25f, -0.5f, 1.0f},
 				cam_pos     = cam->position,
 				look_dir    = Vector3Normalize(Vector3Subtract(cam->target, cam->position));
 			float   
@@ -211,7 +210,6 @@ void
 testHeadResize(Head *head, uint width, uint height)
 {
 	TestHeadData *data = Head_getUserData(head);
-	float aspect_ratio = (float)width/(float)height;
 
 	int
 		region_height = height - (VIEWPORT_INCREMENT * data->viewport_scale),
@@ -228,15 +226,14 @@ testHeadResize(Head *head, uint width, uint height)
 void
 testHeadUpdate(Head *head, float delta)
 {
+	(void)delta;
     TestHeadData *data = Head_getUserData(head);
 
 	int 
 		controller_num = data->controller,
 		screen_width   = GetScreenWidth(),
 		screen_height  = GetScreenHeight();
-	float 
-		look_sensitivity = data->look_sensitivity,
-		aspect_ratio = (float)screen_width / (float)screen_height;
+	float aspect_ratio = (float)screen_width / (float)screen_height;
     /* Adjust viewport size */
     if      (IsKeyPressed(KEY_EQUAL)) {
         if (0 < data->viewport_scale) data->viewport_scale--;
@@ -263,116 +260,118 @@ testHeadUpdate(Head *head, float delta)
     
     /* End adjust viewport size */
 
-PLAYER_INPUT:
-    Camera *camera  = Head_getCamera(head);
-    if (!data->target) {
-        UpdateCamera(camera, CAMERA_FREE);
-        return;
-    }
+PLAYER_INPUT: {
+		Camera *camera  = Head_getCamera(head);
+		if (!data->target) {
+			UpdateCamera(camera, CAMERA_FREE);
+			return;
+		}
+		
+		Entity     *player      = data->target;
+		PlayerData *player_data = data->target_data;
+		Engine     *engine      = Head_getEngine(head);
 
-    CollisionResult collision;
-    Entity     *player      = data->target;
-    PlayerData *player_data = data->target_data;
-    Engine     *engine      = Head_getEngine(head);
-
-	if (
-		GET_KEY_OR_BUTTON_PRESSED(controller_num, GAMEPAD_BUTTON_MIDDLE_RIGHT, KEY_ESCAPE)
-    )
-    {
-		Engine_pause(engine, true);
-	}
-	
-	Vector2 look_delta;
-#ifndef ON_CONSOLE
-	look_delta = GetMouseDelta();
-#else
-	look_delta = (Vector2){
-			GetGamepadAxisMovement(
-					controller_num, 
-					GAMEPAD_AXIS_LEFT_X
-				)*look_sensitivity,
-			GetGamepadAxisMovement(
-					controller_num,
-					GAMEPAD_AXIS_LEFT_Y
-				)*look_sensitivity
-		};
-#endif
-    Vector2 
-        mouse_look = look_delta,
-        move_dir   = GET_KEY_OR_BUTTON_VECTOR(
-				controller_num, 
-				GAMEPAD_BUTTON_LEFT_FACE_UP,
-				KEY_W, 
-				GAMEPAD_BUTTON_LEFT_FACE_DOWN,
-				KEY_S, 
-				GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
-				KEY_D, 
-				GAMEPAD_BUTTON_LEFT_FACE_LEFT,
-				KEY_A
-			);
-    UpdateCameraPro(
-            camera,
-            V3_ZERO,
-            (Vector3){
-                mouse_look.x * MOUSE_SENSITIVITY,
-                mouse_look.y * MOUSE_SENSITIVITY,
-                0.0f
-            },
-            0.0f
-        );
-
-	/* Calculate player inputs */
-    /* FIX: Calculate forward direction FROM camera TO target */
-    Vector3 forward = Vector3Subtract(camera->target, camera->position);
-    forward.y       = 0.0f;  /* Keep movement on horizontal plane */
-    forward         = Vector3Normalize(forward);
-    
-    Vector3 
-        side      = Vector3CrossProduct(forward, V3_UP),  /* Cross product is cleaner than rotation */
-        movement   = Vector3Add(
-                Vector3Scale(forward, move_dir.x),
-                Vector3Scale(side,   move_dir.y)
-            );
-
-	player_data->move_dir     = movement;
-	if (
-		GET_KEY_OR_BUTTON_PRESSED(
-			controller_num, 
-			GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, 
-			KEY_SPACE
+		if (
+			GET_KEY_OR_BUTTON_PRESSED(controller_num, GAMEPAD_BUTTON_MIDDLE_RIGHT, KEY_ESCAPE)
 		)
-	)
-	{
-		player_data->request_jump = true;
-	}
-	/* End calculate player inputs */
-	Vector3
-		old_camera_pos = player_data->prev_position,
-		new_camera_pos = player->position,
-		current_camera_pos = Vector3Add(
-				Vector3Lerp(
-					old_camera_pos,
-					new_camera_pos,
-					Engine_getTickElapsed(engine)
-				),
-				(Vector3){0.0f, data->eye_height, 0.0f}
+		{
+			Engine_pause(engine, true);
+		}
+		
+		Vector2 look_delta;
+#ifndef ON_CONSOLE
+		look_delta = GetMouseDelta();
+#else
+		look_delta = (Vector2){
+				GetGamepadAxisMovement(
+						controller_num, 
+						GAMEPAD_AXIS_LEFT_X
+					)*look_sensitivity,
+				GetGamepadAxisMovement(
+						controller_num,
+						GAMEPAD_AXIS_LEFT_Y
+					)*look_sensitivity
+			};
+#endif
+		Vector2 
+			mouse_look = look_delta,
+			move_dir   = GET_KEY_OR_BUTTON_VECTOR(
+					controller_num, 
+					GAMEPAD_BUTTON_LEFT_FACE_UP,
+					KEY_W, 
+					GAMEPAD_BUTTON_LEFT_FACE_DOWN,
+					KEY_S, 
+					GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
+					KEY_D, 
+					GAMEPAD_BUTTON_LEFT_FACE_LEFT,
+					KEY_A
+				);
+		
+		UpdateCameraPro(
+				camera,
+				V3_ZERO,
+				(Vector3){
+					mouse_look.x * MOUSE_SENSITIVITY,
+					mouse_look.y * MOUSE_SENSITIVITY,
+					0.0f
+				},
+				0.0f
 			);
-	
-	moveCamera(
-		camera, 
-		current_camera_pos
-	);
+		
+		/* Calculate player inputs */
+		/* FIX: Calculate forward direction FROM camera TO target */
+		Vector3 forward = Vector3Subtract(camera->target, camera->position);
+		forward.y       = 0.0f;  /* Keep movement on horizontal plane */
+		forward         = Vector3Normalize(forward);
+		
+		Vector3 
+			side      = Vector3CrossProduct(forward, V3_UP),  /* Cross product is cleaner than rotation */
+			movement   = Vector3Add(
+					Vector3Scale(forward, move_dir.x),
+					Vector3Scale(side,   move_dir.y)
+				);
 
-	
-	if (
-		IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
-		|| IsGamepadButtonPressed(controller_num, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)
-	) {
-		Projectile_new(
-				camera->target,
-				Vector3Subtract(camera->target, camera->position),
-				&Blast_Template,
-				Engine_getScene(engine)
-			);
+		player_data->move_dir     = movement;
+		if (
+			GET_KEY_OR_BUTTON_PRESSED(
+				controller_num, 
+				GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, 
+				KEY_SPACE
+			)
+		)
+		{
+			player_data->request_jump = true;
+		}
+		/* End calculate player inputs */
+		Vector3
+			old_camera_pos = player_data->prev_position,
+			new_camera_pos = player->position,
+			current_camera_pos = Vector3Add(
+					Vector3Lerp(
+						old_camera_pos,
+						new_camera_pos,
+						Engine_getTickElapsed(engine)
+					),
+					(Vector3){0.0f, data->eye_height, 0.0f}
+				);
+		
+		moveCamera(
+			camera, 
+			current_camera_pos
+		);
+		
+		if (
+			IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
+			|| IsGamepadButtonPressed(controller_num, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)
+		) {
+			Projectile_new(
+					projectile_Infos[PROJECTILE_GRENADE], 
+					camera->target, 
+					Vector3Normalize(Vector3Subtract(camera->target, camera->position)), 
+					player, 
+					NULL, 
+					Engine_getScene(engine)
+				);
+		}
 	}
 }

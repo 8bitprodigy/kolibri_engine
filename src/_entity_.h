@@ -33,14 +33,16 @@ EntityNode
                 on_floor          :1, /* Collision States */
                 on_wall           :1,
                 on_ceiling        :1,
-                _flag_4           :1, /* Not yet defined */
-                _flag_5           :1,
+                to_delete         :1,
+                _flag_5           :1, /* Not yet defined */
                 _flag_6           :1,
                 _flag_7           :1;
         };
     };
-	
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 	Entity  base;
+#pragma GCC diagnostic pop
 }
 EntityNode;
 

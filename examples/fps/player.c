@@ -13,47 +13,47 @@ void playerUpdate(Entity *self, float delta);
 */
 	
 Renderable         
-	r_player = (Renderable){
+	r_player = {
 			.data   = &MAGENTA,
 			.Render = NULL,//testRenderableBoxWiresCallback
 		};
 
 EntityVTable 
-player_Callbacks = (EntityVTable){
-	.Setup       = playerSetup,
-	.Enter       = NULL,
-	.Update      = playerUpdate,
-	.Render      = NULL,
-	.OnCollision = NULL,
-	.OnCollided  = NULL,
-	.Teleport    = teleportHead,
-	.Exit        = NULL,
-	.Free        = NULL
-};
+player_Callbacks = {
+		.Setup       = playerSetup,
+		.Enter       = NULL,
+		.Update      = playerUpdate,
+		.Render      = NULL,
+		.OnCollision = NULL,
+		.OnCollided  = NULL,
+		.Teleport    = teleportHead,
+		.Exit        = NULL,
+		.Free        = NULL
+	};
 
 Entity
-playerTemplate = (Entity){
-	.renderables       = {&r_player},
-	.lod_distances     = {1024.0f},
-	.lod_count         = 1,
-	.visibility_radius = 4.5f,
-	.bounds            = {1.0f, 2.0f, 1.0f},
-	.bounds_offset     = {0.0f, 1.0f, 0.0f},
-	.renderable_offset = {0.0f, 1.0f, 0.0f},
-	.user_data         = NULL,
-	.vtable            = &player_Callbacks,
-	.position          = V3_ZERO,
-	.orientation       = V4_ZERO,
-	.scale             = V3_ONE,
-	.velocity          = V3_ZERO,
-	.collision         = {.layers = 1, .masks = 1},
-	.active            = true,
-	.visible           = true,
-	.collision_shape   = COLLISION_BOX, 
-	.solid             = true,
-	.floor_max_angle   = 60.0f,
-	.max_slides        = MAX_SLIDES,
-};
+playerTemplate = {
+		.renderables       = {&r_player},
+		.lod_distances     = {1024.0f},
+		.lod_count         = 1,
+		.visibility_radius = 4.5f,
+		.bounds            = {1.0f, 2.0f, 1.0f},
+		.bounds_offset     = {0.0f, 1.0f, 0.0f},
+		.renderable_offset = {0.0f, 1.0f, 0.0f},
+		.user_data         = NULL,
+		.vtable            = &player_Callbacks,
+		.position          = V3_ZERO_INIT,
+		.orientation       = V4_ZERO_INIT,
+		.scale             = V3_ONE_INIT,
+		.velocity          = V3_ZERO_INIT,
+		.collision         = {.layers = 1, .masks = 1},
+		.active            = true,
+		.visible           = true,
+		.collision_shape   = COLLISION_BOX, 
+		.solid             = true,
+		.floor_max_angle   = 60.0f,
+		.max_slides        = MAX_SLIDES,
+	};
 
 
 /*
@@ -94,14 +94,12 @@ playerUpdate(Entity *self, float delta)
 	PlayerData *data     = self->user_data;
 	data->prev_velocity       = self->velocity;
 	Vector3    
-		*position  = &self->position,
 		*velocity  = &self->velocity,
 		 vel       = *velocity,
 		*direction = &data->direction,
 		 dir       = *direction;
 	
 	bool is_on_floor = Entity_isOnFloor(self);
-	static int frame = 0;
 
 	if (is_on_floor) {
 		data->frames_since_grounded = 0;

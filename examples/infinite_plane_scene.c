@@ -12,7 +12,7 @@ void            infinitePlaneSceneSetup(    Scene *scene, void   *map_data);
 void            infinitePlaneSceneRender(   Scene *scene, Head   *head);
 CollisionResult infinitePlaneSceneCollision(Scene *scene, Entity *entity,   Vector3 to);
 CollisionResult infinitePlaneSceneRaycast(  Scene *scene, Vector3 from,     Vector3 to);
-void            infinitePlaneSceneFree(     Scene *scene, void   *map_data);
+void            infinitePlaneSceneFree(     Scene *scene);
 
 
 Texture debug_texture;
@@ -62,6 +62,8 @@ DrawInfinitePlane(Camera *cam, float tileScale)
 void 
 infinitePlaneSceneSetup(Scene *scene, void *map_data)
 {
+	(void)scene;    /* Suppress warnings about unused arguments */
+	(void)map_data;
 	debug_texture = LoadTexture(
 			PATH_PREFIX 
 			"resources/textures/dev/xor.gif"
@@ -80,7 +82,7 @@ infinitePlaneSceneRender(Scene *scene, Head *head)
 #endif
 	DrawInfinitePlane(camera, 1.0f);
 	EntityList *ent_list = Scene_getEntityList(scene);
-	for (int i = 0; i < ent_list->count; i++) {
+	for (size_t i = 0; i < ent_list->count; i++) {
 		Renderer_submitEntity(renderer, ent_list->entities[i]);
 	}
 }
@@ -88,6 +90,7 @@ infinitePlaneSceneRender(Scene *scene, Head *head)
 CollisionResult
 infinitePlaneSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 {
+	(void)scene;
     Vector3 from = entity->position;
     
     // If both positions above plane, no collision
@@ -126,6 +129,7 @@ infinitePlaneSceneCollision(Scene *scene, Entity *entity, Vector3 to)
 CollisionResult
 infinitePlaneSceneRaycast(Scene *self, Vector3 from, Vector3 to)
 {
+	(void)self;
 	CollisionResult result = {0};
 
 	if (from.y <= 0.0f) {
@@ -154,7 +158,8 @@ infinitePlaneSceneRaycast(Scene *self, Vector3 from, Vector3 to)
 }
 
 void 
-infinitePlaneSceneFree(Scene *scene, void *map_data)
+infinitePlaneSceneFree(Scene *scene)
 {
+	(void)scene;
 	UnloadTexture(debug_texture);
 }

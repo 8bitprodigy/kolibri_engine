@@ -37,7 +37,7 @@ moveCamera(Camera *cam, Vector3 new_position)
 }
 
 inline float
-sig(float x) 
+sigf(float x) 
 {
     return 1.0f / (1.0f + expf(-x));
 }

@@ -27,7 +27,7 @@
 
 #ifndef MAX
     #define MAX(A, B) ((A>B)?A:B)
-#endif
+#endif /* MAX */
 
 /****************
 	CONSTANTS
@@ -93,6 +93,7 @@
 	#define COL_QUERY_SIZE 128
 #endif
 
+/* Runtime versions (compound literals) */
 #define V2_ZERO      ((Vector2){0.0f, 0.0f})
 #define V2_EAST      ((Vector2){1.0f, 0.0f})
 #define V2_WEST      ((Vector2){-1.0f, 0.0f})
@@ -104,10 +105,29 @@
 #define V3_QUARTER   ((Vector3){0.25f, 0.25f, 0.25f})
 #define V3_EIGHTH    ((Vector3){0.125f, 0.125f, 0.125f})
 #define V3_UP        ((Vector3){0.0f, 1.0f, 0.0f})
+#define V3_DOWN      ((Vector3){0.0f, -1.0f, 0.0f})
 #define V3_FORWARD   ((Vector3){0.0f, 0.0f, 1.0f})
 #define V3_LEFT      ((Vector3){1.0f, 0.0f, 0.0f})
 #define XF_ZERO      ((Xform){V3_ZERO,V3_ZERO,V3_ZERO,V3_ZERO})
 #define NO_COLLISION ((CollisionResult){false,0.0f,V3_ZERO,V3_ZERO,0,NULL,NULL})
+
+/* Compile-time initialization versions (for globals/statics) */
+#define V2_ZERO_INIT      {0.0f, 0.0f}
+#define V2_EAST_INIT      {1.0f, 0.0f}
+#define V2_WEST_INIT      {-1.0f, 0.0f}
+#define V2_NORTH_INIT     {0.0f, 1.0f}
+#define V3_ZERO_INIT      {0.0f, 0.0f, 0.0f}
+#define V4_ZERO_INIT      {0.0f, 0.0f, 0.0f, 0.0f}
+#define V3_ONE_INIT       {1.0f, 1.0f, 1.0f}
+#define V3_HALF_INIT      {0.5f, 0.5f, 0.5f}
+#define V3_QUARTER_INIT   {0.25f, 0.25f, 0.25f}
+#define V3_EIGHTH_INIT    {0.125f, 0.125f, 0.125f}
+#define V3_UP_INIT        {0.0f, 1.0f, 0.0f}
+#define V3_DOWN_INIT      {0.0f, -1.0f, 0.0f}
+#define V3_FORWARD_INIT   {0.0f, 0.0f, 1.0f}
+#define V3_LEFT_INIT      {1.0f, 0.0f, 0.0f}
+#define XF_ZERO_INIT      {V3_ZERO_INIT, V3_ZERO_INIT, V3_ZERO_INIT, V3_ZERO_INIT}
+#define NO_COLLISION_INIT {false, 0.0f, V3_ZERO_INIT, V3_ZERO_INIT, 0, NULL, NULL}
 
 
 /**********************
@@ -218,9 +238,9 @@ CollisionResult
 			Vector3 normal;       /* Surface normal at hit point */
 		};
 	};
-    int     material_id;  /* For different surface types */
-    void   *user_data;    /* Scene-specific data (material, etc.) */
-    Entity *entity;       /* If hit an entity (NULL for Scene) */
+    int     material_id; /* For different surface types */
+    void   *user_data;   /* Scene-specific data (material, etc.) */
+    Entity *entity;      /* If hit an entity (NULL for Scene) */
 }
 CollisionResult;
 

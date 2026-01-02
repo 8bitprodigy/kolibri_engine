@@ -9,6 +9,7 @@ void *
 texture_loader(const char *path, void *data, Camera3D *camera)
 {
     (void)data;  // Unused
+    (void)camera;
     Texture2D *texture = malloc(sizeof(Texture2D));
     *texture = LoadTexture(path);
     return texture;
@@ -18,6 +19,7 @@ void
 texture_releaser(void *asset, void *data, Camera3D *camera)
 {
     (void)data;  // Unused
+    (void)camera;
     Texture2D *texture = (Texture2D *)asset;
     UnloadTexture(*texture);
     free(texture);
@@ -28,6 +30,7 @@ void *
 model_loader(const char *path, void *data, Camera3D *camera)
 {
     (void)data;  // Unused
+    (void)camera;
     Model *model = malloc(sizeof(Model));
     *model = LoadModel(path);
     return model;
@@ -37,6 +40,7 @@ void
 model_releaser(void *asset, void *data, Camera3D *camera)
 {
     (void)data;  // Unused
+    (void)camera;
     Model *model = (Model *)asset;
     UnloadModel(*model);
     free(model);
@@ -52,6 +56,7 @@ RenderModel(
 	Camera3D    *camera
 )
 {
+    (void)camera;
 	Model  *model  = (Model*)renderable->data;
 	Entity *entity = (Entity*)render_data;
 	Vector3          
@@ -81,6 +86,7 @@ testRenderableBoxCallback(
 	Camera3D   *camera
 )
 {
+    (void)camera;
 	Entity *entity = render_data;
 	Color  *color  = (Color*)renderable->data;
 	if (!color) return;
@@ -100,6 +106,7 @@ testRenderableBoxWiresCallback(
 	Camera3D   *camera
 )
 {
+    (void)camera;
 	Entity *entity = render_data;
 	Color  *color  = (Color*)renderable->data;
 	if (!color) return;
@@ -118,6 +125,8 @@ testRenderableCylinderWiresCallback(
 	Camera3D   *camera
 )
 {
+	(void)render_data;
+    (void)camera;
 	Entity *entity = renderable->data;
 	Color  *color  = (Color*)renderable->data;
 	float               radius = entity->bounds.x;

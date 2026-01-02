@@ -10,9 +10,7 @@ bool
 isSphereInFrustum(
         Vector3  center, 
         float    radius, 
-        Frustum *frustum,
-        float    dist_sq,
-        float    max_distance
+        Frustum *frustum
     );
 bool
 isAABBInFrustum(

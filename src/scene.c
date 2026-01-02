@@ -67,7 +67,7 @@ void
 Scene_free(Scene *scene)
 {
     SceneVTable *vtable = scene->vtable; 
-    if (vtable && vtable->Free) vtable->Free(scene, scene->info);
+    if (vtable && vtable->Free) vtable->Free(scene);
     
     Engine__removeScene(  scene->engine, scene);
 	DestroyMemPool(      &scene->entity_pool);
@@ -123,13 +123,13 @@ Scene_getEntityList(Scene *self)
 }
 
 void *
-Scene_getMapData(Scene *self)
+Scene_getData(Scene *self)
 {
     return &self->data;
 }
 
 void *
-Scene_getMapInfo(Scene *self)
+Scene_getInfo(Scene *self)
 {
     return self->info;
 }
@@ -265,7 +265,6 @@ void
 Scene_render(Scene *self, Head *head)
 {
     SceneVTable *vtable    = self->vtable;
-    EntityList entity_list = {0};
     if (vtable && vtable->Render) {
         vtable->Render(self, head);
         return;
@@ -276,7 +275,8 @@ Scene_render(Scene *self, Head *head)
 void
 Scene_exit(Scene *self)
 {
-    HANDLE_SCENE_CALLBACK(self, Exit);
+    SceneVTable *vtable = (self)->vtable;
+    if (vtable && vtable->Exit) vtable->Exit(self);
 }
 
 
