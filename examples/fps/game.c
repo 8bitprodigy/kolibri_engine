@@ -27,6 +27,67 @@ ProjectileInfo **projectile_Infos;
 
 
 void
+grenadeTimeout(Entity *projectile)
+{
+	Explosion_new(
+			explosion_Info, 
+			projectile->position,
+			Entity_getScene(projectile)
+		);
+}
+
+void
+rocketCollision(
+	Entity          *projectile, 
+	CollisionResult  collision
+)
+{
+	(void)collision;
+	//if (!collision.hit) return;
+	Explosion_new(
+			explosion_Info, 
+			projectile->position,
+			Entity_getScene(projectile)
+		);
+}
+
+void
+grenadeCollision(
+	Entity          *projectile, 
+	CollisionResult  collision
+)
+{
+    ProjectileData *data = (ProjectileData*)&projectile->local_data;
+    
+    // Check if it's terrain (no entity) or another entity
+    if (!collision.entity) {
+        // Bounce off terrain
+        float restitution = 0.5f; // Energy retained (70%)
+        static const float min_velocity = 2.0f; // Stop bouncing below this speed
+        
+        // Reflect velocity around normal
+        Vector3 reflected = Vector3Reflect(projectile->velocity, collision.normal);
+        projectile->velocity = Vector3Scale(reflected, restitution);
+        
+        float speed = Vector3Length(projectile->velocity);
+        if (speed > min_velocity) {
+            // Move slightly away from surface to prevent getting stuck
+            projectile->position = Vector3Add(
+                collision.position,
+                Vector3Scale(collision.normal, 0.15f)
+            );
+        }
+    } else {
+    	if (data->source == collision.entity) return;
+        projectile->visible = false;
+        projectile->active = false;
+        grenadeTimeout(projectile);
+        Entity_free(projectile);
+    }
+}
+
+
+void
 Explosion_mediaInit(void)
 {
 	char explosion_path[256];
@@ -92,7 +153,9 @@ Projectile_mediaInit(void)
 			5.0f,
 			PROJECTILE_MOTION_STRAIGHT,
 			10.0f,
-			&projectile_renderables[PROJECTILE_BLAST]
+			&projectile_renderables[PROJECTILE_BLAST],
+			NULL,
+			NULL
 		);
 	
 	/* Goo */
@@ -129,7 +192,9 @@ Projectile_mediaInit(void)
 			5.0f,
 			PROJECTILE_MOTION_BALLISTIC,
 			10.0f,
-			SpriteInfo_getRenderable(projectile_SpriteInfos[PROJECTILE_GOO])
+			SpriteInfo_getRenderable(projectile_SpriteInfos[PROJECTILE_GOO]),
+			NULL,
+			NULL
 		);
 	
 	/* Rocket */
@@ -165,7 +230,9 @@ Projectile_mediaInit(void)
 			5.0f,
 			PROJECTILE_MOTION_STRAIGHT,
 			10.0f,
-			&projectile_renderables[PROJECTILE_ROCKET]
+			&projectile_renderables[PROJECTILE_ROCKET],
+			rocketCollision,
+			NULL
 		);
 	
 	/* Grenade */
@@ -199,10 +266,12 @@ Projectile_mediaInit(void)
 	projectile_Infos[PROJECTILE_GRENADE] = ProjectileInfo_new(
 			5.0f,
 			35.0f,
-			1.0f,
+			5.0f,
 			PROJECTILE_MOTION_BALLISTIC,
-			15.0f,
-			&projectile_renderables[PROJECTILE_GRENADE]
+			25.0f,
+			&projectile_renderables[PROJECTILE_GRENADE],
+			grenadeCollision,
+			grenadeTimeout
 		);
 	
 	/* Plasma */
@@ -239,7 +308,9 @@ Projectile_mediaInit(void)
 			5.0f,
 			PROJECTILE_MOTION_STRAIGHT,
 			10.0f,
-			&projectile_renderables[PROJECTILE_PLASMA]
+			&projectile_renderables[PROJECTILE_PLASMA],
+			NULL,
+			NULL
 		);
 }
 

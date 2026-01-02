@@ -11,16 +11,33 @@ typedef enum {
 	PROJECTILE_MOTION_HOMING,    /* Tracks a target */
 }
 ProjectileMotion;
+
 typedef struct ProjectileInfo ProjectileInfo;
+typedef struct
+{
+	SpriteData   sprite_data;
+	Entity
+				*source,
+				*target;
+	Vector3
+				 prev_offset;
+	float        elapsed_time;
+}
+ProjectileData;
+
+typedef void (*ProjectileCollision)(Entity *projectile, CollisionResult collision);
+typedef void (*ProjectileTimeout)(  Entity *projectile);
 
 
 ProjectileInfo *ProjectileInfo_new(
-	float             damage,
-	float             speed,
-	float             timeout,
-	ProjectileMotion  motion,
-	float             gravity_or_homing_strength,
-	Renderable       *renderable
+	float                damage,
+	float                speed,
+	float                timeout,
+	ProjectileMotion     motion,
+	float                gravity_or_homing_strength,
+	Renderable          *renderable,
+	ProjectileCollision  Collision_Callback,
+	ProjectileTimeout    Timeout_Callaback
 );
 void ProjectileInfo_free(ProjectileInfo *info);
 

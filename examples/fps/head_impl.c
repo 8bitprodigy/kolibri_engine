@@ -98,9 +98,9 @@ testHeadSetup(Head *head)
 		Handle HUD Weapons
 	*/
 	Model *weapons = &user_data->weapons[0];
-	snprintf(weapon_path, sizeof(weapon_path), "%s%s", path_prefix, "resources/models/weapons/weapon5.obj");
+	snprintf(weapon_path, sizeof(weapon_path), "%s%s", path_prefix, "resources/models/weapons/weapon7.obj");
 	weapons[0] = LoadModel(weapon_path);
-	snprintf(weapon_texture_path, sizeof(weapon_texture_path), "%s%s", path_prefix, "resources/models/weapons/weapon5.png");
+	snprintf(weapon_texture_path, sizeof(weapon_texture_path), "%s%s", path_prefix, "resources/models/weapons/weapon7.png");
 	Texture2D weaponTexture = LoadTexture(weapon_texture_path);
 	SetMaterialTexture(&weapons->materials[0], MATERIAL_MAP_ALBEDO, weaponTexture);
 	SetTextureFilter(weaponTexture, TEXTURE_FILTER_BILINEAR);

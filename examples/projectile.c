@@ -13,38 +13,29 @@ typedef struct
 ProjectileInfo
 {
 	float
-		damage,
-		speed,
-		timeout;
+		               damage,
+		               speed,
+		               timeout;
 	union {
-		float gravity;
-		float homing_strength;
+		float           gravity;
+		float           homing_strength;
 	};
-	ProjectileMotion motion;
-	Renderable renderable;
+	ProjectileMotion    motion;
+	Renderable          renderable;
+	ProjectileCollision Collision;
+	ProjectileTimeout   Timeout;
 }
 ProjectileInfo;
 
-typedef struct
-{
-	SpriteData   sprite_data;
-	Entity
-				*source,
-				*target;
-	Vector3
-				 prev_offset;
-	float        elapsed_time;
-}
-ProjectileData;
 
 
 /*
 	Callback forward delcarations
 */
-void projectileSetup(    Entity *self);
-void projectileUpdate(   Entity *self, float           delta);
-void projectileRender(   Entity *self, float           delta);
-void projectileCollision(Entity *self, CollisionResult collision);
+static void projectileSetup(    Entity *self);
+static void projectileUpdate(   Entity *self, float           delta);
+static void projectileRender(   Entity *self, float           delta);
+static void projectileCollision(Entity *self, CollisionResult collision);
 
 
 /*
@@ -89,19 +80,20 @@ projectile_template = {
 	CALLBACKS
 */
 
-void 
+static void 
 projectileSetup(Entity *self)
 {
 	(void)self; /* Suppress warnings about unused arguments */
 }
 
-void 
+static void 
 projectileUpdate(Entity *self, float delta)
 {
 	ProjectileInfo *info = self->user_data;
 	ProjectileData *data = (ProjectileData*)&self->local_data;
 	
 	if (info && data && info->timeout <= data->elapsed_time) {
+		if (info->Timeout) info->Timeout(self);
 		self->visible = false;
 		self->active  = false;
 		Entity_free(self);
@@ -145,28 +137,36 @@ projectileUpdate(Entity *self, float delta)
 	default:
 		break;
 	}
-	Vector3 old_pos = self->position;
+	Vector3 new_pos = Vector3Add(
+			self->position,
+			Vector3Scale(self->velocity, delta)
+		);
 	CollisionResult collision;
-	
-	Entity_move(self, Vector3Scale(self->velocity, delta));
-
-	self->renderable_offset = Vector3Subtract(old_pos, self->position);
-	data->prev_offset       = self->renderable_offset;
 	
 	collision = Scene_raycast(
 			Entity_getScene(self), 
-			old_pos, 
-			self->position
+			self->position,
+			new_pos
 		);
 
+	self->renderable_offset = Vector3Subtract(self->position, new_pos);
+	data->prev_offset       = self->renderable_offset;
+
+
 	if (collision.hit) {
-		self->visible = false;
-		self->active = false;
-		Entity_free(self);
+		if (info->Collision) info->Collision(self, collision);
+		else {
+			self->visible = false;
+			self->active = false;
+			Entity_free(self);
+		}
+	}
+	else {
+		self->position = new_pos;
 	}
 }
 
-void
+static void
 projectileRender(Entity *self, float delta)
 {
 	(void)delta;
@@ -209,7 +209,7 @@ projectileRender(Entity *self, float delta)
 		);
 }
 
-void 
+static void 
 projectileCollision(Entity *self, CollisionResult collision)
 {
 	ProjectileData *data = (ProjectileData*)self->local_data;
@@ -219,7 +219,7 @@ projectileCollision(Entity *self, CollisionResult collision)
 	Entity_free(self);
 }
 
-void
+static void
 projectileFree(Entity *self)
 {
 	(void)self;
@@ -231,12 +231,14 @@ projectileFree(Entity *self)
 */
 ProjectileInfo *
 ProjectileInfo_new(
-	float             damage,
-	float             speed,
-	float             timeout,
-	ProjectileMotion  motion,
-	float             gravity_or_homing_strength,
-	Renderable       *renderable
+	float                damage,
+	float                speed,
+	float                timeout,
+	ProjectileMotion     motion,
+	float                gravity_or_homing_strength,
+	Renderable          *renderable,
+	ProjectileCollision  Collision_Callback,
+	ProjectileTimeout    Timeout_Callaback
 )
 {
 	ProjectileInfo *info = calloc(1, sizeof(ProjectileInfo));
@@ -245,12 +247,14 @@ ProjectileInfo_new(
 		return NULL;
 	}
 
-	info->damage          =  damage;
-	info->speed           =  speed;
-	info->timeout         =  timeout;
-	info->gravity         =  gravity_or_homing_strength;
-	info->motion          =  motion;
-	info->renderable      = *renderable;
+	info->damage     =  damage;
+	info->speed      =  speed;
+	info->timeout    =  timeout;
+	info->gravity    =  gravity_or_homing_strength;
+	info->motion     =  motion;
+	info->renderable = *renderable;
+	info->Collision  =  Collision_Callback;
+	info->Timeout    =  Timeout_Callaback;
 
 	return info;
 }
