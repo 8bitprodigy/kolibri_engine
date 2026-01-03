@@ -28,7 +28,7 @@ void closeAll  (void *data, void *value);
 Engine       *engine;
 Entity       *player;
 Scene        *scene;
-TestHeadData *head_data;
+FPSHeadData *head_data;
 bool          readyToClose;
 
 Menu
@@ -62,7 +62,7 @@ runEngine(void *data, void *value)
 			(Region){0,0,screen_width, screen_height}, 
 			&head_Callbacks, 
 			engine,
-			sizeof(TestHeadData)
+			sizeof(FPSHeadData)
 		);
 		
 	RendererSettings *settings = Head_getRendererSettings(head);
@@ -105,7 +105,7 @@ runEngine(void *data, void *value)
 	player_data->head       = head;
 	player->position        = (Vector3){0.0f, 8.0f, 0.0f};
 	
-	head_data = (TestHeadData*)Head_getUserData(head);
+	head_data = (FPSHeadData*)Head_getUserData(head);
 	head_data->controller  = 0;
 	head_data->target      = player;
 	head_data->target_data = player->user_data;

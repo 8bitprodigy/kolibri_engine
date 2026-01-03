@@ -79,7 +79,6 @@ projectile_template = {
 /*
 	CALLBACKS
 */
-
 static void 
 projectileSetup(Entity *self)
 {
@@ -153,7 +152,10 @@ projectileUpdate(Entity *self, float delta)
 	data->prev_offset       = self->renderable_offset;
 
 
-	if (collision.hit) {
+	if (
+		collision.hit 
+		&& collision.entity != data->source
+	) {
 		if (info->Collision) info->Collision(self, collision);
 		else {
 			self->visible = false;
@@ -199,14 +201,16 @@ projectileRender(Entity *self, float delta)
 	Quaternion spin     = QuaternionFromAxisAngle(velocityDir, spinAngle);
 	// Combine: first align, then spin around that new forward axis
 	self->orientation   = QuaternionMultiply(spin, align);
-	
-	SpriteInfo *sinfo = (SpriteInfo*)self->renderables[0]->data;
-	SpriteData *sdata = &data->sprite_data;
-	AnimateSprite(
-			sinfo,
-			sdata,
-			Entity_getAge(self)
-		);
+
+	if (self->renderables[0]->Render == RenderBillboard) {
+		SpriteInfo *sinfo = (SpriteInfo*)self->renderables[0]->data;
+		SpriteData *sdata = &data->sprite_data;
+		AnimateSprite(
+				sinfo,
+				sdata,
+				Entity_getAge(self)
+			);
+	}
 }
 
 static void 

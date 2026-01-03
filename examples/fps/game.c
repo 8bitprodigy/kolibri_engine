@@ -1,7 +1,6 @@
 #include <raylib.h>
 
 #include "game.h"
-#include "../projectile.h"
 
 
 Texture        explosion_Sprite;
@@ -25,7 +24,12 @@ Texture         *projectile_Sprite_or_Textures;
 SpriteInfo     **projectile_SpriteInfos;
 ProjectileInfo **projectile_Infos;
 
+WeaponInfo       weapon_Infos[WEAPON_NUM_WEAPONS];
 
+
+/*
+	Projectile callbacks
+*/
 void
 grenadeTimeout(Entity *projectile)
 {
@@ -87,12 +91,64 @@ grenadeCollision(
 }
 
 
+/*
+	Weapon Callbacks
+*/	
+
+void
+fireHitscan(
+	WeaponInfo *info, 
+	WeaponData *data, 
+	Entity     *source, 
+	Vector3     position, 
+	Vector3     direction
+)
+{
+	CollisionResult result = Scene_raycast(
+			Entity_getScene(source),
+			position,
+			Vector3Add(position, Vector3Scale(direction, info->distance))
+		);
+
+	if (result.hit && result.entity)
+		DBG_OUT("Stabbed entity @%p", (void*)result.entity);
+}
+
+void
+fireProjectile(
+	WeaponInfo *info, 
+	WeaponData *data, 
+	Entity     *source, 
+	Vector3     position, 
+	Vector3     direction
+)
+{
+	Projectile_new(
+			info->projectile, 
+			position, 
+			direction, 
+			source, 
+			NULL, 
+			Entity_getScene(source)
+		);
+}
+
+
+/*
+	Resource Inits
+*/
 void
 Explosion_mediaInit(void)
 {
 	char explosion_path[256];
 
-	snprintf(explosion_path, sizeof(explosion_path), "%s%s", path_prefix,  "resources/sprites/explosion.png");
+	snprintf(
+			explosion_path, 
+			sizeof(explosion_path), 
+			"%s%s", 
+			path_prefix,  
+			"resources/sprites/explosion.png"
+		);
 
 	explosion_Sprite = LoadTexture(explosion_path);
 	SetTextureFilter(explosion_Sprite, TEXTURE_FILTER_BILINEAR);
@@ -107,7 +163,6 @@ Explosion_mediaInit(void)
 			4, 4
 		);
 }
-
 
 void
 Projectile_mediaInit(void)
@@ -126,7 +181,7 @@ Projectile_mediaInit(void)
 			sizeof(load_path), 
 			"%s%s", 
 			path_prefix, 
-			"resources/models/projectiles/blast.obj"
+			"resources/models/projectiles/projectile.obj"
 		);
 	projectile_models[PROJECTILE_BLAST] = LoadModel(load_path);
 	snprintf(
@@ -134,7 +189,7 @@ Projectile_mediaInit(void)
 			sizeof(load_path), 
 			"%s%s",
 			path_prefix, 
-			"resources/models/projectiles/blast.png"
+			"resources/models/projectiles/projectile.png"
 		);
 	projectile_Sprite_or_Textures[PROJECTILE_BLAST] = LoadTexture(load_path);
 	SetTextureFilter(
@@ -146,7 +201,8 @@ Projectile_mediaInit(void)
 			MATERIAL_MAP_ALBEDO, 
 			projectile_Sprite_or_Textures[PROJECTILE_BLAST]
 		);
-	projectile_renderables[PROJECTILE_BLAST] = model_Renderable;
+	projectile_renderables[PROJECTILE_BLAST]      = model_Renderable;
+	projectile_renderables[PROJECTILE_BLAST].data = &projectile_models[PROJECTILE_BLAST]; 
 	projectile_Infos[PROJECTILE_BLAST]       = ProjectileInfo_new(
 			5.0f,
 			25.0f,
@@ -224,6 +280,7 @@ Projectile_mediaInit(void)
 			projectile_Sprite_or_Textures[PROJECTILE_ROCKET]
 		);
 	projectile_renderables[PROJECTILE_ROCKET] = model_Renderable;
+	projectile_renderables[PROJECTILE_ROCKET].data = &projectile_models[PROJECTILE_ROCKET]; 
 	projectile_Infos[PROJECTILE_ROCKET] = ProjectileInfo_new(
 			5.0f,
 			25.0f,
@@ -314,10 +371,111 @@ Projectile_mediaInit(void)
 		);
 }
 
+void
+Weapon_init(void)
+{
+	char 
+		weapon_path[256],
+		weapon_texture_path[256];
+	
+	/*
+		Construct Weapons
+	*/
+	weapon_Infos[WEAPON_MELEE] = (WeaponInfo){
+		.projectile        = NULL,
+		.refractory_period = 1.0f,
+		.Fire              = fireHitscan,
+		.action_type       = ACTION_AUTOMATIC,
+	};
+	weapon_Infos[WEAPON_BLASTER] = (WeaponInfo){
+		.projectile        = projectile_Infos[PROJECTILE_BLAST],
+		.refractory_period = 0.35f,
+		.Fire              = fireProjectile,
+		.action_type       = ACTION_SEMIAUTO,
+	};
+	weapon_Infos[WEAPON_MINIGUN] = (WeaponInfo){
+		.projectile        = projectile_Infos[PROJECTILE_BLAST],
+		.refractory_period = 0.125f,
+		.Fire              = fireProjectile,
+		.action_type       = ACTION_AUTOMATIC,
+	};
+	weapon_Infos[WEAPON_SHOTGUN] = (WeaponInfo){
+		.projectile        = projectile_Infos[PROJECTILE_BLAST],
+		.refractory_period = 1.0f,
+		.Fire              = fireProjectile,
+		.action_type       = ACTION_MANUAL,
+	};
+	weapon_Infos[WEAPON_GOOGUN] = (WeaponInfo){
+		.projectile        = projectile_Infos[PROJECTILE_GOO],
+		.refractory_period = 0.3f,
+		.Fire              = fireProjectile,
+		.action_type       = ACTION_SEMIAUTO,
+	};
+	weapon_Infos[WEAPON_ROCKET_LAUNCHER] = (WeaponInfo){
+		.projectile        = projectile_Infos[PROJECTILE_ROCKET],
+		.refractory_period = 1.0f,
+		.Fire              = fireProjectile,
+		.action_type       = ACTION_MANUAL,
+	};
+	weapon_Infos[WEAPON_GRENADE_LAUNCHER] = (WeaponInfo){
+		.projectile        = projectile_Infos[PROJECTILE_GRENADE],
+		.refractory_period = 0.5f,
+		.Fire              = fireProjectile,
+		.action_type       = ACTION_SEMIAUTO,
+	};
+	weapon_Infos[WEAPON_RAILGUN] = (WeaponInfo){
+		.projectile        = NULL,
+		.refractory_period = 1.5f,
+		.Fire              = fireHitscan,
+		.action_type       = ACTION_MANUAL,
+	};
+	weapon_Infos[WEAPON_LIGHTNING_GUN] = (WeaponInfo){
+		.projectile        = NULL,
+		.refractory_period = 0.0f,
+		.Fire              = NULL,
+		.action_type       = ACTION_AUTOMATIC,
+	};
+	/*
+		Load Models
+	*/
+	for (int i = 0; i < WEAPON_NUM_WEAPONS; i++) {
+		snprintf(
+				weapon_path, 
+				sizeof(weapon_path), 
+				"%s%s%d%s", 
+				path_prefix, 
+				"resources/models/weapons/weapon", 
+				i+1, 
+				".obj"
+			);
+		DBG_OUT("Weapon Path: %s", weapon_path);
+		weapon_Infos[i].model = LoadModel(weapon_path);
+		
+		snprintf(
+				weapon_texture_path, 
+				sizeof(weapon_texture_path), 
+				"%s%s%d%s", 
+				path_prefix, 
+				"resources/models/weapons/weapon", 
+				i+1, 
+				".png"
+			);
+		DBG_OUT("Weapon Texture Path: %s", weapon_texture_path);
+		Texture2D weaponTexture = LoadTexture(weapon_texture_path);
+		SetMaterialTexture(
+				&weapon_Infos[i].model.materials[0], 
+				MATERIAL_MAP_ALBEDO, 
+				weaponTexture
+			);  
+		SetTextureFilter(weaponTexture, TEXTURE_FILTER_BILINEAR);
+	}
+}
+
 
 void
 Game_mediaInit()
 {
-	Projectile_mediaInit();
 	Explosion_mediaInit();
+	Projectile_mediaInit();
+	Weapon_init();
 }

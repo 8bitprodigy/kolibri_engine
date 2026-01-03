@@ -1260,26 +1260,26 @@ heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
             float world_x = (x / (float)map->cells_wide - 0.5f) * map->world_size;
             float world_z = (z / (float)map->cells_wide - 0.5f) * map->world_size;
             
-            Vector3 p1 = {
-                world_x,
-                heightmap[z][x]         * data->height_scale + data->offset,
-                world_z
-            };
-            Vector3 p2 = {
-                world_x + cell_size,
-                heightmap[z][x + 1]     * data->height_scale + data->offset,
-                world_z
-            };
-            Vector3 p3 = {
-                world_x + cell_size,
-                heightmap[z + 1][x + 1] * data->height_scale + data->offset,
-                world_z + cell_size
-            };
-            Vector3 p4 = {
-                world_x,
-                heightmap[z + 1][x]     * data->height_scale + data->offset,
-                world_z + cell_size
-            };
+			Vector3 p1 = {
+				world_x,
+				heightmap[z][x] * data->height_scale + data->offset,
+				world_z
+			};
+			Vector3 p2 = {
+				world_x,
+				heightmap[z + 1][x] * data->height_scale + data->offset,
+				world_z + cell_size
+			};
+			Vector3 p3 = {
+				world_x + cell_size,
+				heightmap[z + 1][x + 1] * data->height_scale + data->offset,
+				world_z + cell_size
+			};
+			Vector3 p4 = {
+				world_x + cell_size,
+				heightmap[z][x + 1] * data->height_scale + data->offset,
+				world_z
+			};
             
             // Test quad using raylib's GetRayCollisionQuad
             RayCollision collision = GetRayCollisionQuad(ray.ray, p1, p2, p3, p4);
@@ -1289,7 +1289,7 @@ heightmapSceneRaycast(Scene *scene, Vector3 from, Vector3 to)
                 result.hit = true;
                 result.distance = collision.distance;
                 result.position = collision.point;
-                result.normal = Vector3Negate(collision.normal);
+                result.normal = collision.normal;
                 result.material_id = 0;
                 result.user_data = NULL;
                 result.entity = NULL;

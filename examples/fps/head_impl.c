@@ -6,6 +6,8 @@
 #include "../heightmap.h"
 #include "../reticle.h"
 #include "../skybox.h"
+#define WEAPON_IMPLEMENTATION
+#include "../weapon.h"
 
 
 #define MOUSE_SENSITIVITY   0.05f
@@ -16,31 +18,67 @@
 	#define SKY_PATH "resources/sky/SBS_SKY_panorama_%s.png"
 #endif
 
+#define MOD(a, b) (((a) % (b) + (b)) % (b))
+
 
 /*
 	Callback Forward Declarations
 */
-void testHeadSetup(     Head *head);
-void testHeadPreRender( Head *head);
-void testHeadPostRender(Head *head);
-void testHeadUpdate(    Head *head, float delta);
-void testHeadResize(    Head *head, uint   width, uint height);
+void fpsHeadSetup(     Head *head);
+void fpsHeadPreRender( Head *head);
+void fpsHeadPostRender(Head *head);
+void fpsHeadUpdate(    Head *head, float delta);
+void fpsHeadResize(    Head *head, uint   width, uint height);
 
 
 /*
 	VTable definition
 */
 HeadVTable head_Callbacks = {
-	testHeadSetup, 
-	testHeadUpdate, 
-	testHeadPreRender, 
-	testHeadPostRender,
-	testHeadResize, 
+	fpsHeadSetup, 
+	fpsHeadUpdate, 
+	fpsHeadPreRender, 
+	fpsHeadPostRender,
+	fpsHeadResize, 
 	NULL, 
 	NULL
 };
 
 
+/*
+	Private Methods
+*/
+static void
+cycleWeapon(Head *head, int dir)
+{
+	FPSHeadData *data = Head_getLocalData(head);
+	
+	int 
+		i = 0,
+		direction = (dir < 0)? -1 : 1,
+		next_slot = MOD(data->current_weapon + direction, WEAPON_NUM_WEAPONS);
+	
+	while (!(data->owned_weapons & 1<<next_slot )) {
+		next_slot = MOD(next_slot + direction, WEAPON_NUM_WEAPONS);
+		if (WEAPON_NUM_WEAPONS < ++i) return;
+	}
+	data->current_weapon = next_slot;
+}
+
+static void
+selectWeapon(Head *head, uint8_t selected)
+{
+	FPSHeadData *data = Head_getLocalData(head);
+
+	if (!(data->owned_weapons & 1<<selected )) return;
+
+	data->current_weapon = selected;
+}
+
+
+/*
+	Callback Definitions
+*/
 void
 teleportHead(Entity *entity, Vector3 from, Vector3 to)
 {
@@ -54,17 +92,14 @@ teleportHead(Entity *entity, Vector3 from, Vector3 to)
 		new_cam_pos   = Vector3Add(to, cam_offset);
 	data->prev_position = Vector3Add(to, player_offset);
 	moveCamera(cam, new_cam_pos);
-}
+} /* teleportHead */
 
-/*
-	Callback Definitions
-*/
 void
-testHeadSetup(Head *head)
+fpsHeadSetup(Head *head)
 {
-	TestHeadData *user_data = Head_getLocalData(head);
+	FPSHeadData *user_data = Head_getLocalData(head);
 	if (!user_data) {
-		ERR_OUT("Failed to allocate TestHeadData.");
+		ERR_OUT("Failed to allocate FPSHeadData.");
 		return;
 	}
 	RendererSettings *settings = Head_getRendererSettings(head);
@@ -75,43 +110,31 @@ testHeadSetup(Head *head)
 		weapon_path[256],
 		weapon_texture_path[256];
 
-	user_data->viewport_scale = 1;
-	user_data->target         = NULL;
-	user_data->target_data    = NULL;
-	user_data->controller     = 0;
+	user_data->viewport_scale   = 1;
+	user_data->target           = NULL;
+	user_data->target_data      = NULL;
+	user_data->controller       = 0;
 	user_data->look_sensitivity = 50.0f;
-
-	user_data->current_weapon = 0;
+	user_data->owned_weapons    = (1<<WEAPON_NUM_WEAPONS) - 1;
+	user_data->current_weapon   = 1;
 
 	snprintf(sky_path, sizeof(sky_path), "%s%s", path_prefix, SKY_PATH);
 
 	for (int i = 0; i < 6; i++) {
 		static char filename[256];
 		snprintf(filename, sizeof(filename), sky_path, SkyBox_names[i]);
-		DBG_OUT("Sky Texture loaded: %s", filename);
 		user_data->skybox_textures[i] = LoadTexture(filename);
 		SetTextureFilter(user_data->skybox_textures[i], TEXTURE_FILTER_BILINEAR);
 		SetTextureWrap(   user_data->skybox_textures[i], TEXTURE_WRAP_CLAMP);
 	}
-
-	/*
-		Handle HUD Weapons
-	*/
-	Model *weapons = &user_data->weapons[0];
-	snprintf(weapon_path, sizeof(weapon_path), "%s%s", path_prefix, "resources/models/weapons/weapon7.obj");
-	weapons[0] = LoadModel(weapon_path);
-	snprintf(weapon_texture_path, sizeof(weapon_texture_path), "%s%s", path_prefix, "resources/models/weapons/weapon7.png");
-	Texture2D weaponTexture = LoadTexture(weapon_texture_path);
-	SetMaterialTexture(&weapons->materials[0], MATERIAL_MAP_ALBEDO, weaponTexture);
-	SetTextureFilter(weaponTexture, TEXTURE_FILTER_BILINEAR);
-
+	
 	Head_setUserData(head, user_data);
-}
+} /* fpsHeadSetup */
 
 void
-testHeadPreRender(Head *head)
+fpsHeadPreRender(Head *head)
 {
-	TestHeadData *data = Head_getUserData(head);
+	FPSHeadData *data = Head_getUserData(head);
 	Camera3D     *cam  = Head_getCamera(head);
 	rlClearScreenBuffers();
 	BeginMode3D(*cam);
@@ -121,12 +144,12 @@ testHeadPreRender(Head *head)
 }
 
 void
-testHeadPostRender(Head *head)
+fpsHeadPostRender(Head *head)
 {
 	/*
 		Draw viewmodel
 	*/
-	TestHeadData *data        = Head_getUserData(head);
+	FPSHeadData *data        = Head_getUserData(head);
 	PlayerData   *target_data = data->target_data;
 	Camera3D     *cam         = Head_getCamera(head);
 	Region        region      = Head_getRegion(head);
@@ -147,10 +170,10 @@ testHeadPostRender(Head *head)
 			rlRotatef(yaw_angle,   0.0f, 1.0f, 0.0f);
 			rlTranslatef(0.0f, 0.0f, 0.25f);
 			rlRotatef(pitch_angle, 1.0f, 0.0f, 0.0f);
-			rlTranslatef(-0.5f, -0.5f, 1.25f);
+			rlTranslatef(-0.5f, -0.5f, 1.0f);
 			
 			DrawModel(
-					data->weapons[0], 
+					weapon_Infos[data->current_weapon].model, 
 					V3_ZERO, 
 					0.25f, 
 					HeightmapScene_sampleShadow(scene, cam_pos)
@@ -204,12 +227,12 @@ testHeadPostRender(Head *head)
 			WHITE,
 			RETICLE_CIRCLE
 		);*/
-}
+} /* fpsHeadPostRender */
 
 void
-testHeadResize(Head *head, uint width, uint height)
+fpsHeadResize(Head *head, uint width, uint height)
 {
-	TestHeadData *data = Head_getUserData(head);
+	FPSHeadData *data = Head_getUserData(head);
 
 	int
 		region_height = height - (VIEWPORT_INCREMENT * data->viewport_scale),
@@ -221,19 +244,21 @@ testHeadResize(Head *head, uint width, uint height)
 				region_width, 
 				region_height
 			});
-}
+} /* fpsHeadResize */
 
 void
-testHeadUpdate(Head *head, float delta)
+fpsHeadUpdate(Head *head, float delta)
 {
 	(void)delta;
-    TestHeadData *data = Head_getUserData(head);
+    FPSHeadData *data = Head_getUserData(head);
 
 	int 
 		controller_num = data->controller,
 		screen_width   = GetScreenWidth(),
 		screen_height  = GetScreenHeight();
-	float aspect_ratio = (float)screen_width / (float)screen_height;
+	float 
+		look_sensitivity = data->look_sensitivity,
+		aspect_ratio = (float)screen_width / (float)screen_height;
     /* Adjust viewport size */
     if      (IsKeyPressed(KEY_EQUAL)) {
         if (0 < data->viewport_scale) data->viewport_scale--;
@@ -359,19 +384,30 @@ PLAYER_INPUT: {
 			camera, 
 			current_camera_pos
 		);
-		
-		if (
-			IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
-			|| IsGamepadButtonPressed(controller_num, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)
-		) {
-			Projectile_new(
-					projectile_Infos[PROJECTILE_GRENADE], 
-					camera->target, 
-					Vector3Normalize(Vector3Subtract(camera->target, camera->position)), 
-					player, 
-					NULL, 
-					Engine_getScene(engine)
-				);
+
+		int  dir = (int)GetMouseWheelMoveV().y;
+		if (dir) {
+			cycleWeapon(head, dir);
 		}
+		bool fire_button = (
+				IsMouseButtonDown(MOUSE_BUTTON_LEFT)
+				|| IsGamepadButtonDown(
+						controller_num, 
+						GAMEPAD_BUTTON_RIGHT_FACE_DOWN
+					)
+			);
+		Weapon_fire(
+				&weapon_Infos[data->current_weapon],
+				&data->weapon_data[data->current_weapon],
+				player,
+				camera->target,
+				Vector3Normalize(
+						Vector3Subtract(
+								camera->target, 
+								camera->position
+							)
+					), 
+				fire_button
+			);
 	}
-}
+} /* fpsHeadUpdate */

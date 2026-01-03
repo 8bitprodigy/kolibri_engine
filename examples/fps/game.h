@@ -14,6 +14,7 @@
 #include "../projectile.h"
 #include "../sprite.h"
 #include "../utils.h"
+#include "../weapon.h"
 
 
 #ifndef WINDOW_TITLE
@@ -49,9 +50,6 @@
 #ifndef PATH_PREFIX
 	#define PATH_PREFIX "./"
 #endif
-
-
-#define NUM_WEAPONS 10
 
 
 /* Player Constants */
@@ -101,6 +99,7 @@ typedef enum
 }
 Weapons;
 
+
 /* 
 	game.c
 */
@@ -110,6 +109,8 @@ extern Model           *projectile_models;
 extern Texture         *projectile_Sprite_or_Textures;
 extern SpriteInfo     **projectile_SpriteInfos;
 extern ProjectileInfo **projectile_Infos;
+
+extern WeaponInfo       weapon_Infos[WEAPON_NUM_WEAPONS];
 
 void Game_mediaInit(      void);
 /*
@@ -139,20 +140,21 @@ extern Entity       entityTemplate;
 */
 typedef struct
 {
-	Model      weapons[NUM_WEAPONS];
-	Vector2    look;
+	WeaponData weapon_data[WEAPON_NUM_WEAPONS];
 	Texture2D  skybox_textures[6];
 	Entity    *target;
 	void      *target_data;
+	Vector2    look;
 	float      
 			   look_sensitivity,
 			   eye_height;
 	int     
-			   current_weapon,
 			   viewport_scale,
 			   controller;
+	uint16_t   owned_weapons;
+	uint8_t    current_weapon;
 }
-TestHeadData;
+FPSHeadData;
 
 extern HeadVTable head_Callbacks;
 void   teleportHead(Entity *entity, Vector3 from, Vector3 to);
