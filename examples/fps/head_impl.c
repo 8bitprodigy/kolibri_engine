@@ -1,6 +1,7 @@
 #include <GL/gl.h>
 #include <raylib.h>
 #include <raymath.h>
+#include <string.h>
 
 #include "game.h"
 #include "../heightmap.h"
@@ -54,14 +55,15 @@ cycleWeapon(Head *head, int dir)
 	FPSHeadData *data = Head_getLocalData(head);
 	
 	int 
-		i = 0,
 		direction = (dir < 0)? -1 : 1,
-		next_slot = MOD(data->current_weapon + direction, WEAPON_NUM_WEAPONS);
+		next_slot = MOD(data->current_weapon + direction, WEAPON_NUM_WEAPONS),
+		i         = 0;
 	
 	while (!(data->owned_weapons & 1<<next_slot )) {
 		next_slot = MOD(next_slot + direction, WEAPON_NUM_WEAPONS);
-		if (WEAPON_NUM_WEAPONS < ++i) return;
+		if (WEAPON_NUM_WEAPONS < i++) return;
 	}
+	
 	data->current_weapon = next_slot;
 }
 
@@ -117,6 +119,9 @@ fpsHeadSetup(Head *head)
 	user_data->look_sensitivity = 50.0f;
 	user_data->owned_weapons    = (1<<WEAPON_NUM_WEAPONS) - 1;
 	user_data->current_weapon   = 1;
+	
+	memset(user_data->weapon_data, 0, sizeof(WeaponData) * WEAPON_NUM_WEAPONS);
+	user_data->weapon_data[WEAPON_MINIGUN].data = (Any)1.0f;
 
 	snprintf(sky_path, sizeof(sky_path), "%s%s", path_prefix, SKY_PATH);
 
@@ -125,7 +130,7 @@ fpsHeadSetup(Head *head)
 		snprintf(filename, sizeof(filename), sky_path, SkyBox_names[i]);
 		user_data->skybox_textures[i] = LoadTexture(filename);
 		SetTextureFilter(user_data->skybox_textures[i], TEXTURE_FILTER_BILINEAR);
-		SetTextureWrap(   user_data->skybox_textures[i], TEXTURE_WRAP_CLAMP);
+		SetTextureWrap(  user_data->skybox_textures[i], TEXTURE_WRAP_CLAMP);
 	}
 	
 	Head_setUserData(head, user_data);
@@ -385,7 +390,17 @@ PLAYER_INPUT: {
 			current_camera_pos
 		);
 
+#ifndef ON_CONSOLE
 		int  dir = (int)GetMouseWheelMoveV().y;
+#else
+		int dir = IsGamepadButtonPressed(
+				controller_num,
+				GAMEPAD_BUTTON_RIGHT_FACE_UP
+			) - IsGamepadButtonPressed(
+				controller_num,
+				GAMEPAD_BUTTON_RIGHT_FACE_LEFT
+			);
+#endif
 		if (dir) {
 			cycleWeapon(head, dir);
 		}

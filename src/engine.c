@@ -51,7 +51,10 @@ Engine
 					last_tick_time,
 					last_frame_time,
 					current_time,
-					pause_time;
+					start_time,
+					stop_time,
+					last_pause_time,
+					time_spent_paused;
 	float           
 					delta, 
 					tick_length,
@@ -93,26 +96,31 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 		ERR_OUT("Failed to allocate memory for Engine.");
 		return NULL;
 	}
+	double current_time = GetTime();
 
-	engine->heads            = NULL;
-	engine->scene            = NULL;
-	engine->renderer         = Renderer__new(engine);
+	engine->heads             = NULL;
+	engine->scene             = NULL;
+	engine->renderer          = Renderer__new(engine);
 	
-	engine->frame_num        = 0;
-	engine->tick_num         = 0;
-	engine->head_count       = 0;
-	engine->delta            = 0.0f;
-	engine->tick_length      = 1.0f / tick_rate;
-	engine->tick_elapsed     = 1.0f;
-	engine->tick_rate        = tick_rate;
-
-	engine->last_tick_time   = GetTime();
-	engine->current_time     = engine->last_tick_time;
-
-	engine->paused           = false;
-	engine->request_exit     = false;
+	engine->frame_num         = 0;
+	engine->tick_num          = 0;
+	engine->head_count        = 0;
+	engine->delta             = 0.0f;
+	engine->tick_length       = 1.0f / tick_rate;
+	engine->tick_elapsed      = 1.0f;
+	engine->tick_rate         = tick_rate;
 	
-	engine->vtable           = vtable;
+	engine->last_tick_time    = GetTime();
+	engine->current_time      = engine->last_tick_time;
+	engine->start_time        = 0.0f;
+	engine->stop_time         = 0.0f;
+	engine->last_pause_time   = 0.0f;
+	engine->time_spent_paused = 0.0f;
+
+	engine->paused            = false;
+	engine->request_exit      = false;
+	
+	engine->vtable            = vtable;
 
 	if (vtable && vtable->Setup) vtable->Setup(engine);
 	
@@ -181,7 +189,7 @@ Engine_getTime(Engine *self)
 double
 Engine_getPauseTime(Engine *self)
 {
-	return self->pause_time;
+	return self->time_spent_paused;
 }
 
 Head *
@@ -220,8 +228,9 @@ Engine_getVTable(Engine *engine)
 void
 Engine_run(Engine *self)
 {
-	self->request_exit         = false;
 	const EngineVTable *vtable = self->vtable;
+	self->request_exit = false;
+	self->start_time   = GetTime();
 	
 	SetExitKey(KEY_NULL);
 	
@@ -276,11 +285,11 @@ Engine_update(Engine *self)
 	if (self->paused || self->request_exit) return;
 	const EngineVTable *vtable = self->vtable;
 	
-	self->current_time = GetTime();
-	float frame_time = self->current_time - self->last_frame_time;
+	self->current_time = GetTime() - self->start_time - self->time_spent_paused;
+	float frame_delta = self->current_time - self->last_frame_time;
 	self->last_frame_time = self->current_time;
 	
-	Head__updateAll(self->heads, frame_time);
+	Head__updateAll(self->heads, frame_delta);
 	
 	if (self->tick_rate <= 0) return;
 
@@ -346,10 +355,10 @@ Engine_pause(Engine *self, bool Paused)
 		self->paused = Paused;
 		EngineVTable *vtable = self->vtable;
 		if (Paused) {
-			self->pause_time = GetTime();
+			self->last_pause_time = GetTime();
 			if (vtable && vtable->Pause) vtable->Pause(self);
 		} else {
-			self->last_tick_time += GetTime() - self->pause_time;
+			self->time_spent_paused += GetTime() - self->last_pause_time;
 			if (vtable && vtable->Unpause) vtable->Unpause(self);
 		}
 	}

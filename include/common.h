@@ -202,6 +202,62 @@ typedef int8_t       int8;
 typedef unsigned int uint;
 typedef size_t       word;
 
+
+typedef enum
+{
+	VARIANT_CHAR,
+	VARIANT_UCHAR,
+	VARIANT_INT,
+	VARIANT_UNSIGNED,
+	VARIANT_LONG,
+	VARIANT_ULONG,
+	VARIANT_LONG_LONG,
+	VARIANT_ULONG_LONG,
+	VARIANT_SHORT,
+	VARIANT_USHORT,
+	VARIANT_FLOAT,
+	VARIANT_DOUBLE,
+	VARIANT_VOID_PTR,
+}
+VariantTag;
+
+typedef union 
+{
+	char                c;
+	unsigned char       uc;
+	int                 i;
+	unsigned            u;
+	long                l;
+	unsigned long       ul;
+	long long           ll;
+	unsigned long long  ull;
+	short               s;
+	unsigned short      us;
+	float               f;
+	double              d;
+	void               *v;
+	char               *str;
+    
+    char                ca[8];
+    unsigned char       uca[8];
+    short               sa[4];
+    unsigned short      usa[4];
+    int                 ia[2];
+    unsigned            ua[2];
+    long                la[2];
+    unsigned long       ula[2];
+    float               fa[2];
+}
+Any;
+
+typedef struct
+{
+	VariantTag tag;
+	Any        value;
+}
+Variant;
+
+
 typedef enum
 {
 	COLLISION_NONE     = 0,

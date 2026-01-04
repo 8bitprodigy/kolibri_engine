@@ -15,13 +15,14 @@ ProjectileMotion;
 typedef struct ProjectileInfo ProjectileInfo;
 typedef struct
 {
-	SpriteData   sprite_data;
+	SpriteData    sprite_data;
 	Entity
-				*source,
-				*target;
+				 *source,
+				 *target;
 	Vector3
-				 prev_offset;
-	float        elapsed_time;
+			 	 prev_offset;
+	float         elapsed_time;
+	unsigned char data[];
 }
 ProjectileData;
 
@@ -43,11 +44,13 @@ void ProjectileInfo_free(ProjectileInfo *info);
 
 Entity *Projectile_new(
        ProjectileInfo *info,
-       Vector3 position,
-       Vector3 direction,
-       Entity *source,
-       Entity *target,
-       Scene *scene
+       Vector3         position,
+       Vector3         direction,
+       Entity         *source,
+       Entity         *target,
+       Scene          *scene,
+       size_t          data_size,
+       void           *data
 );
 
 #endif /* PROJECTILE_H */

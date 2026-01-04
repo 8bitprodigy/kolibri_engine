@@ -103,7 +103,12 @@ runEngine(void *data, void *value)
 	player = Entity_new(&playerTemplate, scene, 0);
 	PlayerData *player_data = player->user_data;
 	player_data->head       = head;
-	player->position        = (Vector3){0.0f, 8.0f, 0.0f};
+	player->position        = (Vector3){
+			0.0f, 
+			HeightmapScene_getHeight(scene, V3_ZERO) + 1.0f, 
+			0.0f
+		};
+	DBG_OUT("[SCENE HEIGHT] %.4f", player->position.y);
 	
 	head_data = (FPSHeadData*)Head_getUserData(head);
 	head_data->controller  = 0;

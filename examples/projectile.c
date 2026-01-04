@@ -1,5 +1,6 @@
 #include <raylib.h>
 #include <raymath.h>
+#include <string.h>
 
 #include "kolibri.h"
 #include "entity.h"
@@ -270,13 +271,15 @@ Projectile_new(
        Vector3         direction,
        Entity         *source,
        Entity         *target,
-       Scene          *scene
+       Scene          *scene,
+       size_t          pdata_size,
+       void           *pdata
 )
 {
 	Entity *projectile = Entity_new(
 			&projectile_template, 
 			scene,
-			sizeof(ProjectileData)
+			sizeof(ProjectileData) + pdata_size
 		);
 	if (!projectile) return projectile;
 
@@ -291,6 +294,7 @@ Projectile_new(
 	data->elapsed_time      = 0.0f;
 	data->source            = source;
 	data->target            = target;
+	memcpy(data->data, pdata, pdata_size);
 
 	projectile->user_data      = info;
 	projectile->renderables[0] = &info->renderable;

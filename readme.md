@@ -241,6 +241,8 @@ Defines macros, constants, enums, and types used commonly throughout the engine 
 
       - `Scene *Engine_getScene(Engine *engine)`: Returns a pointer to the current Scene.
 
+      - `double Engine_getTime(Engine *engine)`: Returns the number of seconds the engine has spent running, excluding time spent paused.
+
     - *Methods*
 
       - `void Engine_run(Engine *engine)`: Runs the Engine, starting the simulation.

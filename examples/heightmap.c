@@ -1417,6 +1417,7 @@ HeightmapScene_getWorldSize(Scene *scene)
 float
 HeightmapScene_getHeight(Scene *scene, Vector3 pos)
 {
-	Heightmap *map = Scene_getData(scene);
-	return getTerrainHeight(map, pos);
+	Heightmap     *map  = Scene_getData(scene);
+    HeightmapData *data = &map->data;
+	return getTerrainHeight(map, pos) + data->offset;
 }

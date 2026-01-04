@@ -35,9 +35,13 @@ WeaponInfo;
 typedef struct
 WeaponData
 {
-	double  next_shot;
-	int     ammo;
-	bool    trigger_was_down;
+	double  
+				  trigger_down,
+				  trigger_up,
+				  next_shot;
+	Any           data;
+	int           ammo;
+	bool          trigger_was_down;
 }
 WeaponData;
 
@@ -61,9 +65,11 @@ Weapon_fire(
     bool 
 		just_pressed  = trigger_down  && !data->trigger_was_down,
 		just_released = !trigger_down &&  data->trigger_was_down;
-    data->trigger_was_down = trigger_down;
 
     double current_time = Engine_getTime(Entity_getEngine(source));
+
+    if (    just_pressed ) data->trigger_down = current_time;
+    else if(just_released) data->trigger_up   = current_time;
     
     switch (info->action_type) {
 	case ACTION_MANUAL:
@@ -106,6 +112,7 @@ Weapon_fire(
 		}
 		break;
     }
+    data->trigger_was_down = trigger_down;
 }
 	
 #endif /* WEAPON_IMPLEMENTATION */

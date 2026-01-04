@@ -1,4 +1,6 @@
 #include <raylib.h>
+#include <raymath.h>
+#include <stdlib.h>
 
 #include "game.h"
 
@@ -48,11 +50,14 @@ rocketCollision(
 {
 	(void)collision;
 	//if (!collision.hit) return;
+	projectile->visible = false;
+	projectile->active = false;
 	Explosion_new(
 			explosion_Info, 
 			projectile->position,
 			Entity_getScene(projectile)
 		);
+    Entity_free(projectile);
 }
 
 void
@@ -90,11 +95,37 @@ grenadeCollision(
     }
 }
 
+void
+pelletCollision(
+	Entity          *projectile, 
+	CollisionResult  collision
+)
+{
+    ProjectileData *data         = (ProjectileData*)&projectile->local_data;
+    int            *bounces_left = (int*)data->data;
+    
+	if (*bounces_left == 0) goto NO_BOUNCE;
+	if (0 < *bounces_left ) *bounces_left--;
+	
+    data->source = NULL;
+    // Check if it's terrain (no entity) or another entity
+    if (!collision.entity) {
+        // Reflect velocity around normal
+        projectile->velocity = Vector3Reflect(projectile->velocity, collision.normal);
+        return;
+    } 
+    
+NO_BOUNCE:
+	if (data->source == collision.entity) return;
+	projectile->visible = false;
+	projectile->active = false;
+	Entity_free(projectile);
+}
+
 
 /*
 	Weapon Callbacks
 */	
-
 void
 fireHitscan(
 	WeaponInfo *info, 
@@ -111,7 +142,9 @@ fireHitscan(
 		);
 
 	if (result.hit && result.entity)
-		DBG_OUT("Stabbed entity @%p", (void*)result.entity);
+		DBG_OUT("Hitscan fired at entity @%p", (void*)result.entity);
+	else
+		DBG_OUT("Hitscan fired");
 }
 
 void
@@ -129,8 +162,133 @@ fireProjectile(
 			direction, 
 			source, 
 			NULL, 
-			Entity_getScene(source)
+			Entity_getScene(source),
+			0,
+			NULL
 		);
+}
+
+void
+fireMinigun(
+	WeaponInfo *info, 
+	WeaponData *data, 
+	Entity     *source, 
+	Vector3     position, 
+	Vector3     direction
+)
+{
+	double time = Engine_getTime(Entity_getEngine(source));
+	float  *spread = &data->data.f;
+	
+	const float 
+		MIN_SPREAD    = 1.0f,
+		MAX_SPREAD    = 4.0f,
+		WARMUP_TIME   = 5.0f, 
+		COOLDOWN_TIME = 8.0f,
+		RANGE         = MAX_SPREAD - MIN_SPREAD,
+		WARMUP_RATE   = (RANGE / 5.0F),
+		COOLDOWN_RATE = (RANGE / 8.0F);
+	
+    if (!data->trigger_was_down) {
+		float 
+			elapsed = time - data->trigger_up,
+			cooled  = (elapsed / COOLDOWN_TIME) * RANGE;
+        *spread = CLAMP(*spread - cooled, MIN_SPREAD, MAX_SPREAD);
+    } else {
+        float 
+			elapsed = time - data->trigger_down,
+			delta   = (elapsed / WARMUP_TIME) * RANGE;
+        *spread = fminf(*spread + delta, MAX_SPREAD);
+    }
+	
+	Vector3 random_axis = Vector3Normalize(
+			(Vector3){
+				(float)rand() / RAND_MAX - 0.5f,
+				(float)rand() / RAND_MAX - 0.5f,
+				(float)rand() / RAND_MAX - 0.5f
+			}
+		);
+	float spread_angle = ((float)rand() / RAND_MAX) * DEG2RAD * *spread;
+	Vector3 pellet_direction = Vector3Normalize(
+			Vector3RotateByAxisAngle(
+				direction,
+				random_axis,
+				spread_angle
+			)
+		);
+	Projectile_new(
+			info->projectile, 
+			position, 
+			pellet_direction, 
+			source, 
+			NULL, 
+			Entity_getScene(source),
+			0,
+			NULL
+		);
+}
+
+void
+fireShotgun(
+	WeaponInfo *info, 
+	WeaponData *data, 
+	Entity     *source, 
+	Vector3     position, 
+	Vector3     direction
+)
+{
+	const int  num_bounces = 1;
+	int        max         = 8;
+	double     time        = Engine_getTime(Entity_getEngine(source));
+	Scene     *scene       = Entity_getScene(source);
+
+	/*
+		Mechanic: 
+		If you don't fire for 5 seconds, one of your pellets will always
+		fire straight ahead.
+	*/
+	if (5.0f < (time - data->next_shot)) { 
+		Projectile_new(
+				info->projectile, 
+				position, 
+				direction, 
+				source, 
+				NULL, 
+				scene,
+				sizeof(int),
+				&num_bounces
+			);
+		max--;
+	}
+	
+	for (int i = 0; i < max; i++) {
+		Vector3 random_axis = Vector3Normalize(
+				(Vector3){
+					(float)rand() / RAND_MAX - 0.5f,
+					(float)rand() / RAND_MAX - 0.5f,
+					(float)rand() / RAND_MAX - 0.5f
+				}
+			);
+		float spread_angle = ((float)rand() / RAND_MAX) * DEG2RAD * 8.0f;
+		Vector3 pellet_direction = Vector3Normalize(
+				Vector3RotateByAxisAngle(
+					direction,
+					random_axis,
+					spread_angle
+				)
+			);
+
+		Projectile_new(
+				info->projectile,
+				position,
+				pellet_direction,
+				source,
+				NULL,
+				scene,
+				sizeof(int),
+				&num_bounces
+			);
+	}
 }
 
 
@@ -205,12 +363,24 @@ Projectile_mediaInit(void)
 	projectile_renderables[PROJECTILE_BLAST].data = &projectile_models[PROJECTILE_BLAST]; 
 	projectile_Infos[PROJECTILE_BLAST]       = ProjectileInfo_new(
 			5.0f,
-			25.0f,
+			100.0f,
 			5.0f,
 			PROJECTILE_MOTION_STRAIGHT,
 			10.0f,
 			&projectile_renderables[PROJECTILE_BLAST],
 			NULL,
+			NULL
+		);
+
+	/* Pellet */
+	projectile_Infos[PROJECTILE_PELLET]       = ProjectileInfo_new(
+			5.0f,
+			100.0f,
+			5.0f,
+			PROJECTILE_MOTION_STRAIGHT,
+			10.0f,
+			&projectile_renderables[PROJECTILE_BLAST],
+			pelletCollision,
 			NULL
 		);
 	
@@ -283,7 +453,7 @@ Projectile_mediaInit(void)
 	projectile_renderables[PROJECTILE_ROCKET].data = &projectile_models[PROJECTILE_ROCKET]; 
 	projectile_Infos[PROJECTILE_ROCKET] = ProjectileInfo_new(
 			5.0f,
-			25.0f,
+			50.0f,
 			5.0f,
 			PROJECTILE_MOTION_STRAIGHT,
 			10.0f,
@@ -396,13 +566,13 @@ Weapon_init(void)
 	weapon_Infos[WEAPON_MINIGUN] = (WeaponInfo){
 		.projectile        = projectile_Infos[PROJECTILE_BLAST],
 		.refractory_period = 0.125f,
-		.Fire              = fireProjectile,
+		.Fire              = fireMinigun,
 		.action_type       = ACTION_AUTOMATIC,
 	};
 	weapon_Infos[WEAPON_SHOTGUN] = (WeaponInfo){
-		.projectile        = projectile_Infos[PROJECTILE_BLAST],
+		.projectile        = projectile_Infos[PROJECTILE_PELLET],
 		.refractory_period = 1.0f,
-		.Fire              = fireProjectile,
+		.Fire              = fireShotgun,
 		.action_type       = ACTION_MANUAL,
 	};
 	weapon_Infos[WEAPON_GOOGUN] = (WeaponInfo){

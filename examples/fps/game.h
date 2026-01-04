@@ -76,6 +76,7 @@
 typedef enum
 {
 	PROJECTILE_BLAST,
+	PROJECTILE_PELLET,
 	PROJECTILE_GOO,
 	PROJECTILE_ROCKET,
 	PROJECTILE_GRENADE,
@@ -145,7 +146,7 @@ typedef struct
 	Entity    *target;
 	void      *target_data;
 	Vector2    look;
-	float      
+	float
 			   look_sensitivity,
 			   eye_height;
 	int     
@@ -171,8 +172,8 @@ typedef struct
 		prev_velocity,
 		move_dir,
 		direction;
-	int  frames_since_grounded;
-	bool request_jump;
+	int   frames_since_grounded;
+	bool  request_jump;
 }
 PlayerData;
 
