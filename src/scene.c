@@ -262,14 +262,23 @@ Scene_raycast(Scene *self, Vector3 from, Vector3 to)
 }
 
 void
+Scene_preRender(Scene *self, Head *head)
+{
+    SceneVTable *vtable = self->vtable;
+    if (vtable && vtable->PreRender) {
+        vtable->PreRender(self, head);
+        return;
+    }
+}
+
+void
 Scene_render(Scene *self, Head *head)
 {
-    SceneVTable *vtable    = self->vtable;
+    SceneVTable *vtable = self->vtable;
     if (vtable && vtable->Render) {
         vtable->Render(self, head);
         return;
     }
-    
 }
 
 void

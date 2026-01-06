@@ -28,6 +28,7 @@ SceneVTable
     SceneCollisionCallback       CheckCollision; /* Called when checking if an entity would collide if moved */
     SceneCollisionCallback       MoveEntity;     /* Called Every time an Entity moves in order to check if it has collided with the scene */
     SceneRaycastCallback         Raycast;        /* Called Every time a raycast is performed in order to check if has collided with the scene */
+    SceneRenderCallback          PreRender;      /* Called called optionally by a Head during its PreRender callback */
     SceneRenderCallback          Render;         /* Called once every frame in order to render the scene */
     SceneCallback                Exit;           /* Called upon Scene exiting the engine */
     SceneCallback                Free;           /* Called upon freeing the Scene from memory */
@@ -53,6 +54,7 @@ void            Scene_entityExit(     Scene *scene, Entity  *entity);
 CollisionResult Scene_checkCollision( Scene *scene, Entity  *entity, Vector3 to);
 CollisionResult Scene_checkContinuous(Scene *scene, Entity  *entity, Vector3 movement);
 CollisionResult Scene_raycast(        Scene *scene, Vector3  from,   Vector3 to);
+void            Scene_preRender(      Scene *scene, Head    *head);
 void            Scene_render(         Scene *scene, Head    *head);
 void            Scene_exit(           Scene *scene);
 

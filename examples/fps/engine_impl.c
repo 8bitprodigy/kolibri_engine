@@ -104,7 +104,7 @@ enginePause(Engine *engine)
 						KEY_UP
 					),
 				0,0,
-				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, KEY_ENTER)
+				GET_KEY_OR_BUTTON_PRESSED(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN, KEY_ENTER)
 			);
 		EndDrawing();
 		first_loop = false;

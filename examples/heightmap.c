@@ -1,3 +1,4 @@
+#include <GL/gl.h>
 #include <math.h>
 #include <raylib.h>
 #include <raymath.h>
@@ -11,7 +12,9 @@
 #include "entity.h"
 #include "head.h"
 #include "heightmap.h"
+#include "loading_screen.h"
 #include "renderer.h"
+#include "skybox.h"
 
 
 #define INDEX(array, width, x, y) (array[y * width + x])
@@ -63,6 +66,9 @@ Heightmap
 		      *colormap;
 	Vector3   *normalmap;
 	ChunkData *chunks;
+	Texture2D
+		texture,
+		skybox_textures[6];
 }
 Heightmap;
 
@@ -71,6 +77,7 @@ Heightmap;
 	Callback Forward Declarations
 */
 void            heightmapSceneSetup(    Scene *scene, void   *map_data);
+void            heightmapScenePreRender(Scene *scene, Head   *head);
 void            heightmapSceneRender(   Scene *scene, Head   *head);
 CollisionResult heightmapSceneCollision(Scene *scene, Entity *entity,   Vector3 to);
 CollisionResult heightmapSceneRaycast(  Scene *scene, Vector3 from,     Vector3 to);
@@ -89,6 +96,7 @@ SceneVTable heightmap_Scene_Callbacks = {
 	.CheckCollision = heightmapSceneCollision, 
 	.MoveEntity     = heightmapSceneCollision, 
 	.Raycast        = heightmapSceneRaycast,
+	.PreRender      = heightmapScenePreRender,
 	.Render         = heightmapSceneRender, 
 	.Exit           = NULL, 
 	.Free           = heightmapSceneFree,
@@ -201,8 +209,8 @@ RenderHeightmapChunk(
 	
 	rlBegin(RL_TRIANGLES);
 
-	if (data->texture.id != 0) {
-		rlSetTexture(data->texture.id);
+	if (map->texture.id != 0) {
+		rlSetTexture(map->texture.id);
 	}
 	
 	for (int z = 0; z < chunk_cells; z += step) {
@@ -424,7 +432,7 @@ RenderHeightmapChunk(
 	
 	rlEnd();
 	
-	if (data->texture.id != 0) {
+	if (map->texture.id != 0) {
 		rlSetTexture(0);
 	}
     rlPopMatrix();
@@ -912,17 +920,43 @@ heightmapSceneSetup(Scene *scene, void *map_data)
 	Heightmap     *map  = (Heightmap*)map_data;
 	HeightmapData *data = (HeightmapData*)&map->data;
 	
+	LoadingScreen_draw(20, "Generating Terrain Normals...");
 	map->normalmap = generateNormalMap(map);
-	map->colormap  = generateColorMap(map);
+	LoadingScreen_draw(30, "Lighting Terrain...");
 	map->shadowmap = generateShadowMap(map);
+	LoadingScreen_draw(40, "Painting Terrain...");
+	map->colormap  = generateColorMap(map);
+	LoadingScreen_draw(50, "Generating Terrain Chunks...");
 	map->chunks    = generateChunks(map);
-	
-	if (data->texture.id != 0) {
-        GenTextureMipmaps(&data->texture);
-		SetTextureFilter(  data->texture, TEXTURE_FILTER_TRILINEAR);
+
+	if (data->texture_path) {
+		LoadingScreen_draw(60, data->texture_path);
+		map->texture   = LoadTexture(data->texture_path);
+		if (map->texture.id != 0) {
+			GenTextureMipmaps(&map->texture);
+			SetTextureFilter(  map->texture, TEXTURE_FILTER_TRILINEAR);
+		}
     }
 
+	if (data->skybox_textures_path)
+		for (int i = 0; i < 6; i++) {
+			char filename[256];
+			snprintf(
+					filename, 
+					sizeof(filename), 
+					data->skybox_textures_path, 
+					SkyBox_names[i]
+				);
+			//LoadingScreen_draw(60 + ((i+1) * 5), filename);
+			DBG_OUT("Skybox filename: %s", filename);
+			map->skybox_textures[i] = LoadTexture(filename);
+			SetTextureFilter(map->skybox_textures[i], TEXTURE_FILTER_BILINEAR);
+			SetTextureWrap(  map->skybox_textures[i], TEXTURE_WRAP_CLAMP);
+		}
+
+	int increment = 10 / MAX_LOD_LEVELS;
     for (int lod = 0; lod < MAX_LOD_LEVELS; lod++) {
+		LoadingScreen_draw(90 + ((lod+1) * increment), "Generating LOD Data...");
     	int 
 			step  = 1 <<lod,
 			cells = data->chunk_cells / step;
@@ -935,6 +969,17 @@ heightmapSceneSetup(Scene *scene, void *map_data)
     }
 }
 
+void
+heightmapScenePreRender(Scene *scene, Head *head)
+{
+	Heightmap *map    = Scene_getData(scene);
+	Camera    *camera = Head_getCamera(head);
+	rlClearScreenBuffers();
+	BeginMode3D(*camera);
+		SkyBox_draw(camera, map->skybox_textures, V4_ZERO);  
+	EndMode3D();
+	glClear(GL_DEPTH_BUFFER_BIT);   
+}
 
 void 
 heightmapSceneRender(Scene *scene, Head *head)
@@ -957,7 +1002,7 @@ heightmapSceneRender(Scene *scene, Head *head)
 		roundf(camera_pos.z / chunk_size) * chunk_size
 	};
 	snapped_cam.y = getTerrainHeight(map, snapped_cam) + data->offset;
-		
+	
 	DBG_EXPR( 
 			float half_width = map->world_size/2.0f;
 			
@@ -1319,6 +1364,8 @@ void
 heightmapSceneFree(Scene *scene)
 {
 	Heightmap     *map  = (Heightmap*)Scene_getData(scene);
+	UnloadTexture(map->texture);
+	for (int i = 0; i < 6; i++) UnloadTexture(map->skybox_textures[i]);
 	DynamicArray_free(map->colormap);
 	DynamicArray_free(map->normalmap);
 	DynamicArray_free(map->chunks);
@@ -1333,12 +1380,13 @@ heightmapSceneFree(Scene *scene)
 Scene * 
 HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 {
+	LoadingScreen_draw(0, "Initializing Scene...");
 	Heightmap heightmap;
 	
 	heightmap.cells_wide = heightmap_data->chunks_wide * heightmap_data->chunk_cells;
 	heightmap.world_size = heightmap.cells_wide        * heightmap_data->cell_size;
 	heightmap.data       = *heightmap_data;
-
+	
 	float 
 		lod_scalar     = ( DEFAULT_MAX_RENDER_DISTANCE 
 				/ (
@@ -1358,6 +1406,8 @@ HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 	for (int i = 0; i < MAX_LOD_LEVELS; i++) 
 		heightmap.lod_distances[i] = lod_increment * (i+1);
 	
+	LoadingScreen_draw(5, "Generating Heightmap...");
+	
 	heightmap.heightmap  = genHeightmapDiamondSquare(
 			heightmap.cells_wide,
 			1.0f, 
@@ -1372,6 +1422,18 @@ HeightmapScene_new(HeightmapData *heightmap_data, Engine *engine)
 			sizeof(Heightmap), 
 			engine
 		);
+}
+
+
+void
+HeightmapScene_drawSkybox(Scene *self, Camera *camera)
+{
+	Heightmap *map = Scene_getData(self);
+	rlClearScreenBuffers();
+	BeginMode3D(*camera);
+		SkyBox_draw(camera, map->skybox_textures, V4_ZERO);  
+	EndMode3D();
+	glClear(GL_DEPTH_BUFFER_BIT);   
 }
 
 

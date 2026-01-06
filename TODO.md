@@ -5,7 +5,7 @@
 	- Projectiles now spawn, but do not yet move.
 	- Projectiles now move and disappear after a set amount of time.
 	- Needs to have them either despawn or be part of a pool that recycles them.
-	- [ ] Fix model-based projectiles.
+	- [x] Fix model-based projectiles.
 - [ ] Implement enemy AI
 - [X] Implement heightmap terrain Scene type
 	- Got most of it implemented.
@@ -15,6 +15,7 @@
 		- projectiles can disappear upon collision with world boundaries for some reason
 		- Crossing world boundaries cause the terrain to flicker out of existence for exactly 1 frame
 - [x] Figure out why the Heightmap Scene segfaults on exit to main menu
+- [ ] Track down memory leak when exting/entering a scene.
 
 ## General/Unknown:
 - [ ] (engine/head) Fix RenderTexture viewports 

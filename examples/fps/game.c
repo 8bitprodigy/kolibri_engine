@@ -3,6 +3,8 @@
 #include <stdlib.h>
 
 #include "game.h"
+#define LOADING_SCREEN_IMPLEMENTATION
+#include "../loading_screen.h"
 
 
 Texture        explosion_Sprite;
@@ -181,8 +183,8 @@ fireMinigun(
 	float  *spread = &data->data.f;
 	
 	const float 
-		MIN_SPREAD    = 1.0f,
-		MAX_SPREAD    = 4.0f,
+		MIN_SPREAD    = 0.5f,
+		MAX_SPREAD    = 3.0f,
 		WARMUP_TIME   = 5.0f, 
 		COOLDOWN_TIME = 8.0f,
 		RANGE         = MAX_SPREAD - MIN_SPREAD,
@@ -269,7 +271,7 @@ fireShotgun(
 					(float)rand() / RAND_MAX - 0.5f
 				}
 			);
-		float spread_angle = ((float)rand() / RAND_MAX) * DEG2RAD * 8.0f;
+		float spread_angle = ((float)rand() / RAND_MAX) * DEG2RAD * 4.0f;
 		Vector3 pellet_direction = Vector3Normalize(
 				Vector3RotateByAxisAngle(
 					direction,
@@ -308,6 +310,8 @@ Explosion_mediaInit(void)
 			"resources/sprites/explosion.png"
 		);
 
+	LoadingScreen_draw(0, (const char *)&explosion_path);
+	
 	explosion_Sprite = LoadTexture(explosion_path);
 	SetTextureFilter(explosion_Sprite, TEXTURE_FILTER_BILINEAR);
 	
@@ -341,6 +345,7 @@ Projectile_mediaInit(void)
 			path_prefix, 
 			"resources/models/projectiles/projectile.obj"
 		);
+	LoadingScreen_draw(5, (const char *)&load_path);
 	projectile_models[PROJECTILE_BLAST] = LoadModel(load_path);
 	snprintf(
 			load_path, 
@@ -349,6 +354,7 @@ Projectile_mediaInit(void)
 			path_prefix, 
 			"resources/models/projectiles/projectile.png"
 		);
+	LoadingScreen_draw(10, (const char *)&load_path);
 	projectile_Sprite_or_Textures[PROJECTILE_BLAST] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_BLAST], 
@@ -392,6 +398,7 @@ Projectile_mediaInit(void)
 			path_prefix,  
 			"resources/sprites/glob.png"
 		);
+	LoadingScreen_draw(15, (const char *)&load_path);
 	projectile_Sprite_or_Textures[PROJECTILE_GOO] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_GOO], 
@@ -431,6 +438,7 @@ Projectile_mediaInit(void)
 			path_prefix, 
 			"resources/models/projectiles/rocket.obj"
 		);
+	LoadingScreen_draw(20, (const char *)&load_path);
 	projectile_models[PROJECTILE_ROCKET] = LoadModel(load_path);
 	snprintf(
 			load_path, 
@@ -439,6 +447,7 @@ Projectile_mediaInit(void)
 			path_prefix, 
 			"resources/models/projectiles/rocket.png"
 		);
+	LoadingScreen_draw(25, (const char *)&load_path);
 	projectile_Sprite_or_Textures[PROJECTILE_ROCKET] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_ROCKET], 
@@ -470,6 +479,7 @@ Projectile_mediaInit(void)
 			path_prefix, 
 			"resources/sprites/grenade.png"
 		);
+	LoadingScreen_draw(30, (const char *)&load_path);
 	projectile_Sprite_or_Textures[PROJECTILE_GRENADE] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_GRENADE], 
@@ -509,6 +519,7 @@ Projectile_mediaInit(void)
 			path_prefix, 
 			"resources/sprites/plasma_ball.png"
 		);
+	LoadingScreen_draw(35, (const char *)&load_path);
 	projectile_Sprite_or_Textures[PROJECTILE_PLASMA] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_PLASMA], 
@@ -608,6 +619,7 @@ Weapon_init(void)
 	/*
 		Load Models
 	*/
+	int increment = 50 / WEAPON_NUM_WEAPONS;
 	for (int i = 0; i < WEAPON_NUM_WEAPONS; i++) {
 		snprintf(
 				weapon_path, 
@@ -618,6 +630,7 @@ Weapon_init(void)
 				i+1, 
 				".obj"
 			);
+		LoadingScreen_draw(50 + (i * increment), (const char *)&weapon_path);
 		DBG_OUT("Weapon Path: %s", weapon_path);
 		weapon_Infos[i].model = LoadModel(weapon_path);
 		
@@ -630,6 +643,7 @@ Weapon_init(void)
 				i+1, 
 				".png"
 			);
+		LoadingScreen_draw(50 + (i * increment), (const char *)&weapon_texture_path);
 		DBG_OUT("Weapon Texture Path: %s", weapon_texture_path);
 		Texture2D weaponTexture = LoadTexture(weapon_texture_path);
 		SetMaterialTexture(
@@ -645,7 +659,11 @@ Weapon_init(void)
 void
 Game_mediaInit()
 {
-	Explosion_mediaInit();
-	Projectile_mediaInit();
-	Weapon_init();
+	LoadingScreen_draw(0, NULL);
+		Explosion_mediaInit();
+	LoadingScreen_draw(5, NULL);
+		Projectile_mediaInit();
+	LoadingScreen_draw(50, NULL);
+		Weapon_init();
+	LoadingScreen_draw(100, NULL);
 }

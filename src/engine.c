@@ -231,6 +231,7 @@ Engine_run(Engine *self)
 	const EngineVTable *vtable = self->vtable;
 	self->request_exit = false;
 	self->start_time   = GetTime();
+	self->last_tick_time = 0;
 	
 	SetExitKey(KEY_NULL);
 	

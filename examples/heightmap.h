@@ -51,7 +51,9 @@ typedef struct
 		};
 		Color terrain_colors[2];
 	};
-	Texture2D texture;
+	char 
+		*texture_path,
+		*skybox_textures_path;
 }
 HeightmapData;
 

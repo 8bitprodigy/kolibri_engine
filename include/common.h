@@ -29,6 +29,10 @@
     #define MAX(A, B) ((A>B)?A:B)
 #endif /* MAX */
 
+#ifndef MOD
+    #define MOD(a, b) (((a) % (b) + (b)) % (b))
+#endif /* MOD */
+
 /****************
 	CONSTANTS
 ****************/

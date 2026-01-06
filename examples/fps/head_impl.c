@@ -15,12 +15,6 @@
 #define MOVE_SPEED          5.0f
 #define VIEWPORT_INCREMENT 48
 
-#ifndef SKY_PATH
-	#define SKY_PATH "resources/sky/SBS_SKY_panorama_%s.png"
-#endif
-
-#define MOD(a, b) (((a) % (b) + (b)) % (b))
-
 
 /*
 	Callback Forward Declarations
@@ -65,7 +59,7 @@ cycleWeapon(Head *head, int dir)
 	}
 	
 	data->current_weapon = next_slot;
-}
+} /* cycleWeapon */
 
 static void
 selectWeapon(Head *head, uint8_t selected)
@@ -75,7 +69,7 @@ selectWeapon(Head *head, uint8_t selected)
 	if (!(data->owned_weapons & 1<<selected )) return;
 
 	data->current_weapon = selected;
-}
+} /* selectWeapon */
 
 
 /*
@@ -106,47 +100,34 @@ fpsHeadSetup(Head *head)
 	}
 	RendererSettings *settings = Head_getRendererSettings(head);
 	settings->frustum_culling = false;
-	
-	char 
-		sky_path[256],
-		weapon_path[256],
-		weapon_texture_path[256];
 
 	user_data->viewport_scale   = 1;
 	user_data->target           = NULL;
 	user_data->target_data      = NULL;
 	user_data->controller       = 0;
 	user_data->look_sensitivity = 50.0f;
-	user_data->owned_weapons    = (1<<WEAPON_NUM_WEAPONS) - 1;
+	user_data->owned_weapons    = (1<<WEAPON_NUM_WEAPONS) - 1; /* All weapons */
 	user_data->current_weapon   = 1;
 	
 	memset(user_data->weapon_data, 0, sizeof(WeaponData) * WEAPON_NUM_WEAPONS);
-	user_data->weapon_data[WEAPON_MINIGUN].data = (Any)1.0f;
-
-	snprintf(sky_path, sizeof(sky_path), "%s%s", path_prefix, SKY_PATH);
-
-	for (int i = 0; i < 6; i++) {
-		static char filename[256];
-		snprintf(filename, sizeof(filename), sky_path, SkyBox_names[i]);
-		user_data->skybox_textures[i] = LoadTexture(filename);
-		SetTextureFilter(user_data->skybox_textures[i], TEXTURE_FILTER_BILINEAR);
-		SetTextureWrap(  user_data->skybox_textures[i], TEXTURE_WRAP_CLAMP);
-	}
 	
 	Head_setUserData(head, user_data);
 } /* fpsHeadSetup */
 
 void
-fpsHeadPreRender(Head *head)
+fpsHeadPreRender(Head *self)
 {
-	FPSHeadData *data = Head_getUserData(head);
-	Camera3D     *cam  = Head_getCamera(head);
+	//FPSHeadData *data   = Head_getUserData(head);
+	Camera3D    *camera = Head_getCamera(self);
+/*
 	rlClearScreenBuffers();
 	BeginMode3D(*cam);
 		SkyBox_draw(cam, data->skybox_textures, V4_ZERO);  
 	EndMode3D();
-	glClear(GL_DEPTH_BUFFER_BIT);   
-}
+	glClear(GL_DEPTH_BUFFER_BIT);
+//*/
+	Scene_preRender(Engine_getScene(Head_getEngine(self)), camera);
+} /* fpsHeadPreRender */
 
 void
 fpsHeadPostRender(Head *head)
@@ -154,16 +135,16 @@ fpsHeadPostRender(Head *head)
 	/*
 		Draw viewmodel
 	*/
-	FPSHeadData *data        = Head_getUserData(head);
+	FPSHeadData  *data        = Head_getUserData(head);
 	PlayerData   *target_data = data->target_data;
 	Camera3D     *cam         = Head_getCamera(head);
 	Region        region      = Head_getRegion(head);
 	Engine       *engine      = Head_getEngine(head);
 	Scene        *scene       = Engine_getScene(engine);
 	
+	glClear(GL_DEPTH_BUFFER_BIT);   
 	BeginMode3D(*cam);
 		rlPushMatrix();
-			glClear(GL_DEPTH_BUFFER_BIT);   
 			Vector3 
 				cam_pos     = cam->position,
 				look_dir    = Vector3Normalize(Vector3Subtract(cam->target, cam->position));
@@ -311,7 +292,7 @@ PLAYER_INPUT: {
 		Vector2 look_delta;
 #ifndef ON_CONSOLE
 		look_delta = GetMouseDelta();
-#else
+#else /* is ON_CONSOLE */
 		look_delta = (Vector2){
 				GetGamepadAxisMovement(
 						controller_num, 
@@ -322,18 +303,18 @@ PLAYER_INPUT: {
 						GAMEPAD_AXIS_LEFT_Y
 					)*look_sensitivity
 			};
-#endif
+#endif /* /ON_CONSOLE */
 		Vector2 
 			mouse_look = look_delta,
 			move_dir   = GET_KEY_OR_BUTTON_VECTOR(
 					controller_num, 
-					GAMEPAD_BUTTON_LEFT_FACE_UP,
+					GAMEPAD_BUTTON_RIGHT_FACE_UP,
 					KEY_W, 
-					GAMEPAD_BUTTON_LEFT_FACE_DOWN,
+					GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
 					KEY_S, 
-					GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
+					GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
 					KEY_D, 
-					GAMEPAD_BUTTON_LEFT_FACE_LEFT,
+					GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
 					KEY_A
 				);
 		
@@ -365,7 +346,7 @@ PLAYER_INPUT: {
 		if (
 			GET_KEY_OR_BUTTON_PRESSED(
 				controller_num, 
-				GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, 
+				GAMEPAD_BUTTON_LEFT_FACE_UP, 
 				KEY_SPACE
 			)
 		)
@@ -392,24 +373,24 @@ PLAYER_INPUT: {
 
 #ifndef ON_CONSOLE
 		int  dir = (int)GetMouseWheelMoveV().y;
-#else
+#else /* !ON_CONSOLE */
 		int dir = IsGamepadButtonPressed(
 				controller_num,
-				GAMEPAD_BUTTON_RIGHT_FACE_UP
+				GAMEPAD_BUTTON_LEFT_FACE_RIGHT
 			) - IsGamepadButtonPressed(
 				controller_num,
-				GAMEPAD_BUTTON_RIGHT_FACE_LEFT
+				GAMEPAD_BUTTON_LEFT_FACE_LEFT
 			);
-#endif
+#endif /* /ON_CONSOLE */
 		if (dir) {
 			cycleWeapon(head, dir);
 		}
 		bool fire_button = (
 				IsMouseButtonDown(MOUSE_BUTTON_LEFT)
-				|| IsGamepadButtonDown(
+				|| GetGamepadAxisMovement(
 						controller_num, 
-						GAMEPAD_BUTTON_RIGHT_FACE_DOWN
-					)
+						GAMEPAD_AXIS_RIGHT_TRIGGER
+					) > 0.5f
 			);
 		Weapon_fire(
 				&weapon_Infos[data->current_weapon],

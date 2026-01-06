@@ -51,6 +51,10 @@
 	#define PATH_PREFIX "./"
 #endif
 
+#ifndef SKY_PATH
+	#define SKY_PATH "resources/sky/SBS_SKY_panorama_%s.png"
+#endif
+
 
 /* Player Constants */
 #define GRAVITY             32.0f
@@ -142,7 +146,6 @@ extern Entity       entityTemplate;
 typedef struct
 {
 	WeaponData weapon_data[WEAPON_NUM_WEAPONS];
-	Texture2D  skybox_textures[6];
 	Entity    *target;
 	void      *target_data;
 	Vector2    look;

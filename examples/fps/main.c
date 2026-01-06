@@ -66,21 +66,13 @@ runEngine(void *data, void *value)
 		);
 		
 	RendererSettings *settings = Head_getRendererSettings(head);
-	settings->frustum_culling = true;
 	Camera3D *cam = Head_getCamera(head);
+
+	settings->frustum_culling = true;
 	cam->fovy     = 45.0f;
 	cam->up       = V3_UP;
 	cam->position = (Vector3){0.0f, 1.75f, 0.0f};
 	cam->target   = (Vector3){10.0f, 0.0f, 10.0f};
-
-	char texture_path[256];
-	snprintf(
-			texture_path, 
-			sizeof(texture_path),
-			"%s%s", 
-			path_prefix, 
-			"resources/textures/grass/00_bw.png"
-		);
 		
 	/*scene = Scene_new(&infinite_Plane_Scene_Callbacks, NULL, NULL, 0, engine); // */
 	HeightmapData heightmap = (HeightmapData){
@@ -95,7 +87,16 @@ runEngine(void *data, void *value)
 			.ambient_color = (Color){115, 115, 155, 255},
 			.hi_color      = (Color){110, 141,  70, 255},
 			.lo_color      = BEIGE,
-			.texture       = LoadTexture(texture_path),
+			.texture_path  = TextFormat(
+					"%s%s", 
+					path_prefix, 
+					"resources/textures/grass/00_bw.png"
+				),
+			.skybox_textures_path = TextFormat(
+					"%s%s",
+					path_prefix,
+					SKY_PATH
+				),
 		};
 	scene = HeightmapScene_new(&heightmap, engine);
 	// */
@@ -105,10 +106,10 @@ runEngine(void *data, void *value)
 	player_data->head       = head;
 	player->position        = (Vector3){
 			0.0f, 
-			HeightmapScene_getHeight(scene, V3_ZERO) + 1.0f, 
+			HeightmapScene_getHeight(scene, V3_ZERO), 
 			0.0f
 		};
-	DBG_OUT("[SCENE HEIGHT] %.4f", player->position.y);
+	player_data->prev_position = player->position;
 	
 	head_data = (FPSHeadData*)Head_getUserData(head);
 	head_data->controller  = 0;
@@ -137,6 +138,7 @@ runEngine(void *data, void *value)
 		}
 	}
 	// */
+	EndDrawing();
 	Engine_run(engine);
 }
 
