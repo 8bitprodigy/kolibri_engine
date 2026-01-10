@@ -10,6 +10,7 @@
 #include "_head_.h"
 #include "_spatialhash_.h"
 #include "common.h"
+#include "dynamicarray.h"
 #define RAY2D_COLLISION_IMPLEMENTATION
 #include "../examples/ray_collision_2d.h"
 
@@ -65,12 +66,6 @@ CollisionScene__free(CollisionScene *scene)
 /*
 	Protected Methods
 */
-void
-CollisionScene__markRebuild(CollisionScene *scene)
-{
-	scene->needs_rebuild = true;
-}
-
 /* Insert entity into spatial hash */
 void
 CollisionScene__insertEntity(CollisionScene *scene, Entity *entity)
@@ -91,21 +86,15 @@ CollisionScene__clear(CollisionScene *scene)
 Entity **
 CollisionScene__queryRegion(
 	CollisionScene *scene,
-	BoundingBox bbox,
-	int *count
+	BoundingBox bbox
 )
 {
-	*count = COL_QUERY_SIZE;
-	static Entity *candidates[COL_QUERY_SIZE]; 
-	
-	SpatialHash_queryRegion(
+	Entity **candidates = (Entity**)SpatialHash_queryRegion(
 			scene->spatial_hash, 
-			bbox,
-			(void*)&candidates,
-			count
+			bbox
 		);
 	
-	return (void*)&candidates;
+	return candidates;
 }
 
 /* Cylinder Collision */
@@ -376,15 +365,13 @@ CollisionScene__checkCollision(
 		};
 
 	/* Query spatial hash for potential collisions */
-	int      candidate_count;
 	Entity **candidates = CollisionScene__queryRegion(
 		scene,
-		(BoundingBox){min_bounds, max_bounds},
-		&candidate_count
+		(BoundingBox){min_bounds, max_bounds}
 	);
 
 	/* Check AABB collision with each candidate */
-	for (int i = 0; i < candidate_count; i++) {
+	for (int i = 0; i < DynamicArray_length(candidates); i++) {
 		Entity *other = candidates[i];
 		if (other == entity) continue; /* Skip self */
 		if (!other->collision_shape) continue;
@@ -786,30 +773,28 @@ CollisionScene__moveEntity(
 
     /* Expand query bounds to cover entire swept path */
     BoundingBox bounds = { 
-        .min = Vector3Add(
-            Vector3Subtract(
-                Vector3Min(from, to), 
-                Vector3Scale(e_bounds, 0.5f)
-            ), 
-            b_offset
-        ),
-        .max = Vector3Add(
-            Vector3Add(
-                Vector3Max(from, to), 
-                Vector3Scale(e_bounds, 0.5f)
-            ), 
-            b_offset
-        )
-    };
+			.min = Vector3Add(
+				Vector3Subtract(
+					Vector3Min(from, to), 
+					Vector3Scale(e_bounds, 0.5f)
+				), 
+				b_offset
+			),
+			.max = Vector3Add(
+				Vector3Add(
+					Vector3Max(from, to), 
+					Vector3Scale(e_bounds, 0.5f)
+				), 
+				b_offset
+			)
+		};
     
-    int candidate_count;
     Entity **candidates = CollisionScene__queryRegion(
-        scene, 
-        bounds, 
-        &candidate_count
-    );
+			scene, 
+			bounds
+		);
     
-    for (int i = 0; i < candidate_count; i++) {
+    for (int i = 0; i < DynamicArray_length(candidates); i++) {
         Entity *other = candidates[i];
         if (other == entity || !other->collision_shape) continue;
 
@@ -1085,14 +1070,12 @@ CollisionScene__raycast(CollisionScene *scene, K_Ray ray)
 		};
 	
 	/* Query spatial hash */
-	int      candidate_count;
 	Entity **candidates = CollisionScene__queryRegion(
 			scene, 
-			bbox,
-			&candidate_count
+			bbox
 		);
 	
-	for (int i = 0; i < candidate_count; i++) {
+	for (int i = 0; i < DynamicArray_length(candidates); i++) {
 		Entity *entity = candidates[i];
 
 		CollisionResult result;
@@ -1123,8 +1106,6 @@ CollisionScene__raycast(CollisionScene *scene, K_Ray ray)
 void
 CollisionScene__update(CollisionScene *self)
 {
-	if (!self->needs_rebuild) return;
-	
 	SpatialHash_clear(self->spatial_hash);
 
 	EntityNode *first_entity = Scene__getEntities(self->scene);

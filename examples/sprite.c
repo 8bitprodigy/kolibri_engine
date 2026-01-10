@@ -11,6 +11,7 @@ SpriteInfo
 	float            
 	                 scale,
 	                 time_per_frame;
+	Color            color;
 	size_t           num_frames;
 	Texture2D        atlas;
 	Rectangle       *frames;
@@ -40,6 +41,7 @@ SpriteInfo *
 SpriteInfo_newRegular(
 	float            scale, 
 	float            time_per_frame, 
+	Color            color,
 	Texture2D        atlas, 
 	size_t           x_num_frames, 
 	size_t           y_num_frames, 
@@ -55,6 +57,7 @@ SpriteInfo_newRegular(
 	
 	result->scale            = scale;
 	result->time_per_frame   = time_per_frame;
+	result->color            = color;
 	result->atlas            = atlas;
 	result->num_frames       = total_frames;
 	result->sprite_alignment = sprite_alignment;
@@ -92,6 +95,7 @@ SpriteInfo *
 SpriteInfo_newIrregular(
 	float            scale,
 	float            time_per_frame,
+	Color            color,
 	Texture2D        atlas,
 	size_t           num_frames,
 	Rectangle       *frames_array,
@@ -106,6 +110,7 @@ SpriteInfo_newIrregular(
 
 	result->scale            = scale;
 	result->time_per_frame   = time_per_frame;
+	result->color            = color;
 	result->atlas            = atlas;
 	result->num_frames       = num_frames;
 	result->frames           = frames_array;
@@ -248,23 +253,63 @@ RenderBillboard(
 		pos     = Vector3Add(position, entity->renderable_offset),
 		forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position)),
 		right   = Vector3Normalize(Vector3CrossProduct(forward, (Vector3){0, 1, 0})),
-		up;
+		up,
+		cam_forward = Vector3Normalize(
+				Vector3Subtract(camera->target, camera->position)
+			),
+		cam_right   = Vector3Normalize(
+				Vector3CrossProduct((Vector3){0,1,0}, cam_forward)
+			),
+		cam_up      = Vector3CrossProduct(cam_forward, cam_right);
 
 	switch (info->sprite_alignment) {
-	case SPRITE_ALIGN_X:
-		up = V3_LEFT;
-		break;
 	case SPRITE_ALIGN_Y:
 		up = V3_UP;
 		break;
-	case SPRITE_ALIGN_Z:
-		up = V3_FORWARD;
+	case SPRITE_ALIGN_X:
+		up = Vector3Normalize(
+			Vector3Project(cam_up, (Vector3){1,0,0})
+		);
 		break;
-	case SPRITE_ALIGN_LOCAL_AXIS:
-		up = Vector3Normalize(*(Vector3*)&entity->orientation);
+	case SPRITE_ALIGN_Z:
+		up = Vector3Normalize(
+			Vector3Project(cam_up, (Vector3){0,0,1})
+		);
+		break;
+	case SPRITE_ALIGN_LOCAL_AXIS: 
+	    /* 1. Get the constraint axis in WORLD space */
+		Vector3 axis = Vector3Normalize(
+			Vector3RotateByQuaternion(
+				(Vector3){ 0, 0, 1 },   // LOCAL muzzle axis — change if needed
+				entity->orientation
+			)
+		);
+
+		/* 2. Vector from sprite to camera */
+		Vector3 to_cam = Vector3Normalize(
+			Vector3Subtract(camera->position, position)
+		);
+
+		/* 3. Remove axis component (THIS is the critical step) */
+		Vector3 facing = Vector3Subtract(
+			to_cam,
+			Vector3Scale(axis, Vector3DotProduct(to_cam, axis))
+		);
+
+		/* Degenerate case: camera is exactly on axis */
+		if (Vector3LengthSqr(facing) < 0.00001f)
+			facing = Vector3Perpendicular(axis);
+
+		facing = Vector3Normalize(facing);
+
+		/* 4. Build orthonormal basis (Raylib expects THIS order) */
+		right = Vector3Normalize(Vector3CrossProduct(facing, axis));
+		up    = Vector3CrossProduct(axis, right);
+
 		break;
 	case SPRITE_ALIGN_CAMERA:
-		up = Vector3CrossProduct(right, forward);
+		up = cam_up;
+		break;
 	}
 	
 	Vector2 size = (Vector2){
@@ -281,7 +326,7 @@ RenderBillboard(
 			size,
 			Vector2Scale(size, 0.5f),
 			rotation, 
-			WHITE
+			info->color
 		);
     
     if (fabsf(position.x) > 1000 || fabsf(position.z) > 1000) {

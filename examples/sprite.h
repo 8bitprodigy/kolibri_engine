@@ -52,6 +52,7 @@ SpriteData;
 SpriteInfo *SpriteInfo_newRegular(
 		float            scale, 
 		float            time_per_frame, 
+		Color            color,
 		Texture2D        atlas, 
 		size_t           x_num_frames, 
 		size_t           y_num_frames,
@@ -65,6 +66,7 @@ SpriteInfo *SpriteInfo_newRegular(
 SpriteInfo *SpriteInfo_newIrregular(
 		float            scale,
 		float            time_per_frame,
+		Color            color,
 		Texture2D        atlas,
 		size_t           num_frames,
 		Rectangle       *frames_array,

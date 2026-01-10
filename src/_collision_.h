@@ -14,13 +14,12 @@ CollisionScene   *CollisionScene__new(           Scene          *scene);
 void              CollisionScene__free(          CollisionScene *scene);
 
 /* Scene management */
-void              CollisionScene__markRebuild(   CollisionScene *scene);
 void              CollisionScene__insertEntity(  CollisionScene *scene, Entity *entity);
 void              CollisionScene__clear(         CollisionScene *scene);
 
 /* Collision detection functions */
 
-Entity          **CollisionScene__queryRegion(   CollisionScene *scene, BoundingBox  bbox,   int     *count);
+Entity          **CollisionScene__queryRegion(   CollisionScene *scene, BoundingBox  bbox);
 CollisionResult   CollisionScene__checkCollision(CollisionScene *scene, Entity      *entity, Vector3  to);
 CollisionResult   CollisionScene__moveEntity(    CollisionScene *scene, Entity      *entity, Vector3  movement);
 CollisionResult   CollisionScene__raycast(       CollisionScene *scene, K_Ray        ray);

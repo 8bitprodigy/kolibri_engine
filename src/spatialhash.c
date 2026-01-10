@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "_spatialhash_.h"
+#include "dynamicarray.h"
 #include "common.h"
 
 
@@ -171,7 +172,11 @@ SpatialHash_insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bounds
     for (int x = selection.min.x; x <= selection.max.x; x++) {
         for (int y = selection.min.y; y <= selection.max.y; y++) {
             for (int z = selection.min.z; z <= selection.max.z; z++) {
-                uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
+                uint32 hash_key = hashPosition(
+                        x * CELL_SIZE, 
+                        y * CELL_SIZE, 
+                        z * CELL_SIZE
+                    );
 
                 SpatialEntry *entry   = allocEntry(hash);
                 entry->data           = data;
@@ -185,28 +190,31 @@ SpatialHash_insert(SpatialHash *hash, void *data, Vector3 center, Vector3 bounds
 }
 
 /* Query region */
-void *
+void **
 SpatialHash_queryRegion(
-    SpatialHash  *hash, 
-    BoundingBox   region, 
-    void        **query_results, 
-    int          *count
+    SpatialHash *hash, 
+    BoundingBox  region
 )
 {
-    int size = *count;
-    *count = 0;
-
+    void **query_results = DynamicArray_new(sizeof(void*), 16);
+    
     BoundingBox selection = GET_CELL_SELECTION(region);
 
     for (int x = selection.min.x; x <= selection.max.x; x++) {
         for (int y = selection.min.y; y <= selection.max.y; y++) {
             for (int z = selection.min.z; z <= selection.max.z; z++) {
-                uint32 hash_key = hashPosition(x * CELL_SIZE, y * CELL_SIZE, z * CELL_SIZE);
+                uint32 hash_key = hashPosition(
+                        x * CELL_SIZE, 
+                        y * CELL_SIZE, 
+                        z * CELL_SIZE
+                    );
 
                 SpatialEntry *entry = hash->cells[hash_key];
-                while (entry && *count < size) {
+                while (entry) {
                     bool is_duplicate = false;
-                    for (int i = 0; i < *count; i++) {
+                    size_t count = DynamicArray_length(query_results);
+                    
+                    for (int i = 0; i < count; i++) {
                         if (query_results[i] == entry->data) {
                             is_duplicate = true;
                             break;
@@ -214,8 +222,7 @@ SpatialHash_queryRegion(
                     }
 
                     if (!is_duplicate) {
-                        query_results[*count] = entry->data;
-                        (*count)++;
+                        DynamicArray_append((void**)&query_results, &entry->data, 1);
                     }
 
                     entry = entry->next;
@@ -224,5 +231,5 @@ SpatialHash_queryRegion(
         }
     }
 
-    return (void*)query_results;
+    return query_results;
 }

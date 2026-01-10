@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "_collision_.h"
 #include "_engine_.h"
 #include "_scene_.h"
 #include "_renderer_.h"
@@ -148,9 +149,8 @@ Scene_enter(Scene *self)
 void
 Scene_update(Scene *self, float delta)
 {
-    EntityNode__updateAll(      self->entities, delta);
-    CollisionScene__markRebuild(self->collision_scene);
     CollisionScene__update(     self->collision_scene);
+    EntityNode__updateAll(      self->entities, delta);
     
     SceneVTable *vtable = self->vtable; 
     if (vtable && vtable->Update) vtable->Update(self, delta);
@@ -286,6 +286,17 @@ Scene_exit(Scene *self)
 {
     SceneVTable *vtable = (self)->vtable;
     if (vtable && vtable->Exit) vtable->Exit(self);
+}
+
+Entity **
+Scene_queryRegion(Scene *scene, BoundingBox  bbox)
+{
+    CollisionScene *collision_scene = scene->collision_scene;
+    
+    Entity **result = (Entity**)CollisionScene__queryRegion(collision_scene, bbox);
+    DBG_OUT("Scene_queryRegion returning %zu candidates", DynamicArray_length(result));
+    
+    return (Entity**)CollisionScene__queryRegion(collision_scene, bbox);
 }
 
 

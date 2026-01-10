@@ -9,8 +9,8 @@
 	#define DYNAMIC_ARRAY_GROWTH_FACTOR 2.0f
 #endif
 
-#define DynamicArray(type_, capacity) DynamicArray_new(sizeof(type_), capacity)
-#define DynamicArray_add(array, datum) DynamicArray_append((array), (datum), 1)
+#define DynamicArray(    type_, capacity) DynamicArray_new(sizeof(type_), capacity)
+#define DynamicArray_add(array, datum)    DynamicArray_append((array), (datum), 1)
 
 
 /* Constructor / Destructor */

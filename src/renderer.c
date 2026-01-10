@@ -203,18 +203,14 @@ Renderer__queryFrustum(
         frustum_center.y + query_radius,
         frustum_center.z + query_radius
     };
-
-    int                       candidate_count = VIS_QUERY_SIZE;
-    static RenderableWrapper *candidates[VIS_QUERY_SIZE];
-    SpatialHash_queryRegion(
+    
+    RenderableWrapper **candidates = (RenderableWrapper**)SpatialHash_queryRegion(
         renderer->visibility_hash,
-        (BoundingBox){min_bounds, max_bounds},
-        (void*)&candidates,
-        &candidate_count
+        (BoundingBox){min_bounds, max_bounds}
     );
 
     /* Optimized culling loop */
-    for (int i = 0; i < candidate_count && *visible_count < VIS_QUERY_SIZE; i++) {
+    for (int i = 0; i < DynamicArray_length(candidates) && *visible_count < VIS_QUERY_SIZE; i++) {
         RenderableWrapper *wrapper = candidates[i];
         
         if (wrapper->is_entity && !wrapper->entity->visible) continue;

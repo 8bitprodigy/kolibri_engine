@@ -9,6 +9,8 @@
 
 Texture        explosion_Sprite;
 ExplosionInfo *explosion_Info;
+Texture        impact_Sprite;
+ExplosionInfo *impact_Info;
 
 Renderable
 	sprite_Renderable = {
@@ -35,11 +37,39 @@ WeaponInfo       weapon_Infos[WEAPON_NUM_WEAPONS];
 	Projectile callbacks
 */
 void
+projectileCollision(
+	Entity          *projectile, 
+	CollisionResult  collision
+)
+{
+	projectile->visible = false;
+	projectile->active = false;
+	
+	if (!collision.hit) {
+		Entity_free(projectile);
+		return;
+	}
+	
+	Explosion_new(
+			impact_Info, 
+			Vector3Add(
+					collision.position,
+					(Vector3){0.0f, 0.55f, 0.0f}
+				),
+			QuaternionFromAxisAngle(collision.normal, 0.0f),
+			Entity_getScene(projectile)
+		);
+	
+	Entity_free(projectile);
+}
+
+void
 grenadeTimeout(Entity *projectile)
 {
 	Explosion_new(
 			explosion_Info, 
 			projectile->position,
+			QuaternionIdentity(),
 			Entity_getScene(projectile)
 		);
 }
@@ -57,6 +87,7 @@ rocketCollision(
 	Explosion_new(
 			explosion_Info, 
 			projectile->position,
+			QuaternionIdentity(),
 			Entity_getScene(projectile)
 		);
     Entity_free(projectile);
@@ -121,8 +152,17 @@ NO_BOUNCE:
 	if (data->source == collision.entity) return;
 	projectile->visible = false;
 	projectile->active = false;
+	
+	Explosion_new(
+			impact_Info, 
+			collision.position,
+			QuaternionFromAxisAngle(collision.normal, 0.0f),
+			Entity_getScene(projectile)
+		);
+	
 	Entity_free(projectile);
 }
+
 
 
 /*
@@ -137,16 +177,26 @@ fireHitscan(
 	Vector3     direction
 )
 {
+	Scene *scene = Entity_getScene(source);
+	
 	CollisionResult result = Scene_raycast(
-			Entity_getScene(source),
+			scene,
 			position,
 			Vector3Add(position, Vector3Scale(direction, info->distance))
 		);
 
-	if (result.hit && result.entity)
-		DBG_OUT("Hitscan fired at entity @%p", (void*)result.entity);
-	else
-		DBG_OUT("Hitscan fired");
+	if (result.hit) {
+		if (result.entity)
+			DBG_OUT("Hitscan fired at entity @%p", (void*)result.entity);
+		else {
+			Explosion_new(
+					impact_Info, 
+					result.position,
+					QuaternionFromAxisAngle(result.normal, 0.0f),
+					scene
+				);
+		}
+	}
 }
 
 void
@@ -183,10 +233,10 @@ fireMinigun(
 	float  *spread = &data->data.f;
 	
 	const float 
-		MIN_SPREAD    = 0.5f,
-		MAX_SPREAD    = 3.0f,
-		WARMUP_TIME   = 5.0f, 
-		COOLDOWN_TIME = 8.0f,
+		MIN_SPREAD    = 0.25f,
+		MAX_SPREAD    = 2.5f,
+		WARMUP_TIME   = 6.0f, 
+		COOLDOWN_TIME = 16.0f,
 		RANGE         = MAX_SPREAD - MIN_SPREAD,
 		WARMUP_RATE   = (RANGE / 5.0F),
 		COOLDOWN_RATE = (RANGE / 8.0F);
@@ -293,6 +343,18 @@ fireShotgun(
 	}
 }
 
+void
+fireLightning(
+	WeaponInfo *info, 
+	WeaponData *data, 
+	Entity     *source, 
+	Vector3     position, 
+	Vector3     direction
+)
+{
+	
+}
+
 
 /*
 	Resource Inits
@@ -316,13 +378,42 @@ Explosion_mediaInit(void)
 	SetTextureFilter(explosion_Sprite, TEXTURE_FILTER_BILINEAR);
 	
 	explosion_Info = ExplosionInfo_new(
-			2.5f,
+			5.0f,
 			0.5f,
 			10.0f,
-			2.0f,
+			100.0f,
+			4.0f,
 			1.0f/15.0f,
+			WHITE,
 			explosion_Sprite,
-			4, 4
+			SPRITE_ALIGN_CAMERA,
+			4, 4, 16
+		);
+
+	snprintf(
+			explosion_path, 
+			sizeof(explosion_path), 
+			"%s%s", 
+			path_prefix,  
+			"resources/sprites/impact.png"
+		);
+
+	LoadingScreen_draw(2.5, (const char *)&explosion_path);
+	
+	impact_Sprite = LoadTexture(explosion_path);
+	SetTextureFilter(impact_Sprite, TEXTURE_FILTER_BILINEAR);
+	
+	impact_Info = ExplosionInfo_new(
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			2.0f,
+			1.0f/30.0f,
+			BEIGE,
+			impact_Sprite,
+			SPRITE_ALIGN_Y,
+			4, 4, 16
 		);
 }
 
@@ -369,19 +460,19 @@ Projectile_mediaInit(void)
 	projectile_renderables[PROJECTILE_BLAST].data = &projectile_models[PROJECTILE_BLAST]; 
 	projectile_Infos[PROJECTILE_BLAST]       = ProjectileInfo_new(
 			5.0f,
-			100.0f,
+			200.0f,
 			5.0f,
 			PROJECTILE_MOTION_STRAIGHT,
 			10.0f,
 			&projectile_renderables[PROJECTILE_BLAST],
-			NULL,
+			projectileCollision,
 			NULL
 		);
 
 	/* Pellet */
 	projectile_Infos[PROJECTILE_PELLET]       = ProjectileInfo_new(
 			5.0f,
-			100.0f,
+			200.0f,
 			5.0f,
 			PROJECTILE_MOTION_STRAIGHT,
 			10.0f,
@@ -407,6 +498,7 @@ Projectile_mediaInit(void)
 	projectile_SpriteInfos[PROJECTILE_GOO] = SpriteInfo_newRegular(
 			0.5f,
 			1.0f/24.0f,
+			WHITE,
 			projectile_Sprite_or_Textures[PROJECTILE_GOO],
 			4, 4,
 			16,
@@ -488,6 +580,7 @@ Projectile_mediaInit(void)
 	projectile_SpriteInfos[PROJECTILE_GRENADE] = SpriteInfo_newRegular(
 			0.5f,
 			1.0f/48.0f,
+			WHITE,
 			projectile_Sprite_or_Textures[PROJECTILE_GRENADE],
 			4, 2,
 			8,
@@ -528,6 +621,7 @@ Projectile_mediaInit(void)
 	projectile_SpriteInfos[PROJECTILE_PLASMA] = SpriteInfo_newRegular(
 			0.5f,
 			1.0f/24.0f,
+			WHITE,
 			projectile_Sprite_or_Textures[PROJECTILE_PLASMA],
 			4, 4,
 			16,

@@ -118,7 +118,7 @@ void
 fpsHeadPreRender(Head *self)
 {
 	//FPSHeadData *data   = Head_getUserData(head);
-	Camera3D    *camera = Head_getCamera(self);
+	//Camera *camera = Head_getCamera(self);
 /*
 	rlClearScreenBuffers();
 	BeginMode3D(*cam);
@@ -126,7 +126,7 @@ fpsHeadPreRender(Head *self)
 	EndMode3D();
 	glClear(GL_DEPTH_BUFFER_BIT);
 //*/
-	Scene_preRender(Engine_getScene(Head_getEngine(self)), camera);
+	Scene_preRender(Engine_getScene(Head_getEngine(self)), self);
 } /* fpsHeadPreRender */
 
 void

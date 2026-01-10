@@ -58,5 +58,7 @@ void            Scene_preRender(      Scene *scene, Head    *head);
 void            Scene_render(         Scene *scene, Head    *head);
 void            Scene_exit(           Scene *scene);
 
+Entity        **Scene_queryRegion(    Scene *scene, BoundingBox  bbox);
+
 
 #endif /* SCENE_H */

@@ -21,17 +21,21 @@ typedef struct ExplosionInfo ExplosionInfo;
 
 
 ExplosionInfo *ExplosionInfo_new(
-	float     radius, 
-	float     falloff, 
-	float     damage, 
-	float     scale,
-	float     time_per_frame,
-	Texture2D atlas,
-	size_t    x_num_frames,
-	size_t    y_num_frames
+	float           radius, 
+	float           falloff, 
+	float           damage,
+	float           impulse,
+	float           scale,
+	float           time_per_frame,
+	Color           color,
+	Texture2D       atlas,
+	SpriteAlignment alignment,
+	size_t          x_num_frames,
+	size_t          y_num_frames,
+	size_t          total_frames
 );
 
-void Explosion_new(    ExplosionInfo *info, Vector3     position, Scene *scene);
+void Explosion_new(    ExplosionInfo *info, Vector3     position, Quaternion orientation, Scene *scene);
 void ExplosionComplete(SpriteInfo    *info, SpriteData *data);
 
 #endif /* EXPLOSION_H */
