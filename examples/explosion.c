@@ -33,7 +33,7 @@ ExplosionData;
 	Callback forward delcarations
 */
 void explosionSetup(    Entity *self);
-void explosionRender(   Entity *self, float           delta);
+void explosionRender(   Entity *self, float delta);
 
 
 /*
@@ -61,7 +61,7 @@ Explosion_Callbacks = {
 Entity
 Explosion_Template = {
 		.renderables       = {&explosion_Renderable},
-		.lod_distances     = {1024.0f},
+		.lod_distances     = {512.0f},
 		.lod_count         = 1,
 		.visibility_radius = 0.25f,
 		.bounds            = {0.1f, 0.1f, 0.1f},
@@ -119,8 +119,12 @@ void
 ExplosionComplete(SpriteInfo *info, SpriteData *data) 
 {
 	(void)info;
-	ExplosionData *edata   = (ExplosionData*)((char*)data - offsetof(ExplosionData, sprite_data));
-	Entity        *entity = (Entity*)((char*)edata - offsetof(Entity, local_data));
+	ExplosionData *edata   = (ExplosionData*)(
+			(char*)data - offsetof(ExplosionData, sprite_data)
+		);
+	Entity        *entity = (Entity*)(
+			(char*)edata - offsetof(Entity, local_data)
+		);
 	entity->active  = false;
 	entity->visible = false;
 	Entity_free(entity);
@@ -208,13 +212,14 @@ Explosion_new(
 
 	info->renderable.Render = RenderBillboard;
 	
-	explosion->renderables[0] = &info->renderable;
-	explosion->user_data      = info;
-	explosion->position       = position;
-	explosion->visible        = true;
-	explosion->active         = true;
-	explosion->solid          = false;
-	explosion->orientation    = orientation;
+	explosion->renderables[0]    = &info->renderable;
+	explosion->visibility_radius = info->radius;
+	explosion->user_data         = info;
+	explosion->position          = position;
+	explosion->visible           = true;
+	explosion->active            = true;
+	explosion->solid             = false;
+	explosion->orientation       = orientation;
 
 	float radius = info->radius;
 	

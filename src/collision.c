@@ -385,7 +385,8 @@ CollisionScene__checkCollision(
 			break; /* Return first collision found */
 		}
 	}
-	
+
+	DynamicArray_free(candidates);
 	return result;
 }
 
@@ -831,7 +832,8 @@ CollisionScene__moveEntity(
             /* If not solid or no overlap at final position, allow the movement */
         }
     }
-    
+	
+	DynamicArray_free(candidates);
     return result;
 }
 
@@ -1098,7 +1100,8 @@ CollisionScene__raycast(CollisionScene *scene, K_Ray ray)
 			closest_result = result;
 		}
 	}
-
+	
+	DynamicArray_free(candidates);
 	return closest_result;
 }
 

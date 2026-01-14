@@ -281,7 +281,10 @@ Projectile_new(
 			scene,
 			sizeof(ProjectileData) + pdata_size
 		);
-	if (!projectile) return projectile;
+	if (!projectile) {
+		ERR_OUT("Couldn't construct Projectile.");
+		return NULL;
+	}
 
 	ProjectileData *data = (ProjectileData*)&projectile->local_data;
 	

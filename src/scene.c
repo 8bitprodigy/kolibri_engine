@@ -293,9 +293,6 @@ Scene_queryRegion(Scene *scene, BoundingBox  bbox)
 {
     CollisionScene *collision_scene = scene->collision_scene;
     
-    Entity **result = (Entity**)CollisionScene__queryRegion(collision_scene, bbox);
-    DBG_OUT("Scene_queryRegion returning %zu candidates", DynamicArray_length(result));
-    
     return (Entity**)CollisionScene__queryRegion(collision_scene, bbox);
 }
 

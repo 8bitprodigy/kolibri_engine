@@ -231,7 +231,8 @@ Renderer__queryFrustum(
             (*visible_count)++;
         }
     }
-
+    
+	DynamicArray_free(candidates);
     return frustum_results;
 }
 

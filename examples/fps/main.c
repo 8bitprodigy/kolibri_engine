@@ -116,7 +116,24 @@ runEngine(void *data, void *value)
 	head_data->target      = player;
 	head_data->target_data = player->user_data;
 	head_data->eye_height  = 1.75f;
-/*	
+
+	Entity *grunt = Enemy_new(
+			&enemy_Infos[ENEMY_GRUNT], 
+			(Vector3){
+					32.0f,
+					HeightmapScene_getHeight(
+							scene, 
+							(Vector3){
+									32.0f, 
+									0.0f, 
+									32.0f
+								}
+						),
+					32.0f
+				},
+			scene
+		);
+	/*
 	Entity *ents[21][21][21];
 	int z = 0; 
  
@@ -124,12 +141,13 @@ runEngine(void *data, void *value)
 		for (int y = 0; y < 21; y++) {
 			for (int z = 0; z < 1; z++) {
 				Vector3 position       = (Vector3){
-						(x * 5.0f) - 50.0f,
-						(z * 5.0f),
-						(y * 5.0f) - 50.0
+						.x = (x * 5.0f) - 50.0f,
+						.y = (z * 5.0f),
+						.z = (y * 5.0f) - 50.0
 					};
-				position.z = HeightmapScene_getHeight(scene, position) + 0.5f;
-				if (Vector3Equals(position, V3_ZERO)) continue;
+				position.y = HeightmapScene_getHeight(scene, position);
+				DBG_OUT("Entity position.y: %.4f", position.y);
+				if (position.x == 0.0f && position.z == 0.0f) continue;
 				ents[x][y][z]           = Entity_new(&entityTemplate, scene, 0);
 				ents[x][y][z]->visible  = true;
 				ents[x][y][z]->active   = true;

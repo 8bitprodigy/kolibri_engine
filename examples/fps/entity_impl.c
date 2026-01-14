@@ -30,13 +30,14 @@ EntityVTable entity_Callbacks = {
 		.Render      = NULL,
 		.OnCollision = NULL,
 		.OnCollided  = NULL,
+		.Teleport    = NULL,
 		.Exit        = NULL,
 		.Free        = NULL
 	};
 
 Entity entityTemplate = {
 		.renderables       = {&r_1,  &r_2,  &r_3},
-		.lod_distances     = {16.0f, 48.0f, 128.0f},
+		.lod_distances     = {16.0f, 48.0f, 2048.0f},
 		.lod_count         = 3,
 		.renderable_offset = {0.0f, 0.5f, 0.0f},
 		.visibility_radius = 1.5f,

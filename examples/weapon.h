@@ -41,7 +41,9 @@ WeaponData
 				  next_shot;
 	Any           data;
 	int           ammo;
-	bool          trigger_was_down;
+	bool          
+				 trigger_was_down,
+				 just_fired;
 }
 WeaponData;
 
@@ -80,11 +82,13 @@ Weapon_fire(
 				&& info->Fire
 			) {
 				info->Fire(info, data, source, position, direction);
+				data->just_fired = true;
 			}
 		}
-		else if (just_released) {
+		else if (just_released && data->just_fired) {
 			/* Start refractory period on release */
 			data->next_shot = current_time + info->refractory_period;
+			data->just_fired = false;
 		}
 		break;
 	case ACTION_SEMIAUTO:

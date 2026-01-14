@@ -117,15 +117,6 @@ fpsHeadSetup(Head *head)
 void
 fpsHeadPreRender(Head *self)
 {
-	//FPSHeadData *data   = Head_getUserData(head);
-	//Camera *camera = Head_getCamera(self);
-/*
-	rlClearScreenBuffers();
-	BeginMode3D(*cam);
-		SkyBox_draw(cam, data->skybox_textures, V4_ZERO);  
-	EndMode3D();
-	glClear(GL_DEPTH_BUFFER_BIT);
-//*/
 	Scene_preRender(Engine_getScene(Head_getEngine(self)), self);
 } /* fpsHeadPreRender */
 

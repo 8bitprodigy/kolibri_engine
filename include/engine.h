@@ -13,7 +13,8 @@ EngineVTable
 {
     EngineCallback       Setup;   /* Called upon creating a new Engine */
     EngineCallback       Run;     /* Called at the beginning of Engine_run() */
-    EngineUpdateCallback Update;  /* Called once every frame after updating all Entities and Heads */
+    EngineUpdateCallback Update;  /* Called once every frame before updating everything */
+    EngineUpdateCallback Tick;    /* Called once every tick after updating the scene */
     EngineCallback       Render;  /* Called once every frame after rendering the scene */
     EngineResizeCallback Resize;  /* Called upon window resize */
     EngineCallback       Pause;   /* Called on pausing the Engine */

@@ -32,6 +32,12 @@ ProjectileInfo **projectile_Infos;
 
 WeaponInfo       weapon_Infos[WEAPON_NUM_WEAPONS];
 
+Model      *enemy_Models;
+Texture    *enemy_Textures;
+Renderable *enemy_Renderables;
+EnemyInfo  *enemy_Infos;
+
+
 
 /*
 	Projectile callbacks
@@ -644,6 +650,88 @@ Projectile_mediaInit(void)
 			NULL,
 			NULL
 		);
+	
+	/* Tracer */
+	snprintf(
+			load_path, 
+			sizeof(load_path), 
+			"%s%s",
+			path_prefix, 
+			"resources/sprites/tracer.png"
+		);
+	LoadingScreen_draw(35, (const char *)&load_path);
+	projectile_Sprite_or_Textures[PROJECTILE_TRACER] = LoadTexture(load_path);
+	SetTextureFilter(
+			projectile_Sprite_or_Textures[PROJECTILE_TRACER], 
+			TEXTURE_FILTER_BILINEAR
+		);
+	projectile_SpriteInfos[PROJECTILE_TRACER] = SpriteInfo_newRegular(
+			0.5f,
+			1.0f/60.0f,
+			WHITE,
+			projectile_Sprite_or_Textures[PROJECTILE_TRACER],
+			4, 2,
+			7,
+			SPRITE_ALIGN_CAMERA,
+			SPRITE_DIR_PINGPONG,
+			SPRITE_PLAY_LOOP,
+			NULL,
+			NULL
+		);
+	projectile_renderables[PROJECTILE_TRACER] = *SpriteInfo_getRenderable(
+			projectile_SpriteInfos[PROJECTILE_TRACER]
+		);
+	projectile_Infos[PROJECTILE_TRACER] = ProjectileInfo_new(
+			5.0f,
+			200.0f,
+			5.0f,
+			PROJECTILE_MOTION_STRAIGHT,
+			10.0f,
+			&projectile_renderables[PROJECTILE_TRACER],
+			projectileCollision,
+			NULL
+		);
+
+	/* Green */
+	snprintf(
+			load_path, 
+			sizeof(load_path), 
+			"%s%s", 
+			path_prefix, 
+			"resources/models/projectiles/blast.obj"
+		);
+	LoadingScreen_draw(5, (const char *)&load_path);
+	projectile_models[PROJECTILE_GREEN] = LoadModel(load_path);
+	snprintf(
+			load_path, 
+			sizeof(load_path), 
+			"%s%s",
+			path_prefix, 
+			"resources/models/projectiles/blast.png"
+		);
+	LoadingScreen_draw(10, (const char *)&load_path);
+	projectile_Sprite_or_Textures[PROJECTILE_GREEN] = LoadTexture(load_path);
+	SetTextureFilter(
+			projectile_Sprite_or_Textures[PROJECTILE_GREEN], 
+			TEXTURE_FILTER_BILINEAR
+		);
+	SetMaterialTexture(
+			&projectile_models[PROJECTILE_GREEN].materials[0], 
+			MATERIAL_MAP_ALBEDO, 
+			projectile_Sprite_or_Textures[PROJECTILE_GREEN]
+		);
+	projectile_renderables[PROJECTILE_GREEN]      = model_Renderable;
+	projectile_renderables[PROJECTILE_GREEN].data = &projectile_models[PROJECTILE_GREEN]; 
+	projectile_Infos[PROJECTILE_GREEN]       = ProjectileInfo_new(
+			5.0f,
+			200.0f,
+			5.0f,
+			PROJECTILE_MOTION_STRAIGHT,
+			10.0f,
+			&projectile_renderables[PROJECTILE_GREEN],
+			projectileCollision,
+			NULL
+		);
 }
 
 void
@@ -669,7 +757,7 @@ Weapon_init(void)
 		.action_type       = ACTION_SEMIAUTO,
 	};
 	weapon_Infos[WEAPON_MINIGUN] = (WeaponInfo){
-		.projectile        = projectile_Infos[PROJECTILE_BLAST],
+		.projectile        = projectile_Infos[PROJECTILE_TRACER],
 		.refractory_period = 0.125f,
 		.Fire              = fireMinigun,
 		.action_type       = ACTION_AUTOMATIC,
@@ -749,6 +837,58 @@ Weapon_init(void)
 	}
 }
 
+void
+Enemy_mediaInit()
+{
+	enemy_Models      = DynamicArray(Model,      ENEMY_NUM_ENEMIES);
+	enemy_Textures    = DynamicArray(Texture,    ENEMY_NUM_ENEMIES);
+	enemy_Renderables = DynamicArray(Renderable, ENEMY_NUM_ENEMIES);
+	enemy_Infos       = DynamicArray(EnemyInfo,  ENEMY_NUM_ENEMIES);
+	
+	char load_path[256];
+
+	snprintf(
+			load_path,
+			sizeof(load_path),
+			"%s%s",
+			path_prefix,
+			"resources/models/grunt/model.glb"
+		);
+
+	enemy_Models[ENEMY_GRUNT] = LoadModel(load_path);
+
+	snprintf(
+		load_path,
+		sizeof(load_path),
+		"%s%s",
+		path_prefix,
+		"resources/models/grunt/texture.png"
+	);
+
+	enemy_Textures[ENEMY_GRUNT] = LoadTexture(load_path);
+	SetMaterialTexture(
+		&enemy_Models[ENEMY_GRUNT].materials[0],
+		MATERIAL_MAP_ALBEDO,
+		enemy_Textures[ENEMY_GRUNT]
+	);
+	SetTextureFilter(enemy_Textures[ENEMY_GRUNT], TEXTURE_FILTER_BILINEAR);
+
+	enemy_Renderables[ENEMY_GRUNT] = model_Renderable;
+	enemy_Renderables[ENEMY_GRUNT].data = &enemy_Models[ENEMY_GRUNT];
+
+	enemy_Infos[ENEMY_GRUNT] = (EnemyInfo){
+			{enemy_Renderables[ENEMY_GRUNT]},
+			{128.0f},
+			1,
+			projectile_Infos[PROJECTILE_GREEN],
+			100.0f, /* health */
+			5.0f,   /* speed */
+			15.0f,  /* melee_damage */
+			2.0f,   /* melee_range */
+			96.0f,  /* projectile_range */
+			128.0f, /* sight_range */
+		};
+}
 
 void
 Game_mediaInit()
@@ -757,6 +897,7 @@ Game_mediaInit()
 		Explosion_mediaInit();
 	LoadingScreen_draw(5, NULL);
 		Projectile_mediaInit();
+		Enemy_mediaInit();
 	LoadingScreen_draw(50, NULL);
 		Weapon_init();
 	LoadingScreen_draw(100, NULL);

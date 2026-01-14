@@ -4,7 +4,6 @@
 
 #include <math.h>
 #include <raylib.h>
-#include <raymath.h>
 #include <string.h>
 
 #include "kolibri.h"
@@ -13,8 +12,10 @@
 #include "../infinite_plane_scene.h"
 #include "../projectile.h"
 #include "../sprite.h"
+#include "../thinker.h"
 #include "../utils.h"
 #include "../weapon.h"
+#include <raymath.h>
 
 
 #ifndef WINDOW_TITLE
@@ -85,6 +86,8 @@ typedef enum
 	PROJECTILE_ROCKET,
 	PROJECTILE_GRENADE,
 	PROJECTILE_PLASMA,
+	PROJECTILE_TRACER,
+	PROJECTILE_GREEN,
 	PROJECTILE_NUM_PROJECTILES
 }
 Projectiles;
@@ -104,13 +107,22 @@ typedef enum
 }
 Weapons;
 
+typedef enum
+{
+	ENEMY_GRUNT,
+	ENEMY_NUM_ENEMIES
+}
+Enemies;
+
 
 /* 
 	game.c
 */
 extern ExplosionInfo   *explosion_Info;
 extern Renderable      *projectile_renderables;
-extern Model           *projectile_models;
+extern Model           
+					   *projectile_models,
+					   *enemy_models;
 extern Texture         *projectile_Sprite_or_Textures;
 extern SpriteInfo     **projectile_SpriteInfos;
 extern ProjectileInfo **projectile_Infos;
@@ -122,6 +134,46 @@ void Game_mediaInit(      void);
 	main.c
 */
 extern char *path_prefix;
+
+/*
+	enemy.c
+*/
+
+typedef struct
+{
+	Renderable      renderables[MAX_RENDERABLES_PER_ENTITY];
+	float           lod_distances[MAX_RENDERABLES_PER_ENTITY];
+	int             num_renderables;
+	ProjectileInfo *projectile_info; 
+	float
+					health,
+					speed,
+					turn_speed,
+					melee_damage,
+					melee_range,
+					projectile_range,
+					sight_range;
+}
+EnemyInfo;
+
+typedef struct
+{
+	Thinker     thinker;
+	Vector3 
+				prev_pos,
+				prev_offset;
+	Entity     *target;
+	float       current_health;
+	Vector3     run_destination;
+	double  
+				pain_time,
+				next_attack_time;
+}
+EnemyData;
+
+Entity *Enemy_new(EnemyInfo *info, Vector3 position, Scene *scene);
+
+extern EnemyInfo *enemy_Infos;
 
 /* 
 	engine_impl.c

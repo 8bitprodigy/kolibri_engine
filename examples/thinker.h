@@ -41,9 +41,9 @@ void
 Thinker_init(Thinker *thinker)
 {
     thinker->function = NULL;
-    thinker->nextTime = 0.0f;
+    thinker->next_time = 0.0f;
     thinker->interval = 0.0f;
-    thinker->userdata = NULL;
+    thinker->user_data = NULL;
 }
 
 void 
@@ -55,9 +55,9 @@ Thinker_set(
 )
 {
     thinker->function =  function;
-    thinker->userdata =  userdata;
+    thinker->user_data =  userdata;
     thinker->interval =  0.0f;
-    thinker->nextTime += delay;
+    thinker->next_time += delay;
 }
 
 void 
@@ -69,9 +69,9 @@ Thinker_repeat(
 )
 {
     thinker->function =  function;
-    thinker->userdata =  userdata;
+    thinker->user_data =  userdata;
     thinker->interval =  interval;
-    thinker->nextTime += interval;
+    thinker->next_time += interval;
 }
 
 void 

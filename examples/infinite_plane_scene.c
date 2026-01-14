@@ -1,5 +1,6 @@
 #include "infinite_plane_scene.h"
 #include "renderer.h"
+#include "utils.h"
 #include <raylib.h>
 
 
@@ -28,6 +29,7 @@ SceneVTable infinite_Plane_Scene_Callbacks = {
 	.CheckCollision = infinitePlaneSceneCollision, 
 	.MoveEntity     = infinitePlaneSceneCollision, 
 	.Raycast        = infinitePlaneSceneRaycast,
+	.PreRender      = NULL,
 	.Render         = infinitePlaneSceneRender, 
 	.Exit           = NULL, 
 	.Free           = infinitePlaneSceneFree,

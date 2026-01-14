@@ -257,7 +257,9 @@ Engine_run(Engine *self)
 			self->screen_size = new_screen_size;
 			Engine_update(self);
 			/* For extrapolation: how far into the next tick are we? */
-			self->tick_elapsed = (self->current_time - self->last_tick_time) / self->tick_length;
+			self->tick_elapsed = (
+					self->current_time - self->last_tick_time
+				) / self->tick_length;
 			BeginDrawing();
 				Engine_render(self);
 			EndDrawing();
@@ -271,7 +273,9 @@ Engine_run(Engine *self)
 
 			Engine_update(self);
 			/* For extrapolation: how far into the next tick are we? */
-			self->tick_elapsed = (self->current_time - self->last_tick_time) / self->tick_length;
+			self->tick_elapsed = (
+					self->current_time - self->last_tick_time
+				) / self->tick_length;
 			self->frame_num++;
 		}
 	}
@@ -285,6 +289,8 @@ Engine_update(Engine *self)
 	//DBG_OUT("Engine updating...");
 	if (self->paused || self->request_exit) return;
 	const EngineVTable *vtable = self->vtable;
+	
+	if (vtable && vtable->Update) vtable->Update(self, self->tick_length);
 	
 	self->current_time = GetTime() - self->start_time - self->time_spent_paused;
 	float frame_delta = self->current_time - self->last_frame_time;
@@ -300,7 +306,7 @@ Engine_update(Engine *self)
 		
 		//DBG_OUT("Engine Tick #%i", self->tick_num);
 		Scene_update(self->scene, self->tick_length);
-		if (vtable && vtable->Update) vtable->Update(self, self->tick_length);
+		if (vtable && vtable->Tick) vtable->Tick(self, self->tick_length);
 		
 		self->last_tick_time += self->tick_length;
 		self->tick_num++;
