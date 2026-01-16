@@ -11,6 +11,8 @@ Texture        explosion_Sprite;
 ExplosionInfo *explosion_Info;
 Texture        impact_Sprite;
 ExplosionInfo *impact_Info;
+Texture        blood_Sprite;
+ExplosionInfo *blood_Info;
 
 Renderable
 	sprite_Renderable = {
@@ -55,16 +57,25 @@ projectileCollision(
 		Entity_free(projectile);
 		return;
 	}
-	
-	Explosion_new(
-			impact_Info, 
-			Vector3Add(
-					collision.position,
-					(Vector3){0.0f, 0.55f, 0.0f}
-				),
-			QuaternionFromAxisAngle(collision.normal, 0.0f),
-			Entity_getScene(projectile)
-		);
+	if (!collision.entity) {
+		Explosion_new(
+				impact_Info, 
+				Vector3Add(
+						collision.position,
+						(Vector3){0.0f, 0.55f, 0.0f}
+					),
+				QuaternionFromAxisAngle(collision.normal, 0.0f),
+				Entity_getScene(projectile)
+			);
+	}
+	else {
+		Explosion_new(
+				blood_Info, 
+				collision.position,
+				QuaternionFromAxisAngle(collision.normal, 0.0f),
+				Entity_getScene(projectile)
+			);
+	}
 	
 	Entity_free(projectile);
 }
@@ -158,13 +169,26 @@ NO_BOUNCE:
 	if (data->source == collision.entity) return;
 	projectile->visible = false;
 	projectile->active = false;
-	
-	Explosion_new(
-			impact_Info, 
-			collision.position,
-			QuaternionFromAxisAngle(collision.normal, 0.0f),
-			Entity_getScene(projectile)
-		);
+
+	if (!collision.entity) {
+		Explosion_new(
+				impact_Info, 
+				Vector3Add(
+						collision.position,
+						(Vector3){0.0f, 0.55f, 0.0f}
+					),
+				QuaternionFromAxisAngle(collision.normal, 0.0f),
+				Entity_getScene(projectile)
+			);
+	}
+	else {
+		Explosion_new(
+				blood_Info, 
+				collision.position,
+				QuaternionFromAxisAngle(collision.normal, 0.0f),
+				Entity_getScene(projectile)
+			);
+	}
 	
 	Entity_free(projectile);
 }
@@ -188,7 +212,8 @@ fireHitscan(
 	CollisionResult result = Scene_raycast(
 			scene,
 			position,
-			Vector3Add(position, Vector3Scale(direction, info->distance))
+			Vector3Add(position, Vector3Scale(direction, info->distance)),
+			source
 		);
 
 	if (result.hit) {
@@ -368,19 +393,9 @@ fireLightning(
 void
 Explosion_mediaInit(void)
 {
-	char explosion_path[256];
-
-	snprintf(
-			explosion_path, 
-			sizeof(explosion_path), 
-			"%s%s", 
-			path_prefix,  
-			"resources/sprites/explosion.png"
-		);
-
-	LoadingScreen_draw(0, (const char *)&explosion_path);
+	LoadingScreen_draw(0, "resources/sprites/explosion.png");
 	
-	explosion_Sprite = LoadTexture(explosion_path);
+	explosion_Sprite = LoadTexture( "resources/sprites/explosion.png");
 	SetTextureFilter(explosion_Sprite, TEXTURE_FILTER_BILINEAR);
 	
 	explosion_Info = ExplosionInfo_new(
@@ -396,17 +411,9 @@ Explosion_mediaInit(void)
 			4, 4, 16
 		);
 
-	snprintf(
-			explosion_path, 
-			sizeof(explosion_path), 
-			"%s%s", 
-			path_prefix,  
-			"resources/sprites/impact.png"
-		);
-
-	LoadingScreen_draw(2.5, (const char *)&explosion_path);
+	LoadingScreen_draw(2.5, "resources/sprites/impact.png");
 	
-	impact_Sprite = LoadTexture(explosion_path);
+	impact_Sprite = LoadTexture("resources/sprites/impact.png");
 	SetTextureFilter(impact_Sprite, TEXTURE_FILTER_BILINEAR);
 	
 	impact_Info = ExplosionInfo_new(
@@ -419,6 +426,24 @@ Explosion_mediaInit(void)
 			BEIGE,
 			impact_Sprite,
 			SPRITE_ALIGN_Y,
+			4, 4, 16
+		);
+
+	LoadingScreen_draw(2.5, "resources/sprites/blood_impact.png");
+	
+	blood_Sprite = LoadTexture("resources/sprites/blood_impact.png");
+	SetTextureFilter(blood_Sprite, TEXTURE_FILTER_BILINEAR);
+	
+	blood_Info = ExplosionInfo_new(
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			0.5f,
+			1.0f/60.0f,
+			WHITE,
+			blood_Sprite,
+			SPRITE_ALIGN_CAMERA,
 			4, 4, 16
 		);
 }
@@ -435,24 +460,15 @@ Projectile_mediaInit(void)
 	char load_path[256];
 
 	/* Blast */
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s", 
-			path_prefix, 
+	LoadingScreen_draw(5, "resources/models/projectiles/projectile.obj");
+	projectile_models[PROJECTILE_BLAST] = LoadModel(
 			"resources/models/projectiles/projectile.obj"
 		);
-	LoadingScreen_draw(5, (const char *)&load_path);
-	projectile_models[PROJECTILE_BLAST] = LoadModel(load_path);
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s",
-			path_prefix, 
+	
+	LoadingScreen_draw(10,"resources/models/projectiles/projectile.png");
+	projectile_Sprite_or_Textures[PROJECTILE_BLAST] = LoadTexture(
 			"resources/models/projectiles/projectile.png"
 		);
-	LoadingScreen_draw(10, (const char *)&load_path);
-	projectile_Sprite_or_Textures[PROJECTILE_BLAST] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_BLAST], 
 			TEXTURE_FILTER_BILINEAR
@@ -488,15 +504,10 @@ Projectile_mediaInit(void)
 		);
 	
 	/* Goo */
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s", 
-			path_prefix,  
+	LoadingScreen_draw(15, "resources/sprites/glob.png");
+	projectile_Sprite_or_Textures[PROJECTILE_GOO] = LoadTexture(
 			"resources/sprites/glob.png"
 		);
-	LoadingScreen_draw(15, (const char *)&load_path);
-	projectile_Sprite_or_Textures[PROJECTILE_GOO] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_GOO], 
 			TEXTURE_FILTER_BILINEAR
@@ -529,24 +540,15 @@ Projectile_mediaInit(void)
 		);
 	
 	/* Rocket */
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s", 
-			path_prefix, 
+	LoadingScreen_draw(20, "resources/models/projectiles/rocket.obj");
+	projectile_models[PROJECTILE_ROCKET] = LoadModel(
 			"resources/models/projectiles/rocket.obj"
 		);
-	LoadingScreen_draw(20, (const char *)&load_path);
-	projectile_models[PROJECTILE_ROCKET] = LoadModel(load_path);
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s",
-			path_prefix, 
+		
+	LoadingScreen_draw(25, "resources/models/projectiles/rocket.png");
+	projectile_Sprite_or_Textures[PROJECTILE_ROCKET] = LoadTexture(
 			"resources/models/projectiles/rocket.png"
 		);
-	LoadingScreen_draw(25, (const char *)&load_path);
-	projectile_Sprite_or_Textures[PROJECTILE_ROCKET] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_ROCKET], 
 			TEXTURE_FILTER_BILINEAR
@@ -570,15 +572,10 @@ Projectile_mediaInit(void)
 		);
 	
 	/* Grenade */
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s",
-			path_prefix, 
+	LoadingScreen_draw(30, "resources/sprites/grenade.png");
+	projectile_Sprite_or_Textures[PROJECTILE_GRENADE] = LoadTexture(
 			"resources/sprites/grenade.png"
 		);
-	LoadingScreen_draw(30, (const char *)&load_path);
-	projectile_Sprite_or_Textures[PROJECTILE_GRENADE] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_GRENADE], 
 			TEXTURE_FILTER_BILINEAR
@@ -611,15 +608,11 @@ Projectile_mediaInit(void)
 		);
 	
 	/* Plasma */
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s",
-			path_prefix, 
+	
+	LoadingScreen_draw(35, "resources/sprites/plasma_ball.png");
+	projectile_Sprite_or_Textures[PROJECTILE_PLASMA] = LoadTexture(
 			"resources/sprites/plasma_ball.png"
 		);
-	LoadingScreen_draw(35, (const char *)&load_path);
-	projectile_Sprite_or_Textures[PROJECTILE_PLASMA] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_PLASMA], 
 			TEXTURE_FILTER_BILINEAR
@@ -652,15 +645,11 @@ Projectile_mediaInit(void)
 		);
 	
 	/* Tracer */
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s",
-			path_prefix, 
+	
+	LoadingScreen_draw(35, "resources/sprites/tracer.png");
+	projectile_Sprite_or_Textures[PROJECTILE_TRACER] = LoadTexture(
 			"resources/sprites/tracer.png"
 		);
-	LoadingScreen_draw(35, (const char *)&load_path);
-	projectile_Sprite_or_Textures[PROJECTILE_TRACER] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_TRACER], 
 			TEXTURE_FILTER_BILINEAR
@@ -693,24 +682,16 @@ Projectile_mediaInit(void)
 		);
 
 	/* Green */
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s", 
-			path_prefix, 
+	
+	LoadingScreen_draw(5, "resources/models/projectiles/blast.obj");
+	projectile_models[PROJECTILE_GREEN] = LoadModel(
 			"resources/models/projectiles/blast.obj"
 		);
-	LoadingScreen_draw(5, (const char *)&load_path);
-	projectile_models[PROJECTILE_GREEN] = LoadModel(load_path);
-	snprintf(
-			load_path, 
-			sizeof(load_path), 
-			"%s%s",
-			path_prefix, 
+		
+	LoadingScreen_draw(10, "resources/models/projectiles/blast.png");
+	projectile_Sprite_or_Textures[PROJECTILE_GREEN] = LoadTexture(
 			"resources/models/projectiles/blast.png"
 		);
-	LoadingScreen_draw(10, (const char *)&load_path);
-	projectile_Sprite_or_Textures[PROJECTILE_GREEN] = LoadTexture(load_path);
 	SetTextureFilter(
 			projectile_Sprite_or_Textures[PROJECTILE_GREEN], 
 			TEXTURE_FILTER_BILINEAR
@@ -806,8 +787,7 @@ Weapon_init(void)
 		snprintf(
 				weapon_path, 
 				sizeof(weapon_path), 
-				"%s%s%d%s", 
-				path_prefix, 
+				"%s%d%s", 
 				"resources/models/weapons/weapon", 
 				i+1, 
 				".obj"
@@ -819,8 +799,7 @@ Weapon_init(void)
 		snprintf(
 				weapon_texture_path, 
 				sizeof(weapon_texture_path), 
-				"%s%s%d%s", 
-				path_prefix, 
+				"%s%d%s", 
 				"resources/models/weapons/weapon", 
 				i+1, 
 				".png"
@@ -844,49 +823,34 @@ Enemy_mediaInit()
 	enemy_Textures    = DynamicArray(Texture,    ENEMY_NUM_ENEMIES);
 	enemy_Renderables = DynamicArray(Renderable, ENEMY_NUM_ENEMIES);
 	enemy_Infos       = DynamicArray(EnemyInfo,  ENEMY_NUM_ENEMIES);
+
+	enemy_Models[ENEMY_GRUNT] = LoadModel("resources/models/grunt/model.m3d");
 	
-	char load_path[256];
-
-	snprintf(
-			load_path,
-			sizeof(load_path),
-			"%s%s",
-			path_prefix,
-			"resources/models/grunt/model.glb"
+	enemy_Textures[ENEMY_GRUNT] = LoadTexture(
+			"resources/models/grunt/texture.png"
 		);
-
-	enemy_Models[ENEMY_GRUNT] = LoadModel(load_path);
-
-	snprintf(
-		load_path,
-		sizeof(load_path),
-		"%s%s",
-		path_prefix,
-		"resources/models/grunt/texture.png"
-	);
-
-	enemy_Textures[ENEMY_GRUNT] = LoadTexture(load_path);
 	SetMaterialTexture(
 		&enemy_Models[ENEMY_GRUNT].materials[0],
 		MATERIAL_MAP_ALBEDO,
 		enemy_Textures[ENEMY_GRUNT]
 	);
 	SetTextureFilter(enemy_Textures[ENEMY_GRUNT], TEXTURE_FILTER_BILINEAR);
-
+	
 	enemy_Renderables[ENEMY_GRUNT] = model_Renderable;
 	enemy_Renderables[ENEMY_GRUNT].data = &enemy_Models[ENEMY_GRUNT];
 
 	enemy_Infos[ENEMY_GRUNT] = (EnemyInfo){
-			{enemy_Renderables[ENEMY_GRUNT]},
-			{128.0f},
-			1,
-			projectile_Infos[PROJECTILE_GREEN],
-			100.0f, /* health */
-			5.0f,   /* speed */
-			15.0f,  /* melee_damage */
-			2.0f,   /* melee_range */
-			96.0f,  /* projectile_range */
-			128.0f, /* sight_range */
+			.renderables      = {enemy_Renderables[ENEMY_GRUNT]},
+			.lod_distances    = {128.0f},
+			.num_renderables  = 1,
+			.projectile_info  = projectile_Infos[PROJECTILE_GREEN],
+			.health           = 100.0f, /* health */
+			.speed            = 5.0f,   /* speed */
+			.turn_speed       = 5.0f,
+			.melee_damage     = 15.0f,  /* melee_damage */
+			.melee_range      = 2.0f,   /* melee_range */
+			.projectile_range = 96.0f,  /* projectile_range */
+			.sight_range      = 128.0f, /* sight_range */
 		};
 }
 

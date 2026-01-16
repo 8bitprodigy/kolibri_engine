@@ -22,7 +22,7 @@ void              CollisionScene__clear(         CollisionScene *scene);
 Entity          **CollisionScene__queryRegion(   CollisionScene *scene, BoundingBox  bbox);
 CollisionResult   CollisionScene__checkCollision(CollisionScene *scene, Entity      *entity, Vector3  to);
 CollisionResult   CollisionScene__moveEntity(    CollisionScene *scene, Entity      *entity, Vector3  movement);
-CollisionResult   CollisionScene__raycast(       CollisionScene *scene, K_Ray        ray);
+CollisionResult   CollisionScene__raycast(       CollisionScene *scene, K_Ray        ray,    Entity  *ignore);
 
 
 /* System updates */

@@ -27,7 +27,7 @@ Thinker;
 void Thinker_init(  Thinker *thinker);
 void Thinker_set(   Thinker *thinker, ThinkerFunction  function, float delay,    void *userdata);
 void Thinker_repeat(Thinker *thinker, ThinkerFunction  function, float interval, void *userdata);
-void Thinker_update(Thinker *thinker, Entity           *entity,  float game_time);
+void Thinker_update(Thinker *thinker, Entity           *entity);
 
 
 #endif /* THINKER_H */
@@ -54,9 +54,9 @@ Thinker_set(
 	void            *userdata
 )
 {
-    thinker->function =  function;
-    thinker->user_data =  userdata;
-    thinker->interval =  0.0f;
+    thinker->function   = function;
+    thinker->user_data  = userdata;
+    thinker->interval   = 0.0f;
     thinker->next_time += delay;
 }
 
@@ -68,28 +68,29 @@ Thinker_repeat(
 	void            *userdata
 )
 {
-    thinker->function =  function;
-    thinker->user_data =  userdata;
-    thinker->interval =  interval;
+    thinker->function   = function;
+    thinker->user_data  = userdata;
+    thinker->interval   = interval;
     thinker->next_time += interval;
 }
 
 void 
 Thinker_update(
 	Thinker *thinker,
-	Entity  *entity,
-	float    game_time
+	Entity  *entity
 )
 {
 	if (!thinker->function) return;
+	
+	float game_time = Entity_getAge(entity);
+	
 	if (game_time < thinker->next_time) return;
 
+	thinker->next_time = 0.0f;
 	thinker->function(entity, thinker->user_data);
 
-	if (thinker->interval > 0.0f)
-		thinker->next_time += thinker->interval;
-	else
-		thinker->function = NULL;
+	if (0.0f < thinker->interval)
+		thinker->next_time = game_time + thinker->interval;
 }
 	
 #endif /* THINKER_IMPLEMENTATION */

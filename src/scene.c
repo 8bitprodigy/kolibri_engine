@@ -234,9 +234,8 @@ Scene_checkContinuous(Scene *self, Entity *entity, Vector3 movement)
     return result;
 }
 
-
 CollisionResult
-Scene_raycast(Scene *self, Vector3 from, Vector3 to)
+Scene_raycast(Scene *self, Vector3 from, Vector3 to, Entity *ignore)
 {
     SceneVTable     *vtable = self->vtable;
     CollisionResult  scene_result;
@@ -249,7 +248,8 @@ Scene_raycast(Scene *self, Vector3 from, Vector3 to)
                     .position  = from,
                     .direction = Vector3Normalize(diff),
                     .length    = Vector3Length(diff)
-                }
+                },
+            ignore
         );
         
     if ( scene_result.hit && !entity_result.hit) return scene_result;
@@ -293,7 +293,9 @@ Scene_queryRegion(Scene *scene, BoundingBox  bbox)
 {
     CollisionScene *collision_scene = scene->collision_scene;
     
-    return (Entity**)CollisionScene__queryRegion(collision_scene, bbox);
+    Entity **result = (Entity**)CollisionScene__queryRegion(collision_scene, bbox);
+    
+    return result;
 }
 
 

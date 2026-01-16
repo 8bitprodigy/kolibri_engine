@@ -96,9 +96,8 @@ enemyUpdate(Entity *self, float delta)
 			? JUMP_GRAVITY * delta 
 			: FALL_GRAVITY * delta;
 	}
-	DBG_OUT("enemyUpdate: thinker.function = %p", (void*)data->thinker.function);
 	
-	Thinker_update(&data->thinker, self, Entity_getAge(self));
+	Thinker_update(&data->thinker, self);
 	Entity_moveAndSlide(self, Vector3Scale(self->velocity, delta));
 }
 
@@ -135,7 +134,9 @@ Enemy_findTarget(Entity *self, float range)
 		};
 
 	Entity **nearby = Scene_queryRegion(scene, search_box);
-	if (!nearby) return NULL;
+	if (!nearby) {
+		return NULL;
+	}
 
 	Entity *target = NULL;
 	float closest_dist_sq = range * range;
@@ -143,12 +144,17 @@ Enemy_findTarget(Entity *self, float range)
 	for (int i = 0; i < DynamicArray_length(nearby); i++) {
 		Entity *candidate = nearby[i];
 
-		if (candidate == self) continue;
-		if (!(self->collision.masks & candidate->collision.layers)) continue;
+		if (candidate == self) {
+			continue;
+		}
+		
+		if (!(self->collision.masks & candidate->collision.layers)) {
+			continue;
+		}
 
 		Vector3 to_target = Vector3Subtract(candidate->position, self->position);
 		float   dist_sq   = Vector3LengthSqr(to_target);
-
+		
 		if (dist_sq < closest_dist_sq) {
 			target          = candidate;
 			closest_dist_sq = dist_sq;
@@ -163,40 +169,51 @@ bool
 Enemy_canSeeTarget(Entity *self)
 {
 	EnemyData *data = (EnemyData*)&self->local_data;
-	if (!data->target || !data->target->active) return false;
+	if (!data->target || !data->target->active) {
+		return false;
+	}
 
 	Scene *scene = Entity_getScene(self);
 
 	Vector3 
 		from = Vector3Add(self->position,         (Vector3){0.0f, 1.5f, 0.0f}),
 		to   = Vector3Add(data->target->position, (Vector3){0.0f, 1.0f, 0.0f});
+	        
+	CollisionResult hit = Scene_raycast(scene, from, to, self);
 
-	CollisionResult hit = Scene_raycast(scene, from, to);
-
-	return (!hit.entity || hit.entity == data->target);
+	bool result = (!hit.hit || hit.entity == self || hit.entity == data->target);
+	
+	return result;
 }
 
 void
-Enemy_faceTarget(Entity *self, float turn_speed)
+Enemy_facePoint(Entity *self, Vector3 point)
+{
+	Vector3 direction = Vector3Subtract(point, self->position);
+	direction.y = 0;
+	
+	if (Vector3LengthSqr(direction) < 0.001f) return;
+
+	direction         = Vector3Normalize(direction);
+	float angle       = atan2f(direction.x, direction.z);
+	self->orientation = QuaternionFromAxisAngle(V3_UP, angle);
+}
+
+void
+Enemy_faceTarget(Entity *self)
 {
 	EnemyData *data = (EnemyData*)&self->local_data;
 	if (!data->target) return;
 
-	Vector3 to_target = Vector3Subtract(
-			data->target->position,
-			self->position
-		);
-	to_target.y = 0.0f;
+	Enemy_facePoint(self, data->target->position);
+}
 
-	if (Vector3LengthSqr(to_target) < 0.001f) return;
+void
+Enemy_faceRunDirection(Entity *self)
+{
+	EnemyData *data = (EnemyData*)&self->local_data;
 
-	Vector3 forward = Vector3Normalize(to_target);
-	float   angle   = atan2f(forward.x, forward.z);
-
-	self->orientation = QuaternionFromAxisAngle(
-			V3_UP,
-			angle
-		);
+	Enemy_facePoint(self, data->run_destination);
 }
 
 void
@@ -205,15 +222,23 @@ Enemy_moveToward(Entity *self, Vector3 target_pos, float speed)
 	Vector3 direction = Vector3Subtract(target_pos, self->position);
 	direction.y = 0.0f;
 
-	if (Vector3LengthSqr(direction) < 0.001f) {
+	float dist = sqrtf(direction.x * direction.x + direction.z * direction.z);
+
+	if (dist < 0.001f) {
 		self->velocity.x = self->velocity.z = 0.0f;
 		return;
 	}
 
-	direction = Vector3Normalize(direction);
+	direction.x /= dist;
+	direction.z /= dist;
 
-	self->velocity.x = direction.x * speed;
-	self->velocity.z = direction.z * speed;
+	float actual_speed = speed;
+	if (dist < 1.0f) {
+		actual_speed = speed * dist;
+	}
+
+	self->velocity.x = direction.x * actual_speed;
+	self->velocity.z = direction.z * actual_speed;
 }
 
 float
@@ -269,13 +294,22 @@ Enemy_shoot(Entity *self)
 	EnemyData *data = (EnemyData*)&self->local_data;
 	EnemyInfo *info = (EnemyInfo*)self->user_data;
 
-	if (!data->target) return;
+	if (!data->target) {
+		DBG_OUT("[Enemy_shoot]\tCouldn't shoot: No target set");
+		return;
+	}
 
 	float dist = Enemy_distanceToTarget(self);
-	if (info->melee_range < dist) return;
+	if (dist < info->melee_range) {
+		DBG_OUT("[Enemy_shoot]\tCouldn't shoot: Target in melee range");
+		return;
+	}
 
 	/* Only shoot if we can see the target */
-	if (!Enemy_canSeeTarget(self)) return;
+	if (!Enemy_canSeeTarget(self)) {
+		DBG_OUT("[Enemy_shoot]\tCouldn't shoot: Target not visible");
+		return;
+	}
 
 	Scene *scene = Entity_getScene(self);
 
@@ -335,26 +369,28 @@ enemy_ai_idle(Entity *self, void *userdata)
 	EnemyData *data = (EnemyData*)&self->local_data;
 	EnemyInfo *info = (EnemyInfo*)self->user_data;
 
-	DBG_OUT("enemy_ai_idle called");
 	self->velocity.x = self->velocity.z = 0.0f;
+	DBG_OUT("enemy_ai_idle() entered.");
 
 	/* Look for target */
 	if (!data->target) {
-		DBG_OUT("\tLooking for a target...");
+		DBG_OUT("\tlooking for target.");
 		data->target = Enemy_findTarget(self, info->sight_range);
-		DBG_OUT("\tEnemy_findTarget returned: %p", (void*)data->target);
 	}
 
 	/* Check if we can see current target */
 	if (data->target) {
-		if (data->target->active && Enemy_canSeeTarget(self)) {
-			DBG_OUT("Target found! Transitioning to run state");
+		
+		bool can_see = Enemy_canSeeTarget(self);
+		DBG_OUT("\tcan see target: %b", can_see);
+		if (data->target->active && can_see) {
 			/* Start chasing */
+			DBG_OUT("\tgoing to chase...");
 			Thinker_set(&data->thinker, enemy_ai_run, 0.5f, NULL);
 			return;
 		}
 		else { /* Lost the target */
-			DBG_OUT("No target found, staying idle");
+			DBG_OUT("\tlost the target.");
 			data->target = NULL;
 		}
 	}
@@ -366,23 +402,25 @@ enemy_ai_run(Entity *self, void *userdata)
 	EnemyData *data   = (EnemyData*)&self->local_data;
 	EnemyInfo *info   = (EnemyInfo*)self->user_data;
 
+	DBG_OUT("enemy_ai_run() entered.");
+	
 	/* Target lost */
 	if (
 		!data->target 
 		|| !data->target->active 
 		|| !Enemy_canSeeTarget(self)
 	) {
+		DBG_OUT("\tlost the target.");
 		Thinker_set(&data->thinker, enemy_ai_idle, 0.0f, NULL);
 		return;
 	}
 
 	if (info->projectile_info) {
+		DBG_OUT("\tpicking run destination...");
 		Enemy_pickRunDestination(self);
 		Thinker_set(&data->thinker, enemy_ai_ranged_run, 0.0f, NULL);
 		return;
 	}
-	/* Keep running */
-	Thinker_set(&data->thinker, enemy_ai_chase, 0.1f, NULL);
 }
 
 void
@@ -391,25 +429,31 @@ enemy_ai_ranged_run(Entity *self, void *userdata)
 	EnemyData *data   = (EnemyData*)&self->local_data;
 	EnemyInfo *info   = (EnemyInfo*)self->user_data;
 	
+	DBG_OUT("enemy_ai_ranged_run() entered.");
+	
 	if (
 		!data->target 
 		|| !data->target->active 
 		|| !Enemy_canSeeTarget(self)
 	) {
+		DBG_OUT("\tlost the target.");
 		Thinker_set(&data->thinker, enemy_ai_idle, 0.0f, NULL);
 		return;
 	}
 
-	float dist_to_dest = Vector3Distance(self->position, data->run_destination);
+	Vector3 to_dest    = Vector3Subtract(data->run_destination, self->position);
+	float dist_to_dest = sqrtf(to_dest.x * to_dest.x + to_dest.z * to_dest.z);
 
-	if (dist_to_dest < 0.5f) {
+	if (dist_to_dest < 1.5f) {
 		/* Reached destination, switch to shooting */
+		DBG_OUT("\tgoing to shoot...");
 		self->velocity.x = self->velocity.z = 0.0f;
 		data->next_attack_time = Entity_getAge(self);
 		Thinker_set(&data->thinker, enemy_ai_ranged_shoot, 0.0f, NULL);
 		return;
 	}
 	
+	Enemy_faceRunDirection(self);
 	Enemy_moveToward(self, data->run_destination, info->speed);
 	Thinker_set(&data->thinker, enemy_ai_ranged_run, 0.1f, NULL);
 }
@@ -420,11 +464,14 @@ enemy_ai_ranged_shoot(Entity *self, void *userdata)
 	EnemyData *data   = (EnemyData*)&self->local_data;
 	EnemyInfo *info   = (EnemyInfo*)self->user_data;
 	
+	DBG_OUT("enemy_ai_ranged_shoot() entered.");
+	
 	if (
 		!data->target 
 		|| !data->target->active 
 		|| !Enemy_canSeeTarget(self)
 	) {
+		DBG_OUT("\tlost the target.");
 		Thinker_set(&data->thinker, enemy_ai_idle, 0.0f, NULL);
 		return;
 	}
@@ -433,10 +480,12 @@ enemy_ai_ranged_shoot(Entity *self, void *userdata)
 		game_time = Entity_getAge(self),
 		dist      = Enemy_distanceToTarget(self);
 
-	Enemy_faceTarget(self, info->turn_speed);
+	Enemy_faceTarget(self);
+	DBG_OUT("\tturning toward target target.");
 
 	/* Melee if they get too close */
 	if (info->melee_range > 0.0f && dist < info->melee_range) {
+		DBG_OUT("\tgoing to melee...");
 		Enemy_melee(self);
 		Thinker_set(&data->thinker, enemy_ai_ranged_shoot, 0.5f, NULL);
 		return;
@@ -444,12 +493,14 @@ enemy_ai_ranged_shoot(Entity *self, void *userdata)
 
 	/* Shoot if in range and cooldown is up */
 	if (dist < info->projectile_range && game_time >= data->next_attack_time) {
+		DBG_OUT("\tshooting!");
 		Enemy_shoot(self);
 		data->next_attack_time = game_time + 0.8f + (rand() % 100) * 0.01f;
 	}
 
 	/* After shooting for a bit, pick a new position and run */
 	if (data->next_attack_time + 2.0f <= game_time) {
+		DBG_OUT("\tgoing to run...");
 		Enemy_pickRunDestination(self);
 		Thinker_set(&data->thinker, enemy_ai_ranged_run, 0.0f, NULL);
 		return;
@@ -464,6 +515,8 @@ enemy_ai_chase(Entity *self, void *userdata)
 	EnemyData *data   = (EnemyData*)&self->local_data;
 	EnemyInfo *info   = (EnemyInfo*)self->user_data;
 	
+	DBG_OUT("enemy_ai_chase() entered.");
+	
 	if (
 		!data->target 
 		|| !data->target->active 
@@ -475,7 +528,7 @@ enemy_ai_chase(Entity *self, void *userdata)
 
 	float dist = Enemy_distanceToTarget(self);
 
-	Enemy_faceTarget(self, info->turn_speed);
+	Enemy_faceTarget(self);
 
 	/* Melee when close */
 	if (0.0f < info->melee_range && dist < info->melee_range) {

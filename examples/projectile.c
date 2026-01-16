@@ -146,7 +146,8 @@ projectileUpdate(Entity *self, float delta)
 	collision = Scene_raycast(
 			Entity_getScene(self), 
 			self->position,
-			new_pos
+			new_pos,
+			data->source
 		);
 
 	self->renderable_offset = Vector3Subtract(self->position, new_pos);

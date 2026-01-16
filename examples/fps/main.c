@@ -76,27 +76,19 @@ runEngine(void *data, void *value)
 		
 	/*scene = Scene_new(&infinite_Plane_Scene_Callbacks, NULL, NULL, 0, engine); // */
 	HeightmapData heightmap = (HeightmapData){
-			.sun_angle     = (Vector3){0.0f, -0.4f, -0.6f},
-			.ambient_value = 0.6f,
-			.offset        = 0.0f,
-			.height_scale  = 200.0f,
-			.cell_size     = 4.0f,
-			.chunk_cells   = 16,
-			.chunks_wide   = 32,
-			.sun_color     = (Color){255, 255, 250, 255},
-			.ambient_color = (Color){115, 115, 155, 255},
-			.hi_color      = (Color){110, 141,  70, 255},
-			.lo_color      = BEIGE,
-			.texture_path  = TextFormat(
-					"%s%s", 
-					path_prefix, 
-					"resources/textures/grass/00_bw.png"
-				),
-			.skybox_textures_path = TextFormat(
-					"%s%s",
-					path_prefix,
-					SKY_PATH
-				),
+			.sun_angle            = (Vector3){0.0f, -0.4f, -0.6f},
+			.ambient_value        = 0.6f,
+			.offset               = 0.0f,
+			.height_scale         = 200.0f,
+			.cell_size            = 4.0f,
+			.chunk_cells          = 16,
+			.chunks_wide          = 32,
+			.sun_color            = (Color){255, 255, 250, 255},
+			.ambient_color        = (Color){115, 115, 155, 255},
+			.hi_color             = (Color){110, 141,  70, 255},
+			.lo_color             = BEIGE,
+			.texture_path         = "resources/textures/grass/00_bw.png",
+			.skybox_textures_path = SKY_PATH
 		};
 	scene = HeightmapScene_new(&heightmap, engine);
 	// */
@@ -126,10 +118,10 @@ runEngine(void *data, void *value)
 							(Vector3){
 									32.0f, 
 									0.0f, 
-									32.0f
+									-32.0f
 								}
 						),
-					32.0f
+					-32.0f
 				},
 			scene
 		);
@@ -199,7 +191,7 @@ handleArgs(int argc, char **argv)
 void
 setupPathPrefix()
 {
-	path_prefix = PATH_PREFIX;
+	ChangeDirectory(PATH_PREFIX);
 
 /*
 	Thanks Darc, for the help with this.
@@ -207,17 +199,14 @@ setupPathPrefix()
 #ifdef __DREAMCAST__
 	DBG_OUT("Checking for a valid drive...");
 	
-	FILE *path_test;
-	path_test = fopen("/pc/resources/textures/dev/xor.gif", "rb");
-	if (path_test) {
-		path_prefix = "/pc/";
+	if (DirectoryExists("/pc/resources")) {
+		ChangeDirectory("/pc/");
 		DBG_OUT("PATH PREFIX: \"/pc\"");
 		goto path_found;
 	}
-
-	path_test = fopen("/cd/resources/textures/dev/xor.gif", "rb");
-	if (path_test) {
-		path_prefix = "/cd/";
+	
+	if (DirectoryExists("/cd/resources")) {
+		ChangeDirectory("/cd/");
 		DBG_OUT("PATH PREFIX: \"/cd\"");
 		goto path_found;
 	}
@@ -232,16 +221,15 @@ setupPathPrefix()
 
 	#if defined(SDCARD_SUPPORT)
 	path_test = fopen("/sd/" PROJECTNAME "/resources/textures/dev/xor.gif", "rb");
-	if (path_test) {
-		path_prefix = "/sd/" PROJECTNAME;
+	if (DirectoryExists("/sd/" PROJECTNAME "/resources")) {
+		ChangeDirectory("/sd/" PROJECTNAME);
 		DBG_OUT("PATH PREFIX: \"/sd\"");
 		goto path_found;
 	}
 	#endif
 	#if defined(IDE_SUPPORT)
-	path_test = fopen("/ide/" PROJECTNAME "/resources/textures/dev/xor.gif", "rb");
-	if (path_test) {
-		path_prefix = "/ide/" PROJECTNAME;
+	if (DirectoryExists("/ide/" PROJECTNAME "/resources")) {
+		ChangeDirectory("/ide/" PROJECTNAME);
 		DBG_OUT("PATH PREFIX: \"/ide\"");
 		goto path_found;
 	}
@@ -249,7 +237,6 @@ setupPathPrefix()
 	DBG_OUT("Couldn't find a valid drive. Quitting now...");
 	exit(-1);
 path_found:
-	fclose(path_test);
 	#if defined(SDCARD_SUPPORT)
 	fs_fat_unmount("/sd");
 	sd_shutdown();

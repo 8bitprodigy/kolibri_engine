@@ -1052,7 +1052,7 @@ Collision_checkRayCylinder(K_Ray ray, Entity *entity)
 
 /* Simple raycast */
 CollisionResult
-CollisionScene__raycast(CollisionScene *scene, K_Ray ray)
+CollisionScene__raycast(CollisionScene *scene, K_Ray ray, Entity *ignore)
 {
 	CollisionResult closest_result = {0};
 	closest_result.hit      = false;
@@ -1080,6 +1080,9 @@ CollisionScene__raycast(CollisionScene *scene, K_Ray ray)
 	for (int i = 0; i < DynamicArray_length(candidates); i++) {
 		Entity *entity = candidates[i];
 
+		/* Skip ignored entity */
+		if (entity == ignore) continue;
+		
 		CollisionResult result;
 		switch (entity->collision_shape) {
 		case COLLISION_NONE:

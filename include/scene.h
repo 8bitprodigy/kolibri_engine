@@ -53,7 +53,7 @@ void            Scene_entityEnter(    Scene *scene, Entity  *entity);
 void            Scene_entityExit(     Scene *scene, Entity  *entity);
 CollisionResult Scene_checkCollision( Scene *scene, Entity  *entity, Vector3 to);
 CollisionResult Scene_checkContinuous(Scene *scene, Entity  *entity, Vector3 movement);
-CollisionResult Scene_raycast(        Scene *scene, Vector3  from,   Vector3 to);
+CollisionResult Scene_raycast(        Scene *scene, Vector3  from,   Vector3 to, Entity *ignore);
 void            Scene_preRender(      Scene *scene, Head    *head);
 void            Scene_render(         Scene *scene, Head    *head);
 void            Scene_exit(           Scene *scene);

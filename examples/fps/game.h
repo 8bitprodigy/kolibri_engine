@@ -152,7 +152,9 @@ typedef struct
 					melee_damage,
 					melee_range,
 					projectile_range,
-					sight_range;
+					sight_range,
+					current_yaw,
+					target_yaw;
 }
 EnemyInfo;
 
@@ -165,9 +167,13 @@ typedef struct
 	Entity     *target;
 	float       current_health;
 	Vector3     run_destination;
+	int         
+				current_animation,
+				current_frame;
 	double  
-				pain_time,
-				next_attack_time;
+				animation_time,
+				next_attack_time,
+				pain_time;
 }
 EnemyData;
 
