@@ -34,10 +34,11 @@ ProjectileInfo **projectile_Infos;
 
 WeaponInfo       weapon_Infos[WEAPON_NUM_WEAPONS];
 
-Model      *enemy_Models;
-Texture    *enemy_Textures;
-Renderable *enemy_Renderables;
-EnemyInfo  *enemy_Infos;
+Model          *enemy_Models;
+Texture        *enemy_Textures;
+ModelAnimation *enemy_animations;
+Renderable     *enemy_Renderables;
+EnemyInfo      *enemy_Infos;
 
 
 
@@ -440,11 +441,11 @@ Explosion_mediaInit(void)
 			0.0f,
 			0.0f,
 			0.5f,
-			1.0f/60.0f,
+			1.0f/30.0f,
 			WHITE,
 			blood_Sprite,
 			SPRITE_ALIGN_CAMERA,
-			4, 4, 16
+			4, 2, 6
 		);
 }
 

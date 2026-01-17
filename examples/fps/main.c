@@ -10,7 +10,11 @@
 
 #ifdef __PSP__
 	#include <pspsdk.h>
+	#include <pspuser.h>
+	#include <pspdebug.h>
+	#include <pspdisplay.h>
 	PSP_MODULE_INFO("TEST", 0, 1, 0);
+	PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER);
 #endif
 #ifdef __Dreamcast__
 	#if defined(IDE_SUPPORT) || defined(SDCARD_SUPPORT)

@@ -940,16 +940,20 @@ heightmapSceneSetup(Scene *scene, void *map_data)
 
 	if (data->skybox_textures_path)
 		for (int i = 0; i < 6; i++) {
-			char filename[256];
-			snprintf(
-					filename, 
-					sizeof(filename), 
-					data->skybox_textures_path, 
-					SkyBox_names[i]
-				);
 			//LoadingScreen_draw(60 + ((i+1) * 5), filename);
-			DBG_OUT("Skybox filename: %s", filename);
-			map->skybox_textures[i] = LoadTexture(filename);
+			DBG_OUT(
+					"Skybox filename: %s", 
+					TextFormat(
+							data->skybox_textures_path, 
+							SkyBox_names[i]
+						)
+				);
+			map->skybox_textures[i] = LoadTexture(
+					TextFormat(
+							data->skybox_textures_path, 
+							SkyBox_names[i]
+						)
+					);
 			SetTextureFilter(map->skybox_textures[i], TEXTURE_FILTER_BILINEAR);
 			SetTextureWrap(  map->skybox_textures[i], TEXTURE_WRAP_CLAMP);
 		}

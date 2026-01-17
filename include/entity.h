@@ -34,6 +34,9 @@ Entity
     Renderable     *renderables[  MAX_LOD_LEVELS];
     float           lod_distances[MAX_LOD_LEVELS];
     uint8           lod_count;
+    int
+                    current_anim,
+                    anim_frame;
     float           visibility_radius;
     float           floor_max_angle;
     union {
