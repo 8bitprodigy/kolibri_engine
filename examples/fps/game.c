@@ -25,6 +25,11 @@ Renderable
 			.Render      = RenderModel,
 			.transparent = false,
 		},
+	animatedModel_Renderable = {
+			.data        = NULL,
+			.Render      = RenderAnimatedModel,
+			.transparent = false,
+		},
 	*projectile_renderables;
 		
 Model           *projectile_models;
@@ -34,9 +39,8 @@ ProjectileInfo **projectile_Infos;
 
 WeaponInfo       weapon_Infos[WEAPON_NUM_WEAPONS];
 
-Model          *enemy_Models;
+AnimatedModel  *enemy_Models;
 Texture        *enemy_Textures;
-ModelAnimation *enemy_animations;
 Renderable     *enemy_Renderables;
 EnemyInfo      *enemy_Infos;
 
@@ -820,24 +824,34 @@ Weapon_init(void)
 void
 Enemy_mediaInit()
 {
-	enemy_Models      = DynamicArray(Model,      ENEMY_NUM_ENEMIES);
-	enemy_Textures    = DynamicArray(Texture,    ENEMY_NUM_ENEMIES);
-	enemy_Renderables = DynamicArray(Renderable, ENEMY_NUM_ENEMIES);
-	enemy_Infos       = DynamicArray(EnemyInfo,  ENEMY_NUM_ENEMIES);
+	enemy_Models      = DynamicArray(AnimatedModel, ENEMY_NUM_ENEMIES);
+	enemy_Textures    = DynamicArray(Texture,       ENEMY_NUM_ENEMIES);
+	enemy_Renderables = DynamicArray(Renderable,    ENEMY_NUM_ENEMIES);
+	enemy_Infos       = DynamicArray(EnemyInfo,     ENEMY_NUM_ENEMIES);
 
-	enemy_Models[ENEMY_GRUNT] = LoadModel("resources/models/grunt/model.m3d");
+	enemy_Models[ENEMY_GRUNT].model      = LoadModel(
+			"resources/models/grunt/model.m3d"
+		);
+	enemy_Models[ENEMY_GRUNT].animations = LoadModelAnimations(
+			"resources/models/grunt/model.m3d", 
+			&enemy_Models[ENEMY_GRUNT].anim_count
+		);
+	DBG_OUT(
+			"Loaded %d animations for grunt", 
+			enemy_Models[ENEMY_GRUNT].anim_count
+		);
 	
 	enemy_Textures[ENEMY_GRUNT] = LoadTexture(
 			"resources/models/grunt/texture.png"
 		);
 	SetMaterialTexture(
-		&enemy_Models[ENEMY_GRUNT].materials[0],
+		&enemy_Models[ENEMY_GRUNT].model.materials[0],
 		MATERIAL_MAP_ALBEDO,
 		enemy_Textures[ENEMY_GRUNT]
 	);
 	SetTextureFilter(enemy_Textures[ENEMY_GRUNT], TEXTURE_FILTER_BILINEAR);
 	
-	enemy_Renderables[ENEMY_GRUNT] = model_Renderable;
+	enemy_Renderables[ENEMY_GRUNT]      = animatedModel_Renderable;
 	enemy_Renderables[ENEMY_GRUNT].data = &enemy_Models[ENEMY_GRUNT];
 
 	enemy_Infos[ENEMY_GRUNT] = (EnemyInfo){

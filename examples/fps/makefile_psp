@@ -23,7 +23,7 @@ PSPDIR = $(shell psp-config --psp-prefix)
 
 # Compiler and flags
 INCDIR = include $(PSPDIR)/include/raylib $(PSPDIR)/include/raylib
-CFLAGS = -G0 -Wall -O3 -g3 -DSCREEN_HEIGHT=272 -DSCREEN_WIDTH=480
+CFLAGS = -G0 -Wall -O0 -g3 -D__PSP__=1 -DSCREEN_HEIGHT=272 -DSCREEN_WIDTH=480 
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 

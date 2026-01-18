@@ -24,6 +24,14 @@ RenderModel(
 );
 
 void
+RenderAnimatedModel(
+	Renderable *renderable,
+	void       *render_data, 
+	Vector3     position,
+	Camera3D   *camera
+);
+
+void
 testRenderableBoxCallback(
 	Renderable *renderable,
 	void       *render_data, 

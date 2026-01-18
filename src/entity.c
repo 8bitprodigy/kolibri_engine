@@ -51,7 +51,7 @@ Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
 	}
 	Entity *entity = NODE_TO_ENTITY(node);
 	Engine *engine = scene->engine;
-
+	*entity           = (Entity){0}; /* Clear data first */
 	*entity           = *template;
 	entity->user_data =  NULL;
 	

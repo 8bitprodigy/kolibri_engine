@@ -79,6 +79,81 @@ RenderModel(
 }
 
 void
+RenderAnimatedModel(
+	Renderable *renderable,
+	void       *render_data, 
+	Vector3     position,
+	Camera3D    *camera
+)
+{
+    (void)camera;
+	AnimatedModel *anim_model = (AnimatedModel*)renderable->data;
+	Entity        *entity     = (Entity*)render_data;
+	
+	if (!anim_model) {
+		DBG_OUT("anim_model is NULL!");
+		return;
+	}
+	DBG_OUT("Model bone count: %d", anim_model->model.boneCount);
+	DBG_OUT("Model mesh count: %d", anim_model->model.meshCount);
+	
+	Vector3          
+		    pos               = Vector3Add(position, entity->renderable_offset),
+		    scale             = entity->scale;
+	Matrix  matrix            = QuaternionToMatrix(entity->orientation);
+	
+	if (
+		entity->current_anim < 0 
+		|| entity->current_anim >= anim_model->anim_count
+	) {
+		DBG_OUT(
+				"Invalid anim: %d (max %d)", 
+				entity->current_anim, 
+				anim_model->anim_count
+			);
+		/* Just draw without animation */
+		goto DRAW_ONLY;
+	}
+	if (
+		0 <= entity->current_anim 
+		&& anim_model->animations
+	) {
+		ModelAnimation *anim  = &anim_model->animations[entity->current_anim];
+		int             frame = entity->anim_frame % anim->frameCount;
+		if (frame < 0) frame = 0;
+		
+		DBG_OUT("Animation bone count: %d", anim->boneCount);
+		DBG_OUT("Animation frame count: %d", anim->frameCount);
+		DBG_OUT(
+				"Updating animation %d, frame %d/%d", 
+				entity->current_anim, frame, 
+				anim->frameCount
+			);
+		
+		UpdateModelAnimation(
+			anim_model->model,
+			*anim,
+			entity->anim_frame
+		);
+//*/
+	}
+	
+DRAW_ONLY:
+	rlPushMatrix();
+		rlTranslatef(pos.x, pos.y, pos.z);
+		rlMultMatrixf(MatrixToFloat(matrix));
+		rlScalef(scale.x, scale.y, scale.z);
+		
+		DrawModel(
+				anim_model->model,
+				V3_ZERO, 
+				1.0f, 
+				WHITE
+			);
+	rlPopMatrix();
+}
+
+void
 testRenderableBoxCallback(
 	Renderable *renderable,
 	void       *render_data, 

@@ -114,6 +114,24 @@ typedef enum
 }
 Enemies;
 
+typedef enum
+{
+	ENEMY_ANIM_IDLE,
+	ENEMY_ANIM_MELEE,
+	ENEMY_ANIM_PAIN,
+	ENEMY_ANIM_SHOOT,
+	ENEMY_ANIM_WALK
+}
+EnemyAnims;
+
+typedef struct
+{
+	Model           model;
+	ModelAnimation *animations;
+	unsigned        anim_count;
+}
+AnimatedModel;
+
 
 /* 
 	game.c

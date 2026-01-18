@@ -24,7 +24,8 @@ void enemy_ai_idle(        Entity *self, void *userdata);
 void enemy_ai_run(         Entity *self, void *userdata);
 void enemy_ai_chase(       Entity *self, void *userdata);
 void enemy_ai_ranged_run(  Entity *self, void *userdata);
-void enemy_ai_ranged_shoot(Entity *self, void *userdata);
+void enemy_ai_melee(       Entity *self, void *userdata);
+void enemy_ai_shoot(       Entity *self, void *userdata);
 void enemy_ai_pain(        Entity *self, void *userdata);
 void enemy_ai_dead(        Entity *self, void *userdata);
 
@@ -113,6 +114,19 @@ enemyRender(Entity *self, float delta)
 		V3_ZERO,
 		tick_elapsed_val
 	);
+
+	AnimatedModel *anim_model = (AnimatedModel*)self->renderables[0]->data;
+
+	if (0 <= self->current_anim && anim_model->animations) {
+		ModelAnimation *anim = &anim_model->animations[self->current_anim];
+
+		float
+			anim_time = Entity_getAge(self),
+			fps       = 25.0f;
+		int total_frames = (int)(anim_time * fps);
+
+		self->anim_frame = total_frames % anim->frameCount;
+	}
 }
 
 void 
@@ -369,6 +383,11 @@ enemy_ai_idle(Entity *self, void *userdata)
 	EnemyData *data = (EnemyData*)&self->local_data;
 	EnemyInfo *info = (EnemyInfo*)self->user_data;
 
+	if (self->current_anim != ENEMY_ANIM_IDLE) {
+		self->current_anim = ENEMY_ANIM_IDLE;
+		self->anim_frame   = 0;
+	}
+
 	self->velocity.x = self->velocity.z = 0.0f;
 	DBG_OUT("enemy_ai_idle() entered.");
 
@@ -394,6 +413,7 @@ enemy_ai_idle(Entity *self, void *userdata)
 			data->target = NULL;
 		}
 	}
+	Thinker_set(&data->thinker, enemy_ai_idle, 0.5f, NULL);
 }
 
 void
@@ -403,6 +423,10 @@ enemy_ai_run(Entity *self, void *userdata)
 	EnemyInfo *info   = (EnemyInfo*)self->user_data;
 
 	DBG_OUT("enemy_ai_run() entered.");
+	if (self->current_anim != ENEMY_ANIM_WALK) {
+		self->current_anim = ENEMY_ANIM_WALK;
+		self->anim_frame   = 0;
+	}
 	
 	/* Target lost */
 	if (
@@ -430,6 +454,10 @@ enemy_ai_ranged_run(Entity *self, void *userdata)
 	EnemyInfo *info   = (EnemyInfo*)self->user_data;
 	
 	DBG_OUT("enemy_ai_ranged_run() entered.");
+	if (self->current_anim != ENEMY_ANIM_IDLE) {
+		self->current_anim = ENEMY_ANIM_IDLE;
+		self->anim_frame   = 0;
+	}
 	
 	if (
 		!data->target 
@@ -449,7 +477,7 @@ enemy_ai_ranged_run(Entity *self, void *userdata)
 		DBG_OUT("\tgoing to shoot...");
 		self->velocity.x = self->velocity.z = 0.0f;
 		data->next_attack_time = Entity_getAge(self);
-		Thinker_set(&data->thinker, enemy_ai_ranged_shoot, 0.0f, NULL);
+		Thinker_set(&data->thinker, enemy_ai_shoot, 0.0f, NULL);
 		return;
 	}
 	
@@ -459,12 +487,16 @@ enemy_ai_ranged_run(Entity *self, void *userdata)
 }
 
 void
-enemy_ai_ranged_shoot(Entity *self, void *userdata)
+enemy_ai_melee(Entity *self, void *userdata)
 {
 	EnemyData *data   = (EnemyData*)&self->local_data;
 	EnemyInfo *info   = (EnemyInfo*)self->user_data;
 	
-	DBG_OUT("enemy_ai_ranged_shoot() entered.");
+	DBG_OUT("enemy_ai_melee() entered.");
+	if (self->current_anim != ENEMY_ANIM_MELEE) {
+		self->current_anim = ENEMY_ANIM_MELEE;
+		self->anim_frame   = 0;
+	}
 	
 	if (
 		!data->target 
@@ -484,10 +516,57 @@ enemy_ai_ranged_shoot(Entity *self, void *userdata)
 	DBG_OUT("\tturning toward target target.");
 
 	/* Melee if they get too close */
-	if (info->melee_range > 0.0f && dist < info->melee_range) {
+	if (0.0f < info->melee_range && dist < info->melee_range) {
 		DBG_OUT("\tgoing to melee...");
 		Enemy_melee(self);
-		Thinker_set(&data->thinker, enemy_ai_ranged_shoot, 0.5f, NULL);
+		Thinker_set(&data->thinker, enemy_ai_melee, 0.5f, NULL);
+		return;
+	}
+
+	/* Shoot if in range and cooldown is up */
+	if (dist < info->projectile_range && game_time >= data->next_attack_time) {
+		DBG_OUT("\meleeing!");
+		//Enemy_shoot(self);
+		data->next_attack_time = game_time + 0.5f + (rand() % 100) * 0.01f;
+	}
+	
+	Thinker_set(&data->thinker, enemy_ai_shoot, 0.5f, NULL);
+}
+
+void
+enemy_ai_shoot(Entity *self, void *userdata)
+{
+	EnemyData *data   = (EnemyData*)&self->local_data;
+	EnemyInfo *info   = (EnemyInfo*)self->user_data;
+	
+	DBG_OUT("enemy_ai_shoot() entered.");
+	if (self->current_anim != ENEMY_ANIM_SHOOT) {
+		self->current_anim = ENEMY_ANIM_SHOOT;
+		self->anim_frame   = 0;
+	}
+	
+	if (
+		!data->target 
+		|| !data->target->active 
+		|| !Enemy_canSeeTarget(self)
+	) {
+		DBG_OUT("\tlost the target.");
+		Thinker_set(&data->thinker, enemy_ai_idle, 0.0f, NULL);
+		return;
+	}
+
+	float
+		game_time = Entity_getAge(self),
+		dist      = Enemy_distanceToTarget(self);
+
+	Enemy_faceTarget(self);
+	DBG_OUT("\tturning toward target target.");
+
+	/* Melee if they get too close */
+	if (0.0f < info->melee_range && dist < info->melee_range) {
+		DBG_OUT("\tgoing to melee...");
+		Enemy_melee(self);
+		Thinker_set(&data->thinker, enemy_ai_melee, 0.5f, NULL);
 		return;
 	}
 
@@ -502,11 +581,11 @@ enemy_ai_ranged_shoot(Entity *self, void *userdata)
 	if (data->next_attack_time + 2.0f <= game_time) {
 		DBG_OUT("\tgoing to run...");
 		Enemy_pickRunDestination(self);
-		Thinker_set(&data->thinker, enemy_ai_ranged_run, 0.0f, NULL);
+		Thinker_set(&data->thinker, enemy_ai_ranged_run, 0.5f, NULL);
 		return;
 	}
 	
-	Thinker_set(&data->thinker, enemy_ai_ranged_shoot, 0.1f, NULL);
+	Thinker_set(&data->thinker, enemy_ai_shoot, 0.5f, NULL);
 }
 
 void
@@ -516,6 +595,10 @@ enemy_ai_chase(Entity *self, void *userdata)
 	EnemyInfo *info   = (EnemyInfo*)self->user_data;
 	
 	DBG_OUT("enemy_ai_chase() entered.");
+	if (self->current_anim != ENEMY_ANIM_WALK) {
+		self->current_anim = ENEMY_ANIM_WALK;
+		self->anim_frame   = 0;
+	}
 	
 	if (
 		!data->target 
@@ -546,6 +629,11 @@ void
 enemy_ai_pain(Entity *self, void *userdata)
 {
 	EnemyData *data = (EnemyData*)&self->local_data;
+	
+	if (self->current_anim != ENEMY_ANIM_PAIN) {
+		self->current_anim = ENEMY_ANIM_PAIN;
+		self->anim_frame   = 0;
+	}
 
 	/* Flinch */
 	self->velocity.x = self->velocity.z = 0.0f;
@@ -590,10 +678,12 @@ Enemy_new(
 	}
 
 	EnemyData *data  = &enemy->local_data;
-	enemy->user_data = info;
-	enemy->position  = position;
-	enemy->active    = true;
-	enemy->visible   = true;
+	enemy->user_data    = info;
+	enemy->position     = position;
+	enemy->active       = true;
+	enemy->visible      = true;
+	enemy->current_anim = -1;  // Not initialized yet
+	enemy->anim_frame = 0;
 
 	enemy->lod_count = info->num_renderables;
 	for (int i = 0; i < info->num_renderables; i++) {
@@ -605,8 +695,8 @@ Enemy_new(
 	data->prev_pos    = position;
 	data->prev_offset = V3_ZERO;
 	data->target      = NULL;
-
-	Thinker_repeat(&data->thinker, enemy_ai_idle, 0.5f, NULL);
+	
+	Thinker_set(&data->thinker, enemy_ai_idle, 0.5f, NULL);
 
 	return enemy;
 }
