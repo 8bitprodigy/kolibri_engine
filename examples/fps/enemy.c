@@ -85,7 +85,7 @@ enemySetup(Entity *self)
 void 
 enemyUpdate(Entity *self, float delta)
 {
-	EnemyData *data = &self->local_data;
+	EnemyData *data = (EnemyData*)&self->local_data;
 	Vector3    
 		*velocity  = &self->velocity,
 		 vel       = *velocity;
@@ -105,7 +105,7 @@ enemyUpdate(Entity *self, float delta)
 void 
 enemyRender(Entity *self, float delta)
 {
-	EnemyData *data   = &self->local_data;
+	EnemyData *data   = (EnemyData*)&self->local_data;
 	Engine    *engine = Entity_getEngine(self);
 	
 	float tick_elapsed_val = Engine_getTickElapsed(engine);
@@ -141,8 +141,8 @@ enemyFree(Entity *self)
 Entity *
 Enemy_findTarget(Entity *self, float range)
 {
-	Scene *scene   = Entity_getScene(self);
-	BoundingBox search_box = {
+	Scene       *scene      = Entity_getScene(self);
+	BoundingBox  search_box = {
 			.min = Vector3SubtractValue(self->position, range),
 			.max = Vector3AddValue(     self->position, range)
 		};
@@ -677,7 +677,7 @@ Enemy_new(
 		return NULL;
 	}
 
-	EnemyData *data  = &enemy->local_data;
+	EnemyData *data  = (EnemyData*)&enemy->local_data;
 	enemy->user_data    = info;
 	enemy->position     = position;
 	enemy->active       = true;

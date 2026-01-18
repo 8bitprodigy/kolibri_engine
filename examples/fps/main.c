@@ -13,8 +13,10 @@
 	#include <pspuser.h>
 	#include <pspdebug.h>
 	#include <pspdisplay.h>
-	PSP_MODULE_INFO("TEST", 0, 1, 0);
+	PSP_MODULE_INFO("fps_test", 0, 1, 1);
 	PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER | PSP_THREAD_ATTR_VFPU);
+	PSP_MAIN_THREAD_STACK_SIZE_KB(256);
+	PSP_HEAP_SIZE_KB(20480);
 #endif
 #ifdef __Dreamcast__
 	#if defined(IDE_SUPPORT) || defined(SDCARD_SUPPORT)

@@ -1,58 +1,79 @@
-PROJECTNAME = kolibritest
+PROJECTNAME = fps_test
 PLATFORM    = psp
 
-SRCDIR     = src
-GAMESRCDIR = gamesrc
-OBJDIR     = obj/$(PLATFORM)
+SRCDIR      = ../../src
+EXAMPLESDIR = ../
+GAMESRCDIR  = .
+OBJDIR      = obj/$(PLATFORM)
 
-TARGET = $(PROJECTNAME)
+TARGET = $(PROJECTNAME).$(PLATFORM)
 EXTRA_TARGETS = EBOOT.PBP
 PSP_EBOOT_TITLE = Kolibri Engine Test
 
 # Source files
 ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
+EXAMPLES_SRC = $(wildcard $(EXAMPLESDIR)/*.c)
 GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
 
 # Don't separate engine/game objects - let PSP SDK handle it
-OBJS = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o) \
-       $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/%.o)
+ENGINE_OBJS   = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
+EXAMPLES_OBJS = $(EXAMPLES_SRC:$(EXAMPLESDIR)/%.c=$(OBJDIR)/examples/%.o)
+GAME_OBJS     = $(GAME_SRC:$(GAMESRCDIR)/%.c=$(OBJDIR)/game/%.o)
+
+OBJS = $(ENGINE_OBJS) $(EXAMPLES_OBJS) $(GAME_OBJS)
 
 # PSP SDK paths
 PSPSDK = $(shell psp-config --pspsdk-path)
 PSPDIR = $(shell psp-config --psp-prefix)
 
+# EBOOT.PBP parameters
+PSP_EBOOT_TITLE = Kolibri Engine FPS Test
+PSP_EBOOT_ICON = NULL
+PSP_EBOOT_PIC1 = NULL
+
 # Compiler and flags
-INCDIR = include $(PSPDIR)/include/raylib $(PSPDIR)/include/raylib
-CFLAGS = -G0 -Wall -O0 -g3 -D__PSP__=1 -DSCREEN_HEIGHT=272 -DSCREEN_WIDTH=480 
+INCDIR = ../../include $(PSPDIR)/include/raylib $(PSPDIR)/include/raylib
+CFLAGS = -D_PSP_FW_VERSION=661 -G0 -Wall -O0 -g3 -D__PSP__=1 -DSCREEN_HEIGHT=272 -DSCREEN_WIDTH=480 
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
 # Libraries
-LIBS = -lraylib -lpspvfpu -lpspaudio -lm \
-       -lpspgum_vfpu -lpspvram -lpspgu \
-       -lpspdisplay -lpspge -lpspctrl \
-       -lpspnet_inet -lpsppower -lpsputility \
-       -lpspuser -lpspkernel
+LIBS = -lraylib -lpng -lz -lglut -lGLU -lGL -lpspvfpu -lpspaudio \
+       -lm -lpspgum_vfpu -lpspvram -lpspgu -lpspge -lpspdisplay \
+       -lpspctrl -lpspnet_inet -lpsppower -lpspnet -lpspnet_apctl \
+       -lpspdebug -lpsputility -lpspuser -lpspkernel
 
 # Build system
-BUILD_PRX = 1
+#BUILD_PRX = 1
 
 # Include PSP build rules FIRST
 include $(PSPSDK)/lib/build.mak
 
-# Add custom rules for compiling from src/ and gamesrc/
-$(OBJDIR)/%.o: $(SRCDIR)/%.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCDIR:%=-I%) -c $< -o $@
-
-$(OBJDIR)/%.o: $(GAMESRCDIR)/%.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCDIR:%=-I%) -c $< -o $@
-
 .PHONY: prepare clean-all debug
 
+rm-elf:
+	rm -f $(TARGET)
+
 prepare:
-	@mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR)/engine
+	mkdir -p $(OBJDIR)/examples
+	mkdir -p $(OBJDIR)/game
+	
+# Add custom rules for compiling from different directories
+$(OBJDIR)/engine/%.o: $(SRCDIR)/%.c | $(OBJDIR)/engine
+	$(CC) $(CFLAGS) $(INCDIR:%=-I%) -c $< -o $@
+
+$(OBJDIR)/examples/%.o: $(EXAMPLESDIR)/%.c | $(OBJDIR)/examples
+	$(CC) $(CFLAGS) $(INCDIR:%=-I%) -c $< -o $@
+
+$(OBJDIR)/game/%.o: $(GAMESRCDIR)/%.c | $(OBJDIR)/game
+	$(CC) $(CFLAGS) $(INCDIR:%=-I%) -c $< -o $@
+
+# Directory creation rules
+$(OBJDIR)/engine $(OBJDIR)/examples $(OBJDIR)/game:
+	mkdir -p $@
+
 
 clean-all:
 	rm -rf obj
