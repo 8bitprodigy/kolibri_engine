@@ -4,6 +4,7 @@
 #include <raymath.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "common.h"
@@ -687,7 +688,11 @@ getTerrainHeight(Heightmap *map, Vector3 position)
 	size_t          grid_size             = map->cells_wide;
 	float         (*heightmap)[grid_size] = (float(*)[grid_size])map->heightmap;
 
-	struct TerrainSample sample = getTerrainSample(map->world_size, grid_size, position);
+	struct TerrainSample sample = getTerrainSample(
+			map->world_size, 
+			grid_size, 
+			position
+		);
 	
 	float
 		lower = Lerp(heightmap[sample.z0][sample.x0], heightmap[sample.z0][sample.x1], sample.x_frac),
@@ -721,6 +726,8 @@ genHeightmapDiamondSquare(
 )
 {
 	float *heightmap = DynamicArray(float, cells_wide * cells_wide);
+	
+	memset(heightmap, 0, sizeof(float) * cells_wide * cells_wide);  
 	
 	diamondSquareSeeded(heightmap, cells_wide, roughness,decay, seed);
 
@@ -871,8 +878,8 @@ generateChunks(Heightmap *map)
 			for (size_t z = 0; z <= data->chunk_cells; z++) {
 				for (size_t x = 0; x <= data->chunk_cells; x++) {
 					
-					hm_x = start_x + x % map->cells_wide;
-					hm_z = start_z + z % map->cells_wide;
+					hm_x = (start_x + x) % map->cells_wide;
+					hm_z = (start_z + z) % map->cells_wide;
 						
 					float h  = heightmap[hm_z][hm_x] * data->height_scale + data->offset;
 					

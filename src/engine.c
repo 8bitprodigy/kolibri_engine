@@ -3,6 +3,22 @@
 #include "_renderer_.h"
 
 
+#ifdef __PSP__
+	#include <psprtc.h>
+
+static u64 psp_time_start = 0;
+
+double GetTime_PSP(void) {
+    u64 tick;
+    sceRtcGetCurrentTick(&tick);
+    if (psp_time_start == 0) psp_time_start = tick;
+    return (double)(tick - psp_time_start) / 1000000.0; // Convert to seconds
+}
+
+	#define GetTime GetTime_PSP
+#endif
+
+
 #define foreach_Head( head_ptr ) \
 	for (unsigned i = 0; i < self->head_count && ((head_ptr) = &self->heads[i], 1); i++)
 	
@@ -110,7 +126,7 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 	engine->tick_elapsed      = 1.0f;
 	engine->tick_rate         = tick_rate;
 	
-	engine->last_tick_time    = GetTime();
+	engine->last_tick_time    = current_time;
 	engine->current_time      = engine->last_tick_time;
 	engine->start_time        = 0.0f;
 	engine->stop_time         = 0.0f;
@@ -229,9 +245,12 @@ void
 Engine_run(Engine *self)
 {
 	const EngineVTable *vtable = self->vtable;
-	self->request_exit = false;
-	self->start_time   = GetTime();
-	self->last_tick_time = 0;
+	self->request_exit    = false;
+	self->start_time      = GetTime();
+	DBG_OUT("Inside Engine_run, start_time set to: %f", self->start_time);
+	self->current_time    = 0.0f;
+	self->last_tick_time  = self->tick_length;
+	self->last_frame_time = self->tick_length;
 	
 	SetExitKey(KEY_NULL);
 	
@@ -291,10 +310,22 @@ Engine_update(Engine *self)
 	const EngineVTable *vtable = self->vtable;
 	
 	if (vtable && vtable->Update) vtable->Update(self, self->tick_length);
-	
-	self->current_time = GetTime() - self->start_time - self->time_spent_paused;
+
+	double raw_time = GetTime();
+	self->current_time = raw_time - self->start_time - self->time_spent_paused;
 	float frame_delta = self->current_time - self->last_frame_time;
 	self->last_frame_time = self->current_time;
+	self->delta           = frame_delta;
+	
+	DBG_OUT(
+			"Raw GetTime: %f, Engine time: %f, Last tick: %f, Delta: %f, Tick check: %f >= %f", 
+			raw_time, 
+			self->current_time, 
+			self->last_tick_time, 
+			frame_delta,
+			self->current_time - self->last_tick_time,  // The actual value being compared
+			self->tick_length                            // What it needs to exceed
+		);
 	
 	Head__updateAll(self->heads, frame_delta);
 	
@@ -302,7 +333,7 @@ Engine_update(Engine *self)
 
 	
 	/* Run ticks for elapsed time */
-	while (self->current_time - self->last_tick_time >= self->tick_length) {
+	while (self->tick_length <= self->current_time - self->last_tick_time) {
 		
 		//DBG_OUT("Engine Tick #%i", self->tick_num);
 		Scene_update(self->scene, self->tick_length);

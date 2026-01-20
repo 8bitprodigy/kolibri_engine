@@ -33,18 +33,29 @@ PSP_EBOOT_PIC1 = NULL
 
 # Compiler and flags
 INCDIR = ../../include $(PSPDIR)/include/raylib $(PSPDIR)/include/raylib
-CFLAGS = -D_PSP_FW_VERSION=661 -G0 -Wall -O0 -g3 -D__PSP__=1 -DSCREEN_HEIGHT=272 -DSCREEN_WIDTH=480 
-CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
-ASFLAGS = $(CFLAGS)
+CFLAGS    = -G0 -Wall -O0 -g3 -D__PSP__=1 -DSCREEN_HEIGHT=272 -DSCREEN_WIDTH=480
+CFLAGS   += -D_PSP_FW_VERSION=661
+CFLAGS   += -DPATH_PREFIX='"./"'
+CFLAGS   += -DDEBUG
+CFLAGS   += -DDEFAULT_MAX_RENDER_DISTANCE=256.0f
+CFLAGS   += -DDEFAULT_TICK_RATE=35
+CFLAGS   += -DMAX_NUM_ENTITIES=1024
+CFLAGS   += -DSPATIAL_HASH_SIZE=1031
+CFLAGS   += -DENTRY_POOL_SIZE=2048
+CFLAGS   += -DVIS_QUERY_SIZE=1024
+CFLAGS   += -DSKY_PATH='"resources/sky/SBS_SKY_panorama_half_%s.png"'
+CFLAGS   += -DNO_MOUSE -DON_CONSOLE -DENGINE_SINGLE_HEAD_ONLY
+CXXFLAGS  = $(CFLAGS) -fno-exceptions -fno-rtti
+ASFLAGS   = $(CFLAGS)
 
 # Libraries
 LIBS = -lraylib -lpng -lz -lglut -lGLU -lGL -lpspvfpu -lpspaudio \
        -lm -lpspgum_vfpu -lpspvram -lpspgu -lpspge -lpspdisplay \
        -lpspctrl -lpspnet_inet -lpsppower -lpspnet -lpspnet_apctl \
-       -lpspdebug -lpsputility -lpspuser -lpspkernel
+       -lpspdebug -lpsputility -lpspuser 
 
 # Build system
-#BUILD_PRX = 1
+BUILD_PRX = 1
 
 # Include PSP build rules FIRST
 include $(PSPSDK)/lib/build.mak

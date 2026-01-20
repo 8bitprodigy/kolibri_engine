@@ -58,8 +58,9 @@ engineRun(Engine *engine)
 void
 engineRender(Engine *engine)
 {
-	(void)engine;
-	DrawFPS(10, 10);
+	float delta = Engine_getDeltaTime(engine);
+	float fps = (delta > 0.0f) ? (1.0f / delta) : 0.0f;
+	DrawText(TextFormat("FPS: %.1f", fps), 10, 10, 20, LIME);
 }
 
 void

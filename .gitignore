@@ -64,3 +64,8 @@ fps_example
 *.7z
 *.tar
 *.tar.gz
+
+# PSP-related files
+EBOOT.PBP
+PARAM.SFO
+*.prx

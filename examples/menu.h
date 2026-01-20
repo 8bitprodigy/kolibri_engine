@@ -75,16 +75,29 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 	else GuiSetState(STATE_NORMAL);
 
 
-#define Menu( label_str, item_width, item_height, padding, ... ) \
-	(Menu){ \
-		(label_str), \
-		(item_width), \
-		(item_height), \
-		(padding), \
-		-1, \
-		sizeof((MenuItem[]){__VA_ARGS__}) / sizeof(MenuItem), \
-		(MenuItem[]){__VA_ARGS__} \
-	}
+#ifdef ON_CONSOLE
+	#define Menu( label_str, item_width, item_height, padding, ... ) \
+		(Menu){ \
+			(label_str), \
+			(item_width), \
+			(item_height), \
+			(padding), \
+			0, \
+			sizeof((MenuItem[]){__VA_ARGS__}) / sizeof(MenuItem), \
+			(MenuItem[]){__VA_ARGS__} \
+		}
+#else
+	#define Menu( label_str, item_width, item_height, padding, ... ) \
+		(Menu){ \
+			(label_str), \
+			(item_width), \
+			(item_height), \
+			(padding), \
+			-1, \
+			sizeof((MenuItem[]){__VA_ARGS__}) / sizeof(MenuItem), \
+			(MenuItem[]){__VA_ARGS__} \
+		}
+#endif
 
 #define MenuLabel( label_str ) \
 	{ MENU_LABEL, {(label_str)} }

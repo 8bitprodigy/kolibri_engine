@@ -14,7 +14,7 @@
 	#include <pspdebug.h>
 	#include <pspdisplay.h>
 	PSP_MODULE_INFO("fps_test", 0, 1, 1);
-	PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER | PSP_THREAD_ATTR_VFPU);
+	PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 	PSP_MAIN_THREAD_STACK_SIZE_KB(256);
 	PSP_HEAP_SIZE_KB(20480);
 #endif
@@ -102,9 +102,10 @@ runEngine(void *data, void *value)
 	player = Entity_new(&playerTemplate, scene, 0);
 	PlayerData *player_data = player->user_data;
 	player_data->head       = head;
+	float height = HeightmapScene_getHeight(scene, V3_ZERO);
 	player->position        = (Vector3){
 			0.0f, 
-			HeightmapScene_getHeight(scene, V3_ZERO), 
+			height + 0.01f,
 			0.0f
 		};
 	player_data->prev_position = player->position;
@@ -115,20 +116,12 @@ runEngine(void *data, void *value)
 	head_data->target_data = player->user_data;
 	head_data->eye_height  = 1.75f;
 
-	Entity *grunt = Enemy_new(
+	Vector3 enemy_pos  = (Vector3){32.0f, 0.0f, -32.0f};
+	float enemy_height = HeightmapScene_getHeight(scene, enemy_pos) + 0.01f;
+	enemy_pos.y = enemy_height;
+	Entity *grunt      = Enemy_new(
 			&enemy_Infos[ENEMY_GRUNT], 
-			(Vector3){
-					32.0f,
-					HeightmapScene_getHeight(
-							scene, 
-							(Vector3){
-									32.0f, 
-									0.0f, 
-									-32.0f
-								}
-						),
-					-32.0f
-				},
+			enemy_pos,
 			scene
 		);
 	/*
@@ -154,8 +147,11 @@ runEngine(void *data, void *value)
 		}
 	}
 	// */
-	EndDrawing();
-	Engine_run(engine);
+	DBG_OUT("Enemy entity created");
+
+	DBG_OUT("About to call Engine_run()");
+		Engine_run(engine);
+	DBG_OUT("Engine_run() completed");
 }
 
 void 
@@ -198,11 +194,11 @@ void
 setupPathPrefix()
 {
 	ChangeDirectory(PATH_PREFIX);
-
+	
 /*
 	Thanks Darc, for the help with this.
 */
-#ifdef __DREAMCAST__
+#if defined(__DREAMCAST__)
 	DBG_OUT("Checking for a valid drive...");
 	
 	if (DirectoryExists("/pc/resources")) {
@@ -273,15 +269,16 @@ main(int argc, char **argv)
 #ifndef ON_CONSOLE
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
 #endif /* ON_CONSOLE */
-	setupPathPrefix();
 	
 	InitWindow(screen_width, screen_height, WINDOW_TITLE);
+	
+	setupPathPrefix();
 	
 	HandleMouse();
 	
 	Game_mediaInit();
 
-#ifndef ON_CONSOLE
+#if !defined(ON_CONSOLE) || defined(__PSP__)
 	mainMenu = Menu( "Main Menu",
 			MENU_WIDTH,
 			MENU_ITEM_HEIGHT,

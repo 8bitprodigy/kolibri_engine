@@ -496,6 +496,24 @@ Collision_checkContinuousAABB(Entity *a, Entity *b, Vector3 movement)
     };
     
     Ray ray = { from, Vector3Normalize(movement) };
+    DBG_OUT(
+			"Ray origin: (%f, %f, %f), dir: (%f, %f, %f)", 
+			ray.position.x, 
+			ray.position.y, 
+			ray.position.z,
+			ray.direction.x, 
+			ray.direction.y, 
+			ray.direction.z
+		);
+	DBG_OUT(
+			"Box min: (%f, %f, %f), max: (%f, %f, %f)",
+			expanded_box.min.x, 
+			expanded_box.min.y, 
+			expanded_box.min.z,
+			expanded_box.max.x, 
+			expanded_box.max.y, 
+			expanded_box.max.z
+		);
     RayCollision collision = GetRayCollisionBox(ray, expanded_box);
     
     /* Check if collision is within our movement distance and in forward direction */
