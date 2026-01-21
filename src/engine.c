@@ -6,13 +6,22 @@
 #ifdef __PSP__
 	#include <psprtc.h>
 
-static u64 psp_time_start = 0;
+static u64 psp_time_start       = 0;
+static int psp_time_initialized = 0;
 
-double GetTime_PSP(void) {
+double 
+GetTime_PSP(void) 
+{
     u64 tick;
     sceRtcGetCurrentTick(&tick);
-    if (psp_time_start == 0) psp_time_start = tick;
-    return (double)(tick - psp_time_start) / 1000000.0; // Convert to seconds
+    
+    if (!psp_time_initialized) {
+        psp_time_start = tick;
+        psp_time_initialized = 1;
+        return 0.0;  // Explicitly return 0 on first call
+    }
+    
+    return (double)(tick - psp_time_start) / 1000000.0;
 }
 
 	#define GetTime GetTime_PSP
@@ -114,12 +123,32 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 	}
 	double current_time = GetTime();
 
+	*engine                   = (Engine){0};
+	DBG_OUT(
+			"After zero-init, tick_num = %llu", 
+			(unsigned long long)engine->tick_num
+		);
+
 	engine->heads             = NULL;
 	engine->scene             = NULL;
+	DBG_OUT(
+			"Before Renderer__new, tick_num = %llu", 
+			(unsigned long long)engine->tick_num
+		);
 	engine->renderer          = Renderer__new(engine);
+	DBG_OUT(
+			"After Renderer__new, tick_num = %llu", 
+			(unsigned long long)engine->tick_num
+		);
+
 	
 	engine->frame_num         = 0;
 	engine->tick_num          = 0;
+	DBG_OUT(
+			"After manual tick_num = 0, tick_num = %llu", 
+			(unsigned long long)engine->tick_num
+		);
+
 	engine->head_count        = 0;
 	engine->delta             = 0.0f;
 	engine->tick_length       = 1.0f / tick_rate;
@@ -140,6 +169,11 @@ Engine_new(EngineVTable *vtable, int tick_rate)
 
 	if (vtable && vtable->Setup) vtable->Setup(engine);
 	
+	DBG_OUT(
+			"End of Engine_new, tick_num = %llu", 
+			(unsigned long long)engine->tick_num
+		);
+
 	return engine;
 }
 
@@ -244,6 +278,11 @@ Engine_getVTable(Engine *engine)
 void
 Engine_run(Engine *self)
 {
+	DBG_OUT(
+			"Start of Engine_run, tick_num = %llu", 
+			(unsigned long long)self->tick_num
+		);
+	
 	const EngineVTable *vtable = self->vtable;
 	self->request_exit    = false;
 	self->start_time      = GetTime();
@@ -252,13 +291,30 @@ Engine_run(Engine *self)
 	self->last_tick_time  = self->tick_length;
 	self->last_frame_time = self->tick_length;
 	
+	DBG_OUT(
+			"After time init, tick_num = %llu", 
+			(unsigned long long)self->tick_num
+		);
+	
 	SetExitKey(KEY_NULL);
 	
 	if (vtable && vtable->Run) vtable->Run(self);
 	
+	DBG_OUT(
+			"After vtable->Run, tick_num = %llu", 
+			(unsigned long long)self->tick_num
+		);
+	
 	if (self->head_count) {
 		while(!self->request_exit) {
+			DBG_OUT(
+					"=== FRAME #%llu START ===", 
+					(unsigned long long)self->frame_num
+				);
+			
+#ifndef __PSP__
 			self->request_exit = WindowShouldClose();
+#endif /* !__PSP__ */
 
 			/* Handle screen resolution changes */
 			Vector2i new_screen_size = (Vector2i){
@@ -274,17 +330,44 @@ Engine_run(Engine *self)
 				Engine_resize(self, new_screen_size.w, new_screen_size.h);
 			
 			self->screen_size = new_screen_size;
+			DBG_OUT("Before update");
+			DBG_OUT(
+					"Pre-render state: tick_num=%llu, last_tick_time=%f, frame_num=%llu", 
+					(unsigned long long)self->tick_num,
+					self->last_tick_time,
+					(unsigned long long)self->frame_num
+				);
 			Engine_update(self);
 			/* For extrapolation: how far into the next tick are we? */
 			self->tick_elapsed = (
 					self->current_time - self->last_tick_time
 				) / self->tick_length;
+			DBG_OUT("Render: starting");
 			BeginDrawing();
+				DBG_OUT("Render: began drawing");
 				Engine_render(self);
-			EndDrawing();
+			DBG_OUT("Render: scene done");
+				rlDrawRenderBatchActive(); 
+			DBG_OUT("About to call EndDrawing()");
+			DBG_OUT(
+					"Current frame_num: %llu, tick_num: %llu", 
+					(unsigned long long)self->frame_num, 
+					(unsigned long long)self->tick_num
+				);
+				EndDrawing();
+			DBG_OUT("EndDrawing() completed successfully");
+			DBG_OUT("Render: ended drawing");
 
+			DBG_OUT(
+					"About to increment frame_num from %llu", 
+					(unsigned long long)self->frame_num
+				);
 			self->frame_num++;
+			DBG_OUT("frame_num incremented to %llu", (unsigned long long)self->frame_num);
+			DBG_OUT("=== FRAME END ===");
+			DBG_OUT("About to check loop condition, request_exit = %d", self->request_exit);
 		}
+		DBG_OUT("Exited main loop");
 	}
 	else { /* For uses such as game servers */
 		while(!self->request_exit) {
@@ -327,45 +410,80 @@ Engine_update(Engine *self)
 			self->tick_length                            // What it needs to exceed
 		);
 	
+    DBG_OUT("Before head updates");
 	Head__updateAll(self->heads, frame_delta);
+	
+	DBG_OUT("After head updates, tick_num = %llu", (unsigned long long)self->tick_num);
 	
 	if (self->tick_rate <= 0) return;
 
+	DBG_OUT(
+			"Before tick loop, tick_num = %llu, condition check: %f >= %f", 
+			(unsigned long long)self->tick_num,
+			self->current_time - self->last_tick_time,
+			self->tick_length
+		);
 	
 	/* Run ticks for elapsed time */
 	while (self->tick_length <= self->current_time - self->last_tick_time) {
 		
-		//DBG_OUT("Engine Tick #%i", self->tick_num);
+		DBG_OUT("Engine Tick #%llu", (unsigned long long)self->tick_num);
+		
 		Scene_update(self->scene, self->tick_length);
+		DBG_OUT(
+				"Engine Tick #%llu - After Scene_update", 
+				(unsigned long long)self->tick_num
+			);
+    
 		if (vtable && vtable->Tick) vtable->Tick(self, self->tick_length);
+		DBG_OUT("Engine Tick #%llu - After vtable->Tick", (unsigned long long)self->tick_num);
+    
 		
 		self->last_tick_time += self->tick_length;
 		self->tick_num++;
+		DBG_OUT(
+				"Engine Tick #%llu - COMPLETED", 
+				(unsigned long long)self->tick_num
+			);
 	}
+	DBG_OUT("Exited tick loop");
 }
 
 
 void
 Engine_render(Engine *self)
 {
+	DBG_OUT("Render: Engine_render() entered.");
+
+	DBG_OUT("Render: About to render all entities");
 	EntityNode__renderAll(self->scene->entities, self->delta);
 	const EngineVTable *vtable = self->vtable;
 	ClearBackground(BLACK);
 	/* Loop through Heads */
 	/* Render to Head stage */
 	Head *current_head;
+	DBG_OUT("Render: Rendering Heads");
+	int j = 1;
 	foreach_Head(current_head) {
 		//current_head = &self->heads[i];
+		DBG_OUT("Render: Rendering Head #%i", j);
 		BeginRenderMode(current_head);
+			DBG_OUT("Render: About to preRender");
 			Head_preRender(current_head); /* Skyboxes, perhaps */
+			DBG_OUT("Render: About to BeginMode3D");
 			BeginMode3D(*Head_getCamera(current_head));
+			DBG_OUT("Render: About to render scene");
 				Renderer__render(self->renderer, current_head);
 			EndMode3D();
+			DBG_OUT("Render: Scene rendered, about to postRender");
 			Head_postRender(current_head); /* UI overlays, etc. */
+			DBG_OUT("Render: About to call EndRenderMode()");
 		EndRenderMode();	
 	}
+	DBG_OUT("Render: Rendered to all Heads");
 	/* End loop through Heads */
 	/* Final stage. If you need to render stuff over the frame, do it here */
+	DBG_OUT("Render: About to call Engine.Render()");
 	if (vtable && vtable->Render) vtable->Render(self);
 }
 

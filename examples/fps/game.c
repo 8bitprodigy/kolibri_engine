@@ -445,11 +445,11 @@ Explosion_mediaInit(void)
 			0.0f,
 			0.0f,
 			0.5f,
-			1.0f/30.0f,
+			1.0f/12.5f,
 			WHITE,
 			blood_Sprite,
 			SPRITE_ALIGN_CAMERA,
-			4, 2, 6
+			4, 1, 4
 		);
 }
 
