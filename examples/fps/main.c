@@ -119,12 +119,13 @@ runEngine(void *data, void *value)
 	Vector3 enemy_pos  = (Vector3){32.0f, 0.0f, -32.0f};
 	float enemy_height = HeightmapScene_getHeight(scene, enemy_pos) + 0.01f;
 	enemy_pos.y = enemy_height;
+	/*
 	Entity *grunt      = Enemy_new(
 			&enemy_Infos[ENEMY_GRUNT], 
 			enemy_pos,
 			scene
 		);
-	/*
+
 	Entity *ents[21][21][21];
 	int z = 0; 
  
@@ -268,7 +269,10 @@ main(int argc, char **argv)
 
 #ifndef ON_CONSOLE
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-#endif /* ON_CONSOLE */
+#endif /* !ON_CONSOLE */
+#ifdef __PSP__
+	SetConfigFlags(FLAG_VSYNC_HINT);
+#endif /* __PSP__ */
 	
 	InitWindow(screen_width, screen_height, WINDOW_TITLE);
 	
