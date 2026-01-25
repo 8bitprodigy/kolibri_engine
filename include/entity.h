@@ -138,9 +138,11 @@ bool         Entity_isOnCeiling(     Entity *entity);
 /*
     Methods
 */
-CollisionResult Entity_move(        Entity *entity, Vector3  movement);
-CollisionResult Entity_moveAndSlide(Entity *entity, Vector3  movement);
-void            Entity_render(      Entity *entity, Head    *head);
-void            Entity_teleport(    Entity *entity, Vector3  to);
+void            Entity_addToScene(     Entity *entity, Scene   *scene);
+void            Entity_removeFromScene(Entity *entity);
+CollisionResult Entity_move(           Entity *entity, Vector3  movement);
+CollisionResult Entity_moveAndSlide(   Entity *entity, Vector3  movement);
+void            Entity_render(         Entity *entity, Head    *head);
+void            Entity_teleport(       Entity *entity, Vector3  to);
 
 #endif /* ENTITY_H */

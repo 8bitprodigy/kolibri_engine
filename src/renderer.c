@@ -295,7 +295,7 @@ Renderer__render(Renderer *renderer, Head *head)
         /* Build pointer array for all wrappers */
         for (size_t i = 0; i < wrapper_count; i++) {
             RenderableWrapper *wrapper = &renderer->wrapper_pool[i];
-            DynamicArray_add((void**)&renderer->all_wrappers, &wrapper);
+            DynamicArray_add(renderer->all_wrappers, wrapper);
         }
         visible_wrappers = renderer->all_wrappers;
         visible_count    = DynamicArray_length(renderer->wrapper_pool);
@@ -325,9 +325,9 @@ Renderer__render(Renderer *renderer, Head *head)
 
         if (renderable->transparent) {
             float dist = Vector3Distance(render_pos, camera_pos);
-            DynamicArray_add((void**)&renderer->transparent_renderables, &wrapper);
-            DynamicArray_add((void**)&renderer->transparent_distances,   &dist);
-            DynamicArray_add((void**)&renderer->transparent_render_data, &render_data);  
+            DynamicArray_add(renderer->transparent_renderables, wrapper);
+            DynamicArray_add(renderer->transparent_distances,   dist);
+            DynamicArray_add(renderer->transparent_render_data, render_data);  
         }
         else if (renderable->Render) {
             renderable->Render(renderable, render_data, render_pos, camera);
@@ -422,7 +422,7 @@ Renderer_submitEntity(Renderer *renderer, Entity *entity) {
     wrapper.bounds    = entity->bounds;
     wrapper.is_entity = true;
     
-    DynamicArray_add((void**)&renderer->wrapper_pool, &wrapper);
+    DynamicArray_add(renderer->wrapper_pool, wrapper);
 }
 
 void Renderer_submitGeometry(
@@ -438,5 +438,5 @@ void Renderer_submitGeometry(
     wrapper.bounds     = bounds;
     wrapper.is_entity  = false;
     
-    DynamicArray_add((void**)&renderer->wrapper_pool, &wrapper);
+    DynamicArray_add(renderer->wrapper_pool, wrapper);
 }

@@ -39,8 +39,8 @@ Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
 {
 	if (!scene) return NULL;
 	
-	EntityNode *node = MemPoolAlloc(
-			&scene->entity_pool,
+	EntityNode *node = malloc(/*MemPoolAlloc(
+			&scene->entity_pool,*/
 			sizeof(EntityNode) 
 				+ user_data_size
 		);
@@ -167,6 +167,16 @@ Entity_isOnFloor(Entity *self)
 }
 
 
+void
+Entity_addToScene(Entity *entity, Scene *scene)
+{
+}
+
+void 
+Entity_removeFromScene(Entity *entity)
+{
+}
+
 CollisionResult
 move(Entity *self, Vector3 movement)
 {
@@ -285,7 +295,8 @@ EntityNode__free(EntityNode *self)
 	
 	Scene__removeEntity(scene, self);
 
-	MemPoolFree(&scene->entity_pool, self);
+	free(self);
+	//MemPoolFree(&scene->entity_pool, self);
 }
 
 void
@@ -313,6 +324,20 @@ EntityNode__insert(EntityNode *self, EntityNode *to)
 	
 	self->next = to;
 	self->prev = last;
+}
+
+void
+EntityNode__remove(EntityNode *self)
+{
+	EntityNode 
+		*prev = self->prev,
+		*next = self->next;
+
+	next->prev = prev;
+	prev->next = next;
+
+	self->prev = self;
+	self->next = self;
 }
 
 void

@@ -52,7 +52,8 @@ void EntityNode__freeAll(  EntityNode *entity_node);
 
 
 /* Methods */
-void EntityNode__insert(   EntityNode *self,         EntityNode *to);
+void EntityNode__insert(   EntityNode *self,        EntityNode *to);
+void EntityNode__remove(   EntityNode *self);
 void EntityNode__updateAll(EntityNode *entity_node, float delta);
 void EntityNode__renderAll(EntityNode *entity_node, float delta);
 

@@ -4,7 +4,6 @@
 
 #include "_collision_.h"
 #include "_entity_.h"
-#include "../examples/rmem.h"
 #include "scene.h"
 
 
@@ -15,14 +14,13 @@ Scene
         *prev,
         *next;
     
-    Engine         *engine;
-    MemPool         entity_pool;
-	EntityNode     *entities;
-	CollisionScene *collision_scene;
-    SceneVTable    *vtable;
-    void           *info;
-	EntityList      entity_list;
-    uint            entity_count;
+    Engine          *engine;
+	EntityNode      *entities;
+	CollisionScene  *collision_scene;
+    SceneVTable     *vtable;
+    void            *info;
+	Entity         **entity_list;
+    uint             entity_count;
     
     union {
         uint8 flags;
@@ -47,6 +45,7 @@ void        Scene__freeAll(     Scene *scene);
 EntityNode *Scene__getEntities( Scene *scene);
 void        Scene__insertEntity(Scene *scene, EntityNode *node);
 void        Scene__removeEntity(Scene *scene, EntityNode *node);
+void        Scene__render(      Scene *scene, float       delta);
 void        Scene__update(      Scene *scene, float       delta);
 
 

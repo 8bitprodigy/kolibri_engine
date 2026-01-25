@@ -1104,10 +1104,10 @@ heightmapSceneRender(Scene *scene, Head *head)
 		}
 		
 	}
-	EntityList *ent_list = Scene_getEntityList(scene);
+	Entity **entities = Scene_getEntityList(scene);
 	
-	for (size_t i = 0; i < ent_list->count; i++) {
-		Entity *entity = ent_list->entities[i];
+	for (size_t i = 0; i < DynamicArray_length(entities); i++) {
+		Entity *entity = entities[i];
 		
 		// Always submit at actual position
 		Renderer_submitEntity(renderer, entity);

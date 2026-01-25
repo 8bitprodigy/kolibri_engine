@@ -4,6 +4,7 @@
 
 #include "_collision_.h"
 #include "_engine_.h"
+#include "_entity_.h"
 #include "_scene_.h"
 #include "_renderer_.h"
 #include "common.h"
@@ -37,21 +38,16 @@ Scene_new(
         return NULL;
     }
 
-    scene->prev                 = scene;
-    scene->next                 = scene;
+    scene->prev             = scene;
+    scene->next             = scene;
     
-    scene->engine               = engine;
-    scene->entities             = NULL;
-    scene->entity_pool          = CreateMemPool(sizeof(EntityNode) * MAX_NUM_ENTITIES);
-    scene->entity_count         = 0;
-	scene->collision_scene      = CollisionScene__new(scene);
-    scene->info                 = info;
-    scene->vtable               = map_type;
-
-    scene->dirty_EntityList     = true;
-    scene->entity_list.entities = DynamicArray(sizeof(Entity*), 128);
-    scene->entity_list.count    = 0;
-    scene->entity_list.capacity = 0;
+    scene->engine           = engine;
+    scene->entities         = NULL;
+    scene->entity_count     = 0;
+	scene->collision_scene  = CollisionScene__new(scene);
+    scene->info             = info;
+    scene->vtable           = map_type;
+    scene->entity_list      = DynamicArray(Entity*, 128);
     
     Engine__insertScene(engine, scene);
 
@@ -71,7 +67,8 @@ Scene_free(Scene *scene)
     if (vtable && vtable->Free) vtable->Free(scene);
     
     Engine__removeScene(  scene->engine, scene);
-	DestroyMemPool(      &scene->entity_pool);
+	//DestroyMemPool(      &scene->entity_pool);
+	EntityNode__freeAll(  scene->entities);
 	CollisionScene__free( scene->collision_scene);
     
     free(scene);
@@ -93,9 +90,9 @@ Scene_getEntityCount(Scene *self)
 	return self->entity_count;
 }
 
-EntityList *
+Entity **
 Scene_getEntityList(Scene *self)
-{
+{/*
 	if (!self->dirty_EntityList) {
 		return &self->entity_list;
 	}
@@ -108,6 +105,7 @@ Scene_getEntityList(Scene *self)
 	}
 
 	/* Clear and rebuild the dynamic array */
+/*
 	DynamicArray_clear(self->entity_list.entities);
 	
 	EntityNode *current = self->entities;
@@ -120,7 +118,8 @@ Scene_getEntityList(Scene *self)
 	self->entity_list.count    = DynamicArray_length(  self->entity_list.entities);
 	self->entity_list.capacity = DynamicArray_capacity(self->entity_list.entities);
 	self->dirty_EntityList     = false;
-	return &self->entity_list;
+*/
+	return self->entity_list;
 }
 
 void *
@@ -150,7 +149,8 @@ void
 Scene_update(Scene *self, float delta)
 {
     CollisionScene__update(     self->collision_scene);
-    EntityNode__updateAll(      self->entities, delta);
+    //EntityNode__updateAll(      self->entities, delta);
+    Scene__update(self, delta);
     
     SceneVTable *vtable = self->vtable; 
     if (vtable && vtable->Update) vtable->Update(self, delta);
@@ -325,28 +325,64 @@ void
 Scene__insertEntity(Scene *self, EntityNode *node)
 {
     if (MAX_NUM_ENTITIES <= self->entity_count) return;
+	Entity *entity = NODE_TO_ENTITY(node);
 	if (!self->entities) {
 		self->entities = node;
-		self->entity_count++;
-		return;
 	}
-	EntityNode__insert(node, self->entities);
+	else {
+        EntityNode__insert(node, self->entities);
+    }
+    
+	DynamicArray_add(self->entity_list, entity);
 	
 	self->entity_count++;
-	self->dirty_EntityList = true;
 }
 
 void
 Scene__removeEntity(Scene *self, EntityNode *node)
 {
     if (!self->entity_count) return;
-	EntityNode *node_1 = node->prev;
-	EntityNode *node_2 = node->next;
+	if (self->entities == node) self->entities = node->next;
 
-	node_1->next = node_2;
-	node_2->prev = node_1;
+	EntityNode__remove(node);
 
-	if (self->entities == node) self->entities = node_2;
+	for (int i = DynamicArray_length(self->entity_list) - 1; 0 <= i; i--) {
+	    if (self->entity_list[i] != NODE_TO_ENTITY(node)) continue;
+	    DynamicArray_delete(self->entity_list, i, 1);
+	    break;
+	}
 	
 	self->entity_count--;
+}
+
+void
+Scene__render(Scene *self, float delta)
+{
+	for (int i = DynamicArray_length(self->entity_list) - 1; 0 <= i; i--) {
+	    Entity       *entity = self->entity_list[i];
+	    
+	    if (!entity->visible) continue;
+	    
+	    EntityVTable *vtable = entity->vtable;
+	    
+	    if (vtable && vtable->Render) vtable->Render(entity, delta);
+	}
+}
+
+void
+Scene__update(Scene *self, float delta)
+{
+	for (int i = DynamicArray_length(self->entity_list) - 1; 0 <= i; i--) {
+	    Entity     *entity = self->entity_list[i];
+	    EntityNode *node   = ENTITY_TO_NODE(entity);
+
+	    if (node->to_delete) {
+	        EntityNode__free(node);
+	        continue;
+	    }
+        if (!entity->active) continue;
+        
+	    EntityVTable *vtable = entity->vtable;
+	    if (vtable && vtable->Update) vtable->Update(entity, delta);
+	}
 }
