@@ -70,6 +70,7 @@ projectileCollision(
 						(Vector3){0.0f, 0.55f, 0.0f}
 					),
 				QuaternionFromAxisAngle(collision.normal, 0.0f),
+				Entity_getEngine(projectile),
 				Entity_getScene(projectile)
 			);
 	}
@@ -78,6 +79,7 @@ projectileCollision(
 				blood_Info, 
 				collision.position,
 				QuaternionFromAxisAngle(collision.normal, 0.0f),
+				Entity_getEngine(projectile),
 				Entity_getScene(projectile)
 			);
 	}
@@ -92,6 +94,7 @@ grenadeTimeout(Entity *projectile)
 			explosion_Info, 
 			projectile->position,
 			QuaternionIdentity(),
+			Entity_getEngine(projectile),
 			Entity_getScene(projectile)
 		);
 }
@@ -110,6 +113,7 @@ rocketCollision(
 			explosion_Info, 
 			projectile->position,
 			QuaternionIdentity(),
+			Entity_getEngine(projectile),
 			Entity_getScene(projectile)
 		);
     Entity_free(projectile);
@@ -183,6 +187,7 @@ NO_BOUNCE:
 						(Vector3){0.0f, 0.55f, 0.0f}
 					),
 				QuaternionFromAxisAngle(collision.normal, 0.0f),
+				Entity_getEngine(projectile),
 				Entity_getScene(projectile)
 			);
 	}
@@ -191,6 +196,7 @@ NO_BOUNCE:
 				blood_Info, 
 				collision.position,
 				QuaternionFromAxisAngle(collision.normal, 0.0f),
+				Entity_getEngine(projectile),
 				Entity_getScene(projectile)
 			);
 	}
@@ -212,7 +218,8 @@ fireHitscan(
 	Vector3     direction
 )
 {
-	Scene *scene = Entity_getScene(source);
+	Engine *engine = Entity_getEngine(source);
+	Scene  *scene  = Entity_getScene(source);
 	
 	CollisionResult result = Scene_raycast(
 			scene,
@@ -229,6 +236,7 @@ fireHitscan(
 					impact_Info, 
 					result.position,
 					QuaternionFromAxisAngle(result.normal, 0.0f),
+					engine,
 					scene
 				);
 		}
@@ -250,7 +258,6 @@ fireProjectile(
 			direction, 
 			source, 
 			NULL, 
-			Entity_getScene(source),
 			0,
 			NULL
 		);
@@ -309,8 +316,7 @@ fireMinigun(
 			position, 
 			pellet_direction, 
 			source, 
-			NULL, 
-			Entity_getScene(source),
+			NULL,
 			0,
 			NULL
 		);
@@ -328,7 +334,6 @@ fireShotgun(
 	const int  num_bounces = 1;
 	int        max         = 8;
 	double     time        = Engine_getTime(Entity_getEngine(source));
-	Scene     *scene       = Entity_getScene(source);
 
 	/*
 		Mechanic: 
@@ -342,7 +347,6 @@ fireShotgun(
 				direction, 
 				source, 
 				NULL, 
-				scene,
 				sizeof(int),
 				&num_bounces
 			);
@@ -372,7 +376,6 @@ fireShotgun(
 				pellet_direction,
 				source,
 				NULL,
-				scene,
 				sizeof(int),
 				&num_bounces
 			);

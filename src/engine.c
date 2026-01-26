@@ -66,6 +66,8 @@ Engine
 	Head           *heads;
 	Scene          *scene;
 	Renderer       *renderer;
+
+	EntityNode     *entities;
 	
 	uint64          
 					frame_num,
@@ -86,6 +88,7 @@ Engine
 					tick_elapsed;
 
 	uint       
+					entity_count,
 		            head_count,
 		            scene_count,
 		            target_fps;
@@ -157,6 +160,7 @@ Engine_free(Engine *self)
 {
 	Head__freeAll(self->heads);
 	Scene__freeAll(self->scene);
+	EntityNode__freeAll(self->entities);
 	Renderer__free(self->renderer);
 	free(self);
 }
@@ -419,6 +423,31 @@ Engine_requestExit(Engine *self)
 /**********************
 	PRIVATE METHODS
 **********************/
+void
+Engine__insertEntity(Engine *self, EntityNode *node)
+{
+    if (MAX_NUM_ENTITIES <= self->entity_count) return;
+	Entity *entity = NODE_TO_ENTITY(node);
+	if (!self->entities) {
+		self->entities = node;
+	}
+	else {
+        EntityNode__insert(node, self->entities);
+    }
+	
+	self->entity_count++;
+}
+
+void
+Engine__removeEntity(Engine *self, EntityNode *node)
+{
+    if (!self->entity_count) return;
+	if (self->entities == node) self->entities = node->next;
+
+	EntityNode__remove(node);
+	
+	self->entity_count--;
+}
 
 void
 Engine__insertHead(Engine *self, Head *head)

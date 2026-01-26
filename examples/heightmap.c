@@ -1104,7 +1104,7 @@ heightmapSceneRender(Scene *scene, Head *head)
 		}
 		
 	}
-	Entity **entities = Scene_getEntityList(scene);
+	Entity **entities = Scene_getEntities(scene);
 	
 	for (size_t i = 0; i < DynamicArray_length(entities); i++) {
 		Entity *entity = entities[i];

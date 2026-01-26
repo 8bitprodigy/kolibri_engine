@@ -42,8 +42,6 @@ Scene_new(
     scene->next             = scene;
     
     scene->engine           = engine;
-    scene->entities         = NULL;
-    scene->entity_count     = 0;
 	scene->collision_scene  = CollisionScene__new(scene);
     scene->info             = info;
     scene->vtable           = map_type;
@@ -66,10 +64,9 @@ Scene_free(Scene *scene)
     SceneVTable *vtable = scene->vtable; 
     if (vtable && vtable->Free) vtable->Free(scene);
     
-    Engine__removeScene(  scene->engine, scene);
-	//DestroyMemPool(      &scene->entity_pool);
-	EntityNode__freeAll(  scene->entities);
 	CollisionScene__free( scene->collision_scene);
+	DynamicArray_free(    scene->entity_list);
+    Engine__removeScene(  scene->engine, scene);
     
     free(scene);
 } /* Scene_free */
@@ -87,38 +84,12 @@ Scene_getEngine(Scene *self)
 uint
 Scene_getEntityCount(Scene *self)
 {
-	return self->entity_count;
+	return DynamicArray_length(self->entity_list);
 }
 
 Entity **
-Scene_getEntityList(Scene *self)
-{/*
-	if (!self->dirty_EntityList) {
-		return &self->entity_list;
-	}
-
-	if (!self->entities || self->entity_count == 0) {
-		DynamicArray_clear(self->entity_list.entities);
-		self->entity_list.count = 0;
-		self->dirty_EntityList = false;
-		return &self->entity_list;
-	}
-
-	/* Clear and rebuild the dynamic array */
-/*
-	DynamicArray_clear(self->entity_list.entities);
-	
-	EntityNode *current = self->entities;
-	do {
-		Entity *entity = NODE_TO_ENTITY(current);
-		DynamicArray_append((void**)&self->entity_list.entities, &entity, 1);
-		current = current->next;
-	} while (current != self->entities);
-	
-	self->entity_list.count    = DynamicArray_length(  self->entity_list.entities);
-	self->entity_list.capacity = DynamicArray_capacity(self->entity_list.entities);
-	self->dirty_EntityList     = false;
-*/
+Scene_getEntities(Scene *self)
+{
 	return self->entity_list;
 }
 
@@ -306,45 +277,14 @@ void
 Scene__freeAll(Scene *scene)
 {
 	Scene *next = scene->next;
+	
 	if (next == scene) {
 		Scene_free(scene);
 		return;
 	}
-	EntityNode__freeAll(scene->entities);
+	
 	Scene_free(scene);
 	Scene__freeAll(next);
-}
-
-EntityNode *
-Scene__getEntities( Scene *self)
-{
-    return self->entities;
-}
-
-void
-Scene__insertEntity(Scene *self, EntityNode *node)
-{
-    if (MAX_NUM_ENTITIES <= self->entity_count) return;
-	Entity *entity = NODE_TO_ENTITY(node);
-	if (!self->entities) {
-		self->entities = node;
-	}
-	else {
-        EntityNode__insert(node, self->entities);
-    }
-	
-	self->entity_count++;
-}
-
-void
-Scene__removeEntity(Scene *self, EntityNode *node)
-{
-    if (!self->entity_count) return;
-	if (self->entities == node) self->entities = node->next;
-
-	EntityNode__remove(node);
-	
-	self->entity_count--;
 }
 
 void

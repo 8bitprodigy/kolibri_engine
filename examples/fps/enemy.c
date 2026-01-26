@@ -350,7 +350,6 @@ Enemy_shoot(Entity *self)
 		direction,
 		self,
 		NULL,
-		scene,
 		0,
 		NULL
 	);
@@ -664,12 +663,12 @@ Entity *
 Enemy_new(
 	EnemyInfo *info,
 	Vector3    position,
-	Scene     *scene
+	Engine     *engine
 )
 {
 	Entity *enemy = Entity_new(
 			&enemyTemplate, 
-			scene, 
+			engine, 
 			sizeof(EnemyData)
 		);
 	if (!enemy) {

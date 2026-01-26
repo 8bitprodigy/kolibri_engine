@@ -117,7 +117,7 @@ Entity;
 /*
     Constructor/Destructor
 */
-Entity  *Entity_new(  const Entity *template_entity, Scene *scene, size_t user_data_size);
+Entity  *Entity_new(  const Entity *template_entity, Engine *engine, size_t user_data_size);
 void     Entity_free(       Entity *entity);
 
 /*

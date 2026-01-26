@@ -1132,21 +1132,13 @@ CollisionScene__update(CollisionScene *self)
 {
 	SpatialHash_clear(self->spatial_hash);
 
-	EntityNode *first_entity = Scene__getEntities(self->scene);
-	if (!first_entity) return;
+	Entity **entities = Scene_getEntities(self->scene);
+	if (!DynamicArray_length(entities)) return;
 
-	EntityNode *current = first_entity;
-	if (current) {
-		do {
-			Entity *entity = &current->base;
+	for (int i = DynamicArray_length(entities) - 1; 0 <= i; i--) {
+		Entity *entity = entities[i];
 
-			if (entity->active && entity->collision_shape) {
-				CollisionScene__insertEntity(self, entity);
-			}
-
-			current = current->next;
-		} while (current != first_entity);
+		if (!(entity->active && entity->collision_shape)) continue;
+		CollisionScene__insertEntity(self, entity);
 	}
-
-	self->needs_rebuild = false;
 }

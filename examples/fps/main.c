@@ -99,7 +99,7 @@ runEngine(void *data, void *value)
 	scene = HeightmapScene_new(&heightmap, engine);
 	// */
 	
-	player = Entity_new(&playerTemplate, scene, 0);
+	player = Entity_new(&playerTemplate, engine, 0);
 	PlayerData *player_data = player->user_data;
 	player_data->head       = head;
 	float height = HeightmapScene_getHeight(scene, V3_ZERO);
@@ -125,7 +125,7 @@ runEngine(void *data, void *value)
 	Entity *grunt      = Enemy_new(
 			&enemy_Infos[ENEMY_GRUNT], 
 			enemy_pos,
-			scene
+			engine
 		);
 	Entity_addToScene(grunt, scene);
  /*

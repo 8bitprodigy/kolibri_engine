@@ -188,12 +188,13 @@ Explosion_new(
 	ExplosionInfo *info, 
 	Vector3        position,
 	Quaternion     orientation,
+	Engine        *engine,
 	Scene         *scene
 )
 {
 	Entity *explosion = Entity_new(
 			&Explosion_Template, 
-			scene,
+			engine,
 			sizeof(ExplosionData)
 		);
 

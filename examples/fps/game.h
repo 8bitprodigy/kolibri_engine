@@ -195,7 +195,7 @@ typedef struct
 }
 EnemyData;
 
-Entity *Enemy_new(EnemyInfo *info, Vector3 position, Scene *scene);
+Entity *Enemy_new(EnemyInfo *info, Vector3 position, Engine *engine);
 
 extern EnemyInfo *enemy_Infos;
 
@@ -252,7 +252,9 @@ typedef struct
 		move_dir,
 		direction;
 	int   frames_since_grounded;
-	bool  request_jump;
+	bool  
+		request_jump,
+		request_end_jump;
 }
 PlayerData;
 

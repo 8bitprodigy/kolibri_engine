@@ -335,6 +335,16 @@ PLAYER_INPUT: {
 
 		player_data->move_dir     = movement;
 		if (
+			GET_KEY_OR_BUTTON_RELEASED(
+				controller_num, 
+				GAMEPAD_BUTTON_LEFT_FACE_UP, 
+				KEY_SPACE
+			)
+		)
+		{
+			player_data->request_end_jump = true;
+		}
+		if (
 			GET_KEY_OR_BUTTON_PRESSED(
 				controller_num, 
 				GAMEPAD_BUTTON_LEFT_FACE_UP, 

@@ -143,6 +143,10 @@
 
 #define GET_KEY_OR_BUTTON_DOWN( Controller, Button, Key ) (int)(IsGamepadButtonDown(Controller, Button) || IsKeyDown(Key))
 
+#define GET_KEY_OR_BUTTON_RELEASED( Controller, Button, Key ) (int)(IsGamepadButtonReleased(Controller, Button) || IsKeyReleased(Key))
+
+#define GET_KEY_OR_BUTTON_UP( Controller, Button, Key ) (int)(IsGamepadButtonUp(Controller, Button) || IsKeyUp(Key))
+
 #define GET_KEY_OR_BUTTON_AXIS( Controller, Btn_Pos, Key_Pos, Btn_Neg, Key_Neg ) ( \
         GET_KEY_OR_BUTTON_DOWN(   (Controller), (Btn_Pos), (Key_Pos) ) \
         - GET_KEY_OR_BUTTON_DOWN( (Controller), (Btn_Neg), (Key_Neg) ) \

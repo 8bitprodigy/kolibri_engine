@@ -35,7 +35,7 @@ ExplosionInfo *ExplosionInfo_new(
 	size_t          total_frames
 );
 
-void Explosion_new(    ExplosionInfo *info, Vector3     position, Quaternion orientation, Scene *scene);
+void Explosion_new(    ExplosionInfo *info, Vector3     position, Quaternion orientation, Engine *engine, Scene *scene);
 void ExplosionComplete(SpriteInfo    *info, SpriteData *data);
 
 #endif /* EXPLOSION_H */

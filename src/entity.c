@@ -34,12 +34,11 @@ setCollisionState(EntityNode *node, CollisionResult *collision)
 	CONSTRUCTOR
 ******************/
 Entity *
-Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
+Entity_new(const Entity *template, Engine *engine, size_t user_data_size)
 {
-	if (!scene) return NULL;
+	if (!engine) return NULL;
 	
-	EntityNode *node = malloc(/*MemPoolAlloc(
-			&scene->entity_pool,*/
+	EntityNode *node = malloc(
 			sizeof(EntityNode) 
 				+ user_data_size
 		);
@@ -49,7 +48,6 @@ Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
 		return NULL;
 	}
 	Entity *entity = NODE_TO_ENTITY(node);
-	Engine *engine = scene->engine;
 	*entity                 = *template;
 	entity->user_data       =  NULL;
 	entity->transform       = (Transform){0};
@@ -57,17 +55,16 @@ Entity_new(const Entity *template, Scene *scene, size_t user_data_size)
 	entity->current_anim    = 0;
 	entity->anim_frame      = 0;
 	
-	node->next      = node;
-	node->prev      = node;
-	node->engine    = engine;
-	node->size      = sizeof(EntityNode) + user_data_size;
-	node->flags     = 0;
-	node->unique_ID = Latest_ID++;
-	
-	Scene__insertEntity(scene, node);
-	node->scene  = scene;
-
+	node->next          = node;
+	node->prev          = node;
+	node->engine        = engine;
+	node->size          = sizeof(EntityNode) + user_data_size;
+	node->flags         = 0;
+	node->unique_ID     = Latest_ID++;
+	node->scene         = NULL;
 	node->creation_time = Engine_getTime(engine);
+	
+	Engine__insertEntity(engine, node);
 	
 	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Setup) vtable->Setup(entity);
@@ -307,15 +304,13 @@ void
 EntityNode__free(EntityNode *self)
 {
 	Entity *entity = NODE_TO_ENTITY(self);
-	Scene  *scene  = self->scene;
 	
 	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Free) vtable->Free(entity);
 	
-	Scene__removeEntity(scene, self);
+	Engine__removeEntity(self->engine, self);
 
 	free(self);
-	//MemPoolFree(&scene->entity_pool, self);
 }
 
 void

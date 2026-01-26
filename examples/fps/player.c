@@ -120,17 +120,22 @@ playerUpdate(Entity *self, float delta)
 			}
 		}
 	}
-	if (data->request_jump) {
-	}
-	if (data->frames_since_grounded < 5 && data->request_jump) {
-		velocity->y = JUMP_VELOCITY;
-		data->request_jump = false;
-	}
 	if (!is_on_floor) {
 		data->frames_since_grounded++;
 		velocity->y -= (0.0f < velocity->y)
 			? JUMP_GRAVITY * delta 
 			: FALL_GRAVITY * delta;
+
+	}
+/*
+	if (0.0f < velocity->y && data->request_end_jump) {
+		velocity->y *= 0.7f;
+		data->request_end_jump = false;
+	}
+*/
+	if (data->frames_since_grounded < 5 && data->request_jump) {
+		velocity->y = JUMP_VELOCITY;
+		data->request_jump = false;
 	}
 	data->direction = Vector3Lerp(data->direction, data->move_dir, delta * CONTROL);
 	

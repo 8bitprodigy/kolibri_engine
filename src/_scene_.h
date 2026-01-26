@@ -15,12 +15,10 @@ Scene
         *next;
     
     Engine          *engine;
-	EntityNode      *entities;
+	Entity         **entity_list;
 	CollisionScene  *collision_scene;
     SceneVTable     *vtable;
     void            *info;
-	Entity         **entity_list;
-    uint             entity_count;
     
     union {
         uint8 flags;
@@ -42,9 +40,6 @@ Scene;
 
 
 void        Scene__freeAll(     Scene *scene);
-EntityNode *Scene__getEntities( Scene *scene);
-void        Scene__insertEntity(Scene *scene, EntityNode *node);
-void        Scene__removeEntity(Scene *scene, EntityNode *node);
 void        Scene__render(      Scene *scene, float       delta);
 void        Scene__update(      Scene *scene, float       delta);
 

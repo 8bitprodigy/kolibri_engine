@@ -48,7 +48,6 @@ Entity *Projectile_new(
        Vector3         direction,
        Entity         *source,
        Entity         *target,
-       Scene          *scene,
        size_t          data_size,
        void           *data
 );

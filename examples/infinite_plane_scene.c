@@ -83,7 +83,7 @@ infinitePlaneSceneRender(Scene *scene, Head *head)
 	//DrawGrid(100, 1.0f);
 #endif
 	DrawInfinitePlane(camera, 1.0f);
-	EntityList *ent_list = Scene_getEntityList(scene);
+	EntityList *ent_list = Scene_getEntities(scene);
 	for (size_t i = 0; i < ent_list->count; i++) {
 		Renderer_submitEntity(renderer, ent_list->entities[i]);
 	}

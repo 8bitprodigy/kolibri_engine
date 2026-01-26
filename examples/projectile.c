@@ -272,16 +272,19 @@ Projectile_new(
        Vector3         direction,
        Entity         *source,
        Entity         *target,
-       Scene          *scene,
        size_t          pdata_size,
        void           *pdata
 )
 {
+	Engine *engine = Entity_getEngine(source);
+	Scene  *scene  = Entity_getScene(source);
+	
 	Entity *projectile = Entity_new(
 			&projectile_template, 
-			scene,
+			engine,
 			sizeof(ProjectileData) + pdata_size
 		);
+	
 	if (!projectile) {
 		ERR_OUT("Couldn't construct Projectile.");
 		return NULL;
