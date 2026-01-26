@@ -22,6 +22,10 @@
 - [ ] (engine/head) Fix Region-based viewports so arbitrary screen regions can be rendered to correctly, and not just the center of the screen.
 - [x] (`common.h`) Fix not all entities being updated/rendered
 	- Forgot to update `MAX_NUM_ENTITIES` in `common.h`
+- [ ] (engine/scene/entity) Migrate ownership of `Entity`s from `Scene` to `Engine`.
+	- [x] removed use of arena to store `EntityNode`s
+	- [x] Make it so `Entity`s have to be explicitly added to a `Scene` for them to appear and update
+	- [ ] Change ownership of entities from `Scene` to `Engine`
 
 ## Collision:
 - [x] Fix the is-on-floor check not working when standing on top of another entity

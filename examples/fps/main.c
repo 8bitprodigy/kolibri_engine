@@ -109,13 +109,15 @@ runEngine(void *data, void *value)
 			0.0f
 		};
 	player_data->prev_position = player->position;
+
+	Entity_addToScene(player, scene);
 	
 	head_data = (FPSHeadData*)Head_getUserData(head);
 	head_data->controller  = 0;
 	head_data->target      = player;
 	head_data->target_data = player->user_data;
 	head_data->eye_height  = 1.75f;
-/*
+
 	Vector3 enemy_pos  = (Vector3){32.0f, 0.0f, -32.0f};
 	float enemy_height = HeightmapScene_getHeight(scene, enemy_pos) + 0.01f;
 	enemy_pos.y = enemy_height;
@@ -125,10 +127,11 @@ runEngine(void *data, void *value)
 			enemy_pos,
 			scene
 		);
-
+	Entity_addToScene(grunt, scene);
+ /*
 	Entity *ents[21][21][21];
 	int z = 0; 
- 
+
 	for (int x = 0; x < 21; x++) {
 		for (int y = 0; y < 21; y++) {
 			for (int z = 0; z < 1; z++) {

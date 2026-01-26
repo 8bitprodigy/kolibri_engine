@@ -314,5 +314,7 @@ Projectile_new(
 			info->speed
 		);
 
+	Entity_addToScene(projectile, scene);
+	
 	return projectile;
 }

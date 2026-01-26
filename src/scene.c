@@ -332,8 +332,6 @@ Scene__insertEntity(Scene *self, EntityNode *node)
 	else {
         EntityNode__insert(node, self->entities);
     }
-    
-	DynamicArray_add(self->entity_list, entity);
 	
 	self->entity_count++;
 }
@@ -345,12 +343,6 @@ Scene__removeEntity(Scene *self, EntityNode *node)
 	if (self->entities == node) self->entities = node->next;
 
 	EntityNode__remove(node);
-
-	for (int i = DynamicArray_length(self->entity_list) - 1; 0 <= i; i--) {
-	    if (self->entity_list[i] != NODE_TO_ENTITY(node)) continue;
-	    DynamicArray_delete(self->entity_list, i, 1);
-	    break;
-	}
 	
 	self->entity_count--;
 }
@@ -377,6 +369,7 @@ Scene__update(Scene *self, float delta)
 	    EntityNode *node   = ENTITY_TO_NODE(entity);
 
 	    if (node->to_delete) {
+	        DynamicArray_delete(self->entity_list, i, 1);
 	        EntityNode__free(node);
 	        continue;
 	    }

@@ -36,6 +36,9 @@
 *.hex
 *.*.elf
 *.elf
+*.PBP
+*.prx
+*.SFO
 
 # Debug files
 *.dSYM/

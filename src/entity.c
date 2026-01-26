@@ -6,8 +6,7 @@
 #include "_head_.h"
 #include "_scene_.h"
 #include "common.h"
-#define RMEM_IMPLEMENTATION
-#include "../examples/rmem.h"
+#include "dynamicarray.h"
 
 
 #define PUSH_OUT_DISTANCE  0.1f
@@ -168,13 +167,33 @@ Entity_isOnFloor(Entity *self)
 
 
 void
-Entity_addToScene(Entity *entity, Scene *scene)
+Entity_addToScene(Entity *self, Scene *scene)
 {
+	EntityNode *node = ENTITY_TO_NODE(self);
+	
+	if (node->scene)  Entity_removeFromScene(self);
+	
+	DynamicArray_add(scene->entity_list, self);
+	node->scene = scene;
 }
 
 void 
-Entity_removeFromScene(Entity *entity)
+Entity_removeFromScene(Entity *self)
 {
+	EntityNode *node = ENTITY_TO_NODE(self);
+	
+	if (!node->scene) return;
+	
+	Scene *scene = node->scene;
+	
+	for (int i = DynamicArray_length(scene->entity_list) - 1; 0 <= i; i--) {
+	    if (scene->entity_list[i] != NODE_TO_ENTITY(node)) continue;
+	    
+	    DynamicArray_delete(scene->entity_list, i, 1);
+	    break;
+	}
+	
+	node->scene = NULL;
 }
 
 CollisionResult
@@ -329,10 +348,14 @@ EntityNode__insert(EntityNode *self, EntityNode *to)
 void
 EntityNode__remove(EntityNode *self)
 {
+	if (self->next == self) return; 
+	
 	EntityNode 
 		*prev = self->prev,
 		*next = self->next;
 
+	DBG_OUT("EntityNode__remove: self=%p, prev=%p, next=%p", self, prev, next);
+	
 	next->prev = prev;
 	prev->next = next;
 

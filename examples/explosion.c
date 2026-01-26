@@ -223,6 +223,8 @@ Explosion_new(
 
 	float radius = info->radius;
 	
+	Entity_addToScene(explosion, scene);
+	
 	if (radius <= 0.0f) return;
 
 	Entity **candidates = Scene_queryRegion(
@@ -264,5 +266,6 @@ Explosion_new(
 					)
 			);
 	}
+
 }
 
