@@ -166,18 +166,22 @@ Entity_isOnFloor(Entity *self)
 void
 Entity_addToScene(Entity *self, Scene *scene)
 {
-	EntityNode *node = ENTITY_TO_NODE(self);
+	EntityNode   *node   = ENTITY_TO_NODE(self);
+	EntityVTable *vtable = self->vtable;
 	
 	if (node->scene)  Entity_removeFromScene(self);
 	
 	DynamicArray_add(scene->entity_list, self);
 	node->scene = scene;
+
+	if (vtable && vtable->Enter) vtable->Enter(self);
 }
 
 void 
 Entity_removeFromScene(Entity *self)
 {
-	EntityNode *node = ENTITY_TO_NODE(self);
+	EntityNode   *node   = ENTITY_TO_NODE(self);
+	EntityVTable *vtable = self->vtable;
 	
 	if (!node->scene) return;
 	
@@ -191,6 +195,8 @@ Entity_removeFromScene(Entity *self)
 	}
 	
 	node->scene = NULL;
+	
+	if (vtable && vtable->Exit) vtable->Exit(self);
 }
 
 CollisionResult

@@ -20,18 +20,18 @@ typedef void            (*SceneRenderCallback)(   Scene *scene, Head    *head);
 typedef struct
 SceneVTable
 {
-    SceneDataCallback            Setup;          /* Called on initialization */
-    SceneCallback                Enter;          /* Called on entering the engine */
-    SceneUpdateCallback          Update;         /* Called once every frame after updating all the entities and before rendering */
-    SceneEntityCallback          EntityEnter;    /* Called every time an Entity enters the scene */
-    SceneEntityCallback          EntityExit;     /* Called every time an Entity exits the scene */
-    SceneCollisionCallback       CheckCollision; /* Called when checking if an entity would collide if moved */
-    SceneCollisionCallback       MoveEntity;     /* Called Every time an Entity moves in order to check if it has collided with the scene */
-    SceneRaycastCallback         Raycast;        /* Called Every time a raycast is performed in order to check if has collided with the scene */
-    SceneRenderCallback          PreRender;      /* Called called optionally by a Head during its PreRender callback */
-    SceneRenderCallback          Render;         /* Called once every frame in order to render the scene */
-    SceneCallback                Exit;           /* Called upon Scene exiting the engine */
-    SceneCallback                Free;           /* Called upon freeing the Scene from memory */
+    SceneDataCallback      Setup;          /* Called on initialization */
+    SceneCallback          Enter;          /* Called on entering the engine */
+    SceneUpdateCallback    Update;         /* Called once every frame after updating all the entities and before rendering */
+    SceneEntityCallback    EntityEnter;    /* Called every time an Entity enters the scene */
+    SceneEntityCallback    EntityExit;     /* Called every time an Entity exits the scene */
+    SceneCollisionCallback CheckCollision; /* Called when checking if an entity would collide if moved */
+    SceneCollisionCallback MoveEntity;     /* Called Every time an Entity moves in order to check if it has collided with the scene */
+    SceneRaycastCallback   Raycast;        /* Called Every time a raycast is performed in order to check if has collided with the scene */
+    SceneRenderCallback    PreRender;      /* Called called optionally by a Head during its PreRender callback */
+    SceneRenderCallback    Render;         /* Called once every frame in order to render the scene */
+    SceneCallback          Exit;           /* Called upon Scene exiting the engine */
+    SceneCallback          Free;           /* Called upon freeing the Scene from memory */
 }
 SceneVTable;
 
@@ -42,7 +42,7 @@ void            Scene_free(Scene      *scene);
 /* Setters/Getters */
 Engine         *Scene_getEngine(      Scene *scene);
 uint            Scene_getEntityCount( Scene *scene);
-Entity        **Scene_getEntities(  Scene *scene);
+Entity        **Scene_getEntities(    Scene *scene);
 void           *Scene_getData(        Scene *scene);
 void           *Scene_getInfo(        Scene *scene);
 

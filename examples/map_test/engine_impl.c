@@ -7,7 +7,6 @@ void exitToMain(void *data, void *value);
 
 void engineRun(    Engine *engine);
 void engineRender( Engine *engine);
-void engineUpdate( Engine *engine, float delta);
 void enginePause(  Engine *engine);
 void engineUnpause(Engine *engine);
 void engineExit(   Engine *engine);
@@ -16,7 +15,7 @@ void engineExit(   Engine *engine);
 EngineVTable engine_Callbacks = {
 	.Setup   = NULL, 
 	.Run     = engineRun, 
-	.Update  = engineUpdate, 
+	.Update  = NULL, 
 	.Render  = engineRender, 
 	.Resize  = NULL, 
 	.Pause   = enginePause, 
@@ -53,31 +52,15 @@ void
 engineRun(Engine *engine)
 {
 	(void)engine;
-	//DisableCursor();
-	EnableCursor();
+	DisableCursor();
 }
 
 void
 engineRender(Engine *engine)
 {
-	DrawFPS(10, 10);
-}
-
-void
-engineUpdate(Engine *engine, float delta)
-{
-	(void)delta;
-	if (
-		GET_KEY_OR_BUTTON_PRESSED(
-				0,
-				GAMEPAD_BUTTON_MIDDLE_RIGHT, 
-				KEY_ESCAPE
-			)
-	)
-	{
-		Engine_pause(engine, true);
-	}
-	DBG_OUT("Engine updated");
+	float delta = Engine_getDeltaTime(engine);
+	float fps = (delta > 0.0f) ? (1.0f / delta) : 0.0f;
+	DrawText(TextFormat("FPS: %.1f", fps), 10, 10, 20, LIME);
 }
 
 void
@@ -127,14 +110,14 @@ enginePause(Engine *engine)
 		EndDrawing();
 		first_loop = false;
 	}
-	//DisableCursor();
+	DisableCursor();
 }
 
 void
 engineUnpause(Engine *engine)
 {
 	(void)engine;
-	//DisableCursor();
+	DisableCursor();
 }
 
 void

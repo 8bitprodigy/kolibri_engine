@@ -56,7 +56,6 @@ DrawInfinitePlane(Camera *cam, float tileScale)
 
 		rlTexCoord2f((cx + size) * tileScale, (cz - size) * tileScale);
 		rlVertex3f(cx + size, 0.0f, cz - size);
-
     rlEnd();
     rlSetTexture(0);
 }

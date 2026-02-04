@@ -324,13 +324,13 @@ Engine_update(Engine *self)
 	if (self->paused || self->request_exit) return;
 	const EngineVTable *vtable = self->vtable;
 	
-	if (vtable && vtable->Update) vtable->Update(self, self->tick_length);
-
 	double raw_time = GetTime();
 	self->current_time = raw_time - self->start_time - self->time_spent_paused;
 	float frame_delta = self->current_time - self->last_frame_time;
 	self->last_frame_time = self->current_time;
 	self->delta           = frame_delta;
+	
+	if (vtable && vtable->Update) vtable->Update(self, self->delta);
 	
 	Head__updateAll(self->heads, frame_delta);
 	
