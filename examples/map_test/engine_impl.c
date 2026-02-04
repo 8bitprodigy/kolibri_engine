@@ -7,6 +7,7 @@ void exitToMain(void *data, void *value);
 
 void engineRun(    Engine *engine);
 void engineRender( Engine *engine);
+void engineUpdate( Engine *engine, float delta);
 void enginePause(  Engine *engine);
 void engineUnpause(Engine *engine);
 void engineExit(   Engine *engine);
@@ -15,7 +16,8 @@ void engineExit(   Engine *engine);
 EngineVTable engine_Callbacks = {
 	.Setup   = NULL, 
 	.Run     = engineRun, 
-	.Update  = NULL, 
+	.Update  = engineUpdate, 
+	.Tick    = NULL,
 	.Render  = engineRender, 
 	.Resize  = NULL, 
 	.Pause   = enginePause, 
@@ -53,6 +55,22 @@ engineRun(Engine *engine)
 {
 	(void)engine;
 	DisableCursor();
+}
+
+void
+engineUpdate(Engine *engine, float delta)
+{
+	(void)delta;
+	if (
+		GET_KEY_OR_BUTTON_PRESSED(
+				0,
+				GAMEPAD_BUTTON_MIDDLE_RIGHT, 
+				KEY_ESCAPE
+			)
+	)
+	{
+		Engine_pause(engine, true);
+	}
 }
 
 void

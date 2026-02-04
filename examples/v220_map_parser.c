@@ -12,9 +12,8 @@
 static AxisRemapping g_remap;
 
 static inline Vector3
-RemapVector3(Vector3 v)
+RemapVector3(Vector3 v, bool scale)
 {
-    printf("[RemapVector3()]\tInput Vector3: X=%.4f\tY=%.4f\tZ=%.4f\n",v.x,v.y,v.z);
     float 
         components[3] = {
                 v.x, 
@@ -32,13 +31,14 @@ RemapVector3(Vector3 v)
     result[g_remap.y_to] = components[AXIS_Y] * flips[AXIS_Y];
     result[g_remap.z_to] = components[AXIS_Z] * flips[AXIS_Z];
     
-    printf("[RemapVector3()]\tOutput Vector3: X=%.4f\tY=%.4f\tZ=%.4f\n",result[0],result[1],result[2]);
-    
-    return (Vector3){
-            .x = result[0],
-            .y = result[1],
-            .z = result[2],
-        };
+    return Vector3Scale(
+            (Vector3){
+                    .x = result[0],
+                    .y = result[1],
+                    .z = result[2],
+                },
+            (scale) ? g_remap.scale : 1.0f
+        );
 }
 
 /* Tokenizer state */
@@ -154,9 +154,9 @@ ParseBrushPlane(Tokenizer *tok, MapPlane *plane)
     if (!GetToken(tok)) return false; p3.z = atof(tok->token);
     if (!GetToken(tok) || strcmp(tok->token, ")") != 0) return false;
 
-    p1 = Vector3Scale(RemapVector3(p1),g_remap.scale);
-    p2 = Vector3Scale(RemapVector3(p2),g_remap.scale);
-    p3 = Vector3Scale(RemapVector3(p3),g_remap.scale);
+    p1 = RemapVector3(p1, true);
+    p2 = RemapVector3(p2, true);
+    p3 = RemapVector3(p3, true);
     
     // Calculate plane equation
     CalculatePlane(p1, p2, p3, plane);
@@ -174,7 +174,7 @@ ParseBrushPlane(Tokenizer *tok, MapPlane *plane)
     if (!GetToken(tok)) return false; plane->u_offset = atof(tok->token);
     if (!GetToken(tok) || strcmp(tok->token, "]") != 0) return false;
 
-    plane->u_axis = RemapVector3(plane->u_axis);
+    plane->u_axis = RemapVector3(plane->u_axis, false);
     
     // Parse V axis [ vx vy vz offset ]
     if (!GetToken(tok) || strcmp(tok->token, "[") != 0) return false;
@@ -184,7 +184,7 @@ ParseBrushPlane(Tokenizer *tok, MapPlane *plane)
     if (!GetToken(tok)) return false; plane->v_offset = atof(tok->token);
     if (!GetToken(tok) || strcmp(tok->token, "]") != 0) return false;
 
-    plane->v_axis = RemapVector3(plane->v_axis);
+    plane->v_axis = RemapVector3(plane->v_axis, false);
     
     // Parse rotation, scale_x, scale_y
     if (!GetToken(tok)) return false; plane->rotation = atof(tok->token);

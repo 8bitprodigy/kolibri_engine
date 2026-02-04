@@ -22,17 +22,19 @@
 typedef struct
 CompiledFace
 {
-    Vector3 verts[MAX_FACE_VERTS];
-    int     vert_count;
+    int     vertex_start;
+    int     vertex_count;
     Vector3 normal;
+    float   plane_dist;
+    bool    is_visible;
 }
 CompiledFace;
 
 typedef struct
 CompiledBrush
 {
-    CompiledFace *faces;        /* Heap-allocated array */
-    int           face_count;
+    int face_start;
+    int face_count;
 }
 CompiledBrush;
 
@@ -42,12 +44,98 @@ typedef struct
 MapSceneData
 {
     MapData       *map;             /* Raw parsed .map data (owned) */
-    CompiledBrush *brushes;         /* Compiled world brushes (owned) */
+
+    /* Flat storage arrays */
+    Vector3       *all_vertices;
+    int            vertex_count;
+    CompiledFace  *all_faces;
+    int            face_count;
+    /* Brush metadata */
+    CompiledBrush *brushes;         /* Brush metadata with indices (owned) */
     int            brush_count;
+    
     char           source_path[256];
 }
 MapSceneData;
 
+
+/*
+    TempCompiledFace - temporary structure used during brush compilation
+    before data is copied into the flat arrays
+*/
+typedef struct
+TempCompiledFace
+{
+    Vector3 verts[MAX_FACE_VERTS];
+    int     vert_count;
+    Vector3 normal;
+    float   plane_dist;
+}
+TempCompiledFace;
+
+
+/*
+    faces_are_coplanar_and_opposite
+        Returns true if f1 and f2 lie on the same plane but face opposite
+        directions (indicating they're internal faces between touching brushes).
+
+        Two faces are considered coplanar-opposite if:
+            1. Their normals point in opposite directions (dot ~= -1)
+            2. They lie on the same geometric plane (within PLANE_EPSILON)
+*/
+static bool
+faces_are_coplanar_and_opposite(const CompiledFace *f1, const CompiledFace *f2)
+{
+    float dot = Vector3DotProduct(f1->normal, f2->normal);
+    if (-0.99f < dot) 
+        return false;
+
+    float dist_sum = fabsf(f1->plane_dist + f2->plane_dist);
+    if (PLANE_EPSILON < dist_sum)
+        return false;
+
+    return true;
+}
+
+/*
+    mark_hidden_faces
+        Iterates all compiled brushes and marks faces as hidden if they are
+        coplanar and opposite-facing with another face (indicating internal
+        geometry between touching brushes).
+
+        Complexity: O(F^2) where F = total face count
+        For typical Valve maps (< 10K faces), this is fast enough.
+*/
+static void
+mark_hidden_faces(MapSceneData *sd)
+{
+    if (!sd || !sd->all_faces) return;
+
+    int hidden_faces = 0;
+
+    /* Initialize all faces as visible */
+    for (int i = 0; i < sd->face_count; i++) {
+        sd->all_faces[i].is_visible = true;
+    }
+
+    /* Check each pair of faces for coplanar-opposite condition */
+    for (int i = 0; i < sd->face_count; i++) {
+        if (!sd->all_faces[i].is_visible) continue;
+
+        for (int j = i + 1; j < sd->face_count; j++) {
+            if (!sd->all_faces[j].is_visible) continue;
+
+            if (faces_are_coplanar_and_opposite(&sd->all_faces[i], &sd->all_faces[j])) {
+                sd->all_faces[j].is_visible = false;
+                hidden_faces++;
+            }
+        }
+    }
+
+    DBG_OUT("[MapScene] Marked %d hidden faces (%.1f%%)", 
+            hidden_faces, 
+            (100.0f * hidden_faces) / (sd->face_count ? sd->face_count : 1));
+}
 
 /*
     BRUSH COMPILER
@@ -199,30 +287,19 @@ make_face_seed_polygon(Vector3 normal, float distance, Vector3 *out)
 
 /*
     compile_brush
-        Takes a single MapBrush and produces a CompiledBrush whose faces array
-        is heap-allocated. Returns true on success. A face with fewer than 3 
-        surviving vertices is degenerate and is silently dropped.
+        Takes a single MapBrush and produces temporary face data (with embedded
+        vertices). Returns the number of valid faces compiled. The caller is
+        responsible for copying this data into the flat arrays.
+        
+        temp_faces: output array (must have space for at least MAX_BRUSH_PLANES faces)
+        Returns: number of valid faces written to temp_faces
 */
 static int g_compile_brush_index = 0;  /* temporary: tracks which brush we're on */
 
-static bool
-compile_brush(const MapBrush *brush, CompiledBrush *out)
+static int
+compile_brush(const MapBrush *brush, TempCompiledFace *temp_faces)
 {
-    int is_debug = (g_compile_brush_index == 0);
-    g_compile_brush_index++;
-
-    CompiledFace temp_faces[MAX_BRUSH_PLANES];
-    int          face_count = 0;
-
-    if (is_debug) {
-        printf("[DBG] brush 0: %d planes\n", brush->plane_count);
-        for (int i = 0; i < brush->plane_count; i++)
-            printf("[DBG]   plane %d: n=(%.3f %.3f %.3f) d=%.3f\n", i,
-                   brush->planes[i].normal.x,
-                   brush->planes[i].normal.y,
-                   brush->planes[i].normal.z,
-                   brush->planes[i].distance);
-    }
+    int face_count = 0;
 
     for (int f = 0; f < brush->plane_count; f++) {
         const MapPlane *face_plane = &brush->planes[f];
@@ -230,9 +307,6 @@ compile_brush(const MapBrush *brush, CompiledBrush *out)
         int      count = make_face_seed_polygon(face_plane->normal, face_plane->distance, clip_buf_a);
         Vector3 *src   = clip_buf_a;
         Vector3 *dst   = clip_buf_b;
-
-        if (is_debug && f == 0)
-            printf("[DBG] face 0: seed count=%d\n", count);
 
         for (int p = 0; p < brush->plane_count; p++) {
             if (p == f) continue;
@@ -243,9 +317,6 @@ compile_brush(const MapBrush *brush, CompiledBrush *out)
                 brush->planes[p].distance
             );
 
-            if (is_debug && f == 0)
-                printf("[DBG]   clipped by plane %d: count=%d\n", p, count);
-
             Vector3 *tmp = src; src = dst; dst = tmp;
 
             if (count == 0) break;
@@ -253,42 +324,16 @@ compile_brush(const MapBrush *brush, CompiledBrush *out)
 
         if (count < 3) continue;
 
-        CompiledFace *face   = &temp_faces[face_count];
-        face->normal         = face_plane->normal;
-        face->vert_count     = (count < 32) ? count : 32;
+        TempCompiledFace *face = &temp_faces[face_count];
+        face->normal           = face_plane->normal;
+        face->plane_dist       = Vector3DotProduct(face_plane->normal, src[0]);
+        face->vert_count       = (count < MAX_FACE_VERTS) ? count : MAX_FACE_VERTS;
         memcpy(face->verts, src, face->vert_count * sizeof(Vector3));
 
         face_count++;
     }
 
-    if (0 < face_count) {
-        out->faces      = (CompiledFace *)malloc(face_count * sizeof(CompiledFace));
-        out->face_count = face_count;
-        if (out->faces)
-            memcpy(out->faces, temp_faces, face_count * sizeof(CompiledFace));
-        else
-            out->face_count = 0;
-    }
-    else {
-        out->faces      = NULL;
-        out->face_count = 0;
-    }
-
-    return (0 < face_count);
-}
-
-
-/*
-    free_compiled_brush
-*/
-static void
-free_compiled_brush(CompiledBrush *brush)
-{
-    if (brush->faces) {
-        free(brush->faces);
-        brush->faces      = NULL;
-        brush->face_count = 0;
-    }
+    return face_count;
 }
 
 
@@ -302,8 +347,9 @@ free_compiled_brush(CompiledBrush *brush)
         "map_data" is the raw "data" pointer passed to Scene_new; we treat it as
         a null-terminated path string.
 
-        allocates a MapSceneData, parses the .map, compiles all world brushes, 
-        and stores the result into the Scene's data slot.
+        Allocates a MapSceneData, parses the .map, compiles all world brushes 
+        into flat arrays (two-pass: count first, then allocate and copy), and 
+        stores the result into the Scene's data slot.
 */
 static void
 mapscene_Setup(Scene *scene, void *map_data)
@@ -311,9 +357,7 @@ mapscene_Setup(Scene *scene, void *map_data)
     (void)scene;
     MapSceneData *sd = (MapSceneData *)map_data;
 
-    /*
-        Parse the .map file
-    */
+    /* Parse the .map file */
     sd->map = ParseValve220Map(sd->source_path, AXIS_REMAP_RAYLIB);
     if (!sd->map)
     {
@@ -325,36 +369,123 @@ mapscene_Setup(Scene *scene, void *map_data)
         return;
     }
 
-    /*
-        Compile world brushes
-    */
     int world_count = sd->map->world_brush_count;
-    sd->brush_count = world_count;
-    sd->brushes     = NULL;
+    if (world_count == 0) {
+        DBG_OUT("[MapScene] No world brushes found");
+        sd->brush_count = 0;
+        sd->brushes = NULL;
+        sd->all_faces = NULL;
+        sd->all_vertices = NULL;
+        sd->face_count = 0;
+        sd->vertex_count = 0;
+        return;
+    }
 
-    if (0 < world_count) {
-        sd->brushes = (CompiledBrush*)calloc(
-                world_count, 
-                sizeof(CompiledBrush)
-            );
-        if (!sd->brushes) {
-            ERR_OUT("[MapScene] Error: Failed to allocate CompiledBrush array");
-            sd->brush_count = 0;
+    /*
+        PASS 1: Compile brushes into temporary buffers and count totals
+    */
+    TempCompiledFace *temp_brush_faces[world_count];  /* Array of pointers to temp face arrays */
+    int               brush_face_counts[world_count];
+    
+    int total_faces = 0;
+    int total_verts = 0;
+
+    for (int i = 0; i < world_count; i++) {
+        temp_brush_faces[i] = (TempCompiledFace*)malloc(MAX_BRUSH_PLANES * sizeof(TempCompiledFace));
+        if (!temp_brush_faces[i]) {
+            ERR_OUT("[MapScene] Failed to allocate temp face buffer for brush");
+            brush_face_counts[i] = 0;
+            continue;
         }
-        else {
-            int compiled = 0;
-            for (int i = 0; i < world_count; i++) {
-                if (compile_brush(&sd->map->world_brushes[i], &sd->brushes[i]))
-                    compiled++;
-            }
-            DBG_OUT(
-                    "[MapScene] Compiled %d / %d world brushes", 
-                    compiled, 
-                    world_count
-                );
+
+        int face_count = compile_brush(&sd->map->world_brushes[i], temp_brush_faces[i]);
+        brush_face_counts[i] = face_count;
+        total_faces += face_count;
+
+        /* Count vertices */
+        for (int f = 0; f < face_count; f++) {
+            total_verts += temp_brush_faces[i][f].vert_count;
         }
     }
+
+    DBG_OUT("[MapScene] Compiled %d brushes: %d faces, %d vertices", 
+            world_count, total_faces, total_verts);
+
+    if (total_faces == 0) {
+        DBG_OUT("[MapScene] Warning: No valid faces compiled");
+        for (int i = 0; i < world_count; i++) {
+            free(temp_brush_faces[i]);
+        }
+        sd->brush_count = 0;
+        sd->brushes = NULL;
+        sd->all_faces = NULL;
+        sd->all_vertices = NULL;
+        sd->face_count = 0;
+        sd->vertex_count = 0;
+        return;
+    }
+
+    /*
+        PASS 2: Allocate flat arrays and copy data
+    */
+    sd->all_vertices = (Vector3*)malloc(total_verts * sizeof(Vector3));
+    sd->all_faces    = (CompiledFace*)malloc(total_faces * sizeof(CompiledFace));
+    sd->brushes      = (CompiledBrush*)malloc(world_count * sizeof(CompiledBrush));
+
+    if (!sd->all_vertices || !sd->all_faces || !sd->brushes) {
+        ERR_OUT("[MapScene] Failed to allocate flat arrays");
+        free(sd->all_vertices);
+        free(sd->all_faces);
+        free(sd->brushes);
+        for (int i = 0; i < world_count; i++) {
+            free(temp_brush_faces[i]);
+        }
+        sd->brush_count = 0;
+        sd->brushes = NULL;
+        sd->all_faces = NULL;
+        sd->all_vertices = NULL;
+        sd->face_count = 0;
+        sd->vertex_count = 0;
+        return;
+    }
+
+    sd->brush_count = world_count;
+    sd->face_count = total_faces;
+    sd->vertex_count = total_verts;
+
+    int face_idx = 0;
+    int vert_idx = 0;
+
+    for (int b = 0; b < world_count; b++) {
+        sd->brushes[b].face_start = face_idx;
+        sd->brushes[b].face_count = brush_face_counts[b];
+
+        for (int f = 0; f < brush_face_counts[b]; f++) {
+            TempCompiledFace *temp_face = &temp_brush_faces[b][f];
+            CompiledFace     *face      = &sd->all_faces[face_idx];
+
+            face->vertex_start = vert_idx;
+            face->vertex_count = temp_face->vert_count;
+            face->normal       = temp_face->normal;
+            face->plane_dist   = temp_face->plane_dist;
+            face->is_visible   = true;
+
+            /* Copy vertices */
+            memcpy(&sd->all_vertices[vert_idx], temp_face->verts, 
+                   temp_face->vert_count * sizeof(Vector3));
+
+            vert_idx += temp_face->vert_count;
+            face_idx++;
+        }
+
+        /* Free temporary face buffer for this brush */
+        free(temp_brush_faces[b]);
+    }
+
+    /* Mark hidden faces (optional optimization) */
+    mark_hidden_faces(sd);
 }
+
 
 
 static void
@@ -373,8 +504,9 @@ mapscene_Exit(Scene *scene)
 /*
     mapscene_Render
         SceneRenderCallback - called once per frame.
-        Iterates every compiled brush and draws each face as a wireframe polygon
-        using raylib's 3D line primitives.
+        Iterates every compiled brush, accesses its faces through indices,
+        and draws each visible face as a wireframe polygon using raylib's 
+        3D line primitives.
 */
 static void
 mapscene_Render(Scene *scene, Head *head)
@@ -385,21 +517,25 @@ mapscene_Render(Scene *scene, Head *head)
     (void)camera; // A secret tool for later
     
     /* World geometry wireframe */
-    if (sd && sd->brushes) {
+    if (sd && sd->brushes && sd->all_faces && sd->all_vertices) {
         Color wire_color = MAGENTA;
 
         for (int b = 0; b < sd->brush_count; b++) {
             CompiledBrush *brush = &sd->brushes[b];
-            if (!brush->faces) continue;
 
             for (int f = 0; f < brush->face_count; f++) {
-                CompiledFace *face = &brush->faces[f];
-                if (face->vert_count < 3) continue;
+                CompiledFace *face = &sd->all_faces[brush->face_start + f];
                 
-                for (int v = 0; v < face->vert_count; v++) {
-                    int next = (v+1) % face->vert_count;
-                    
-                    DrawLine3D(face->verts[v], face->verts[next], wire_color);
+                if (face->vertex_count < 3) continue;
+                if (!face->is_visible) continue;
+                
+                /* Get pointer to this face's vertices in the flat array */
+                Vector3 *face_verts = &sd->all_vertices[face->vertex_start];
+                
+                /* Draw wireframe edges */
+                for (int v = 0; v < face->vertex_count; v++) {
+                    int next = (v + 1) % face->vertex_count;
+                    DrawLine3D(face_verts[v], face_verts[next], wire_color);
                 }
             }
         }
@@ -421,16 +557,31 @@ mapscene_Free(Scene *scene)
     MapSceneData *sd = (MapSceneData*)Scene_getData(scene);
     if (!sd) return;
 
+    /* Free flat arrays */
+    if (sd->all_vertices) {
+        free(sd->all_vertices);
+        sd->all_vertices = NULL;
+        sd->vertex_count = 0;
+    }
+
+    if (sd->all_faces) {
+        free(sd->all_faces);
+        sd->all_faces = NULL;
+        sd->face_count = 0;
+    }
+
+    /* Free brush metadata */
     if (sd->brushes) {
-        for (int i = 0; i < sd->brush_count; i++)
-            free_compiled_brush(&sd->brushes[i]);
         free(sd->brushes);
-        sd->brushes     = NULL;
+        sd->brushes = NULL;
         sd->brush_count = 0;
     }
 
-    FreeMapData(sd->map);
-    sd->map = NULL;
+    /* Free parsed map data */
+    if (sd->map) {
+        FreeMapData(sd->map);
+        sd->map = NULL;
+    }
 }
 
 

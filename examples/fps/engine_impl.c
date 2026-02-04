@@ -16,7 +16,8 @@ void engineExit(   Engine *engine);
 EngineVTable engine_Callbacks = {
 	.Setup   = NULL, 
 	.Run     = engineRun, 
-	.Update  = engineUpdate, 
+	.Update  = NULL, 
+	.Tick    = NULL,
 	.Render  = engineRender, 
 	.Resize  = NULL, 
 	.Pause   = enginePause, 

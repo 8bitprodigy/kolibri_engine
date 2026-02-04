@@ -40,7 +40,8 @@ runEngine(void *data, void *value)
 {
 	(void)data;
 	(void)value;
-	engine = Engine_new(&engine_Callbacks, tick_rate);
+	if (engine_Callbacks.Update)
+		engine = Engine_new(&engine_Callbacks, tick_rate);
 	head   = Head_new(
 			(Region){0,0,screen_width, screen_height},
 			&head_Callbacks,

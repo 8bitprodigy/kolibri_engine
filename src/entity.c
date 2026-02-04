@@ -322,6 +322,7 @@ EntityNode__free(EntityNode *self)
 void
 EntityNode__freeAll(EntityNode *self)
 {
+	if (!self) return;
 	EntityNode *next = self->next;
 	if (next == self) {
 		EntityNode__free(self);

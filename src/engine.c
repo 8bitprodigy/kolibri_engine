@@ -330,7 +330,9 @@ Engine_update(Engine *self)
 	self->last_frame_time = self->current_time;
 	self->delta           = frame_delta;
 	
-	if (vtable && vtable->Update) vtable->Update(self, self->delta);
+	if (vtable && vtable->Update) {
+		vtable->Update(self, self->delta);
+	}
 	
 	Head__updateAll(self->heads, frame_delta);
 	
@@ -338,6 +340,10 @@ Engine_update(Engine *self)
 
 	/* Run ticks for elapsed time */
 	while (self->tick_length <= self->current_time - self->last_tick_time) {
+		if (vtable && vtable->Tick) {
+			vtable->Tick(self, self->delta);
+		}
+		
 		Scene_update(self->scene, self->tick_length);
 		if (vtable && vtable->Tick) vtable->Tick(self, self->tick_length);
 		
