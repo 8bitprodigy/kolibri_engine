@@ -34,9 +34,11 @@ OBJDIR      = obj/$(PLATFORM)
 
 TARGET       = $(PROJECTNAME)$(TARGET_EXT)
 
-ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
-EXAMPLES_SRC = $(wildcard $(EXAMPLESDIR)/*.c)
-GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
+ENGINE_SRC    = $(wildcard $(SRCDIR)/*.c)
+EXAMPLES_SRC  = $(EXAMPLESDIR)/heightmap.c $(EXAMPLESDIR)/infinite_plane_scene.c
+EXAMPLES_SRC += $(EXAMPLESDIR)/explosion.c $(EXAMPLESDIR)/projectile.c
+EXAMPLES_SRC += $(EXAMPLESDIR)/sprite.c $(EXAMPLESDIR)/utils.c
+GAME_SRC      = $(wildcard $(GAMESRCDIR)/*.c)
 
 ENGINE_OBJS   = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
 EXAMPLES_OBJS = $(EXAMPLES_SRC:$(EXAMPLESDIR)/%.c=$(OBJDIR)/examples/%.o)

@@ -11,52 +11,13 @@
 #include "kolibri.h"
 #include "v220_map_parser.h"
 #include "mapscene.h"
+#include "mapscene_bsp.h"
 
 
 #define PLANE_EPSILON  0.01f
 #define CLIP_BOX_HALF  16384.0f
 #define CLIP_BUF_SIZE  256
 #define MAX_FACE_VERTS 32
-
-
-typedef struct
-CompiledFace
-{
-    int     vertex_start;
-    int     vertex_count;
-    Vector3 normal;
-    float   plane_dist;
-    bool    is_visible;
-}
-CompiledFace;
-
-typedef struct
-CompiledBrush
-{
-    int face_start;
-    int face_count;
-}
-CompiledBrush;
-
-/* Scene-local state.  Mirrors how infinite_plane_scene keeps debug_texture
- * as a file-scope global — this is the established pattern. */
-typedef struct
-MapSceneData
-{
-    MapData       *map;             /* Raw parsed .map data (owned) */
-
-    /* Flat storage arrays */
-    Vector3       *all_vertices;
-    int            vertex_count;
-    CompiledFace  *all_faces;
-    int            face_count;
-    /* Brush metadata */
-    CompiledBrush *brushes;         /* Brush metadata with indices (owned) */
-    int            brush_count;
-    
-    char           source_path[256];
-}
-MapSceneData;
 
 
 /*
@@ -482,8 +443,29 @@ mapscene_Setup(Scene *scene, void *map_data)
         free(temp_brush_faces[b]);
     }
 
-    /* Mark hidden faces (optional optimization) */
-    mark_hidden_faces(sd);
+    /*
+        PASS 3: Build BSP tree
+        The BSP builder will determin which faces are actually visible
+        (those bordering empty space) and handle app splitting/clipping
+    */
+    DBG_OUT("[MapScene] Building BSP Tree...");
+    sd->bsp_tree = BSP_Build(
+            sd->all_faces, 
+            sd->face_count, 
+            sd->all_vertices,
+            sd->vertex_count,
+            sd->brushes,
+            sd->brush_count,
+            sd->map
+        );
+
+    if (sd->bsp_tree) {
+        BSP_PrintStats(sd->bsp_tree);
+        BSP_Validate(sd->bsp_tree);
+    }
+    else {
+        ERR_OUT("[MapScene] Failed to build BSP tree");
+    }
 }
 
 
@@ -502,14 +484,14 @@ mapscene_Exit(Scene *scene)
 
 
 /*
-    mapscene_Render
-        SceneRenderCallback - called once per frame.
+    mapscene_RenderMap
+        Renders wireframe of the MapData. Called once per frame.
         Iterates every compiled brush, accesses its faces through indices,
         and draws each visible face as a wireframe polygon using raylib's 
         3D line primitives.
 */
 static void
-mapscene_Render(Scene *scene, Head *head)
+mapscene_RenderMap(Scene *scene, Head *head)
 {
     Renderer     *renderer = Engine_getRenderer(Scene_getEngine(scene));
     MapSceneData *sd       = (MapSceneData*)Scene_getData(scene);
@@ -550,12 +532,63 @@ mapscene_Render(Scene *scene, Head *head)
     }
 }
 
+/*
+    mapscene_Render
+        SceneRenderCallback - called once per frame.
+        
+        Now renders from the BSP tree instead of the flat face arrays.
+        This shows only the visible faces (those in EMPTY leaves) and
+        prepares us for future PVS-based culling.
+*/
+static void
+mapscene_RenderBSP(Scene *scene, Head *head)
+{
+    Renderer     *renderer = Engine_getRenderer(Scene_getEngine(scene));
+    MapSceneData *sd       = (MapSceneData*)Scene_getData(scene);
+    Camera       *camera   = Head_getCamera(head);
+
+    if (sd && sd->bsp_tree) {
+        Color    wire_color = MAGENTA;
+        BSPTree *tree       = sd->bsp_tree;
+
+        /* Iterate ALL leaves - faces are in SOLID leaves after culling */
+        for (int i = 0; i < tree->leaf_count; i++) {
+            const BSPLeaf *leaf = &tree->leaves[i];
+
+            if (leaf->face_count == 0) 
+                continue;
+
+            const BSPFace *face = leaf->faces;
+            while (face) {
+                if (face->vertex_count >= 3) {
+                    for (int v = 0; v < face->vertex_count; v++) {
+                        int next = (v+1) % face->vertex_count;
+                        DrawLine3D(face->vertices[v], face->vertices[next], wire_color);
+                    }
+                }
+                face = face->next;
+            }
+        }
+    }
+
+    /* Entity Submission */
+    Entity **entities = Scene_getEntities(scene);
+    for (size_t i = 0; i < DynamicArray_length(entities); i++) {
+        Renderer_submitEntity(renderer, entities[i]);
+    }
+}
+
 
 static void
 mapscene_Free(Scene *scene)
 {
     MapSceneData *sd = (MapSceneData*)Scene_getData(scene);
     if (!sd) return;
+
+    if (sd->bsp_tree) {
+        BSP_Free(sd->bsp_tree);
+        sd->bsp_tree = NULL;
+    }
 
     /* Free flat arrays */
     if (sd->all_vertices) {
@@ -599,7 +632,7 @@ SceneVTable MapScene_vtable = {
         .MoveEntity     = NULL,
         .Raycast        = NULL,
         .PreRender      = NULL,
-        .Render         = mapscene_Render,
+        .Render         = mapscene_RenderBSP,
         .Exit           = NULL,
         .Free           = mapscene_Free,
     };

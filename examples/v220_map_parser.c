@@ -14,31 +14,24 @@ static AxisRemapping g_remap;
 static inline Vector3
 RemapVector3(Vector3 v, bool scale)
 {
-    float 
-        components[3] = {
-                v.x, 
-                v.y, 
-                v.z,
-            },
-        flips[3]      = {
-                g_remap.flip_x ? -1.0f : 1.0f,
-                g_remap.flip_y ? -1.0f : 1.0f,
-                g_remap.flip_z ? -1.0f : 1.0f
-            },
-        result[3];
-
-    result[g_remap.x_to] = components[AXIS_X] * flips[AXIS_X];
-    result[g_remap.y_to] = components[AXIS_Y] * flips[AXIS_Y];
-    result[g_remap.z_to] = components[AXIS_Z] * flips[AXIS_Z];
+    float components[3] = { v.x, v.y, v.z };
+    float flipped[3];
+    float result[3];
+    
+    // First apply flips to input components
+    flipped[0] = components[0] * (g_remap.flip_x ? -1.0f : 1.0f);
+    flipped[1] = components[1] * (g_remap.flip_y ? -1.0f : 1.0f);
+    flipped[2] = components[2] * (g_remap.flip_z ? -1.0f : 1.0f);
+    
+    // Then remap to output axes
+    result[0] = flipped[g_remap.x_to];
+    result[1] = flipped[g_remap.y_to];
+    result[2] = flipped[g_remap.z_to];
     
     return Vector3Scale(
-            (Vector3){
-                    .x = result[0],
-                    .y = result[1],
-                    .z = result[2],
-                },
-            (scale) ? g_remap.scale : 1.0f
-        );
+        (Vector3){ result[0], result[1], result[2] },
+        scale ? g_remap.scale : 1.0f
+    );
 }
 
 /* Tokenizer state */
@@ -267,8 +260,44 @@ ParseEntity(Tokenizer *tok, MapEntity *entity)
             
             // Get the value
             if (!GetToken(tok)) return false;
-            strncpy(entity->properties[entity->property_count].value, tok->token,
-                   sizeof(entity->properties[entity->property_count].value) - 1);
+
+            /* SPECIAL CASE: Remap origin vectors */
+            if (
+                strcmp(
+                        entity->properties[entity->property_count].key, 
+                        "origin"
+                    ) == 0
+            ) {
+                Vector3 origin;
+                if (
+                    sscanf(
+                            tok->token, 
+                            "%f %f %f",
+                            &origin.x, 
+                            &origin.y, 
+                            &origin.z
+                        ) == 3
+                ) {
+                    origin = RemapVector3(origin, true); /* true = apply scale */
+                    snprintf(
+                            entity->properties[entity->property_count].value,
+                            sizeof(entity->properties[entity->property_count].value),
+                            "%f %f %f",
+                            origin.x,
+                            origin.y,
+                            origin.z
+                        );
+                }
+                else {
+                    // Couldn't parse, store as-is
+                    strncpy(entity->properties[entity->property_count].value, tok->token,
+                        sizeof(entity->properties[entity->property_count].value) - 1);
+                }
+            }
+            else {
+                strncpy(entity->properties[entity->property_count].value, tok->token,
+                    sizeof(entity->properties[entity->property_count].value) - 1);
+            }
             
             entity->property_count++;
         }

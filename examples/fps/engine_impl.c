@@ -54,8 +54,7 @@ void
 engineRun(Engine *engine)
 {
 	(void)engine;
-	//DisableCursor();
-	EnableCursor();
+	DisableCursor();
 }
 
 void
@@ -128,14 +127,13 @@ enginePause(Engine *engine)
 		EndDrawing();
 		first_loop = false;
 	}
-	//DisableCursor();
 }
 
 void
 engineUnpause(Engine *engine)
 {
 	(void)engine;
-	//DisableCursor();
+	DisableCursor();
 }
 
 void

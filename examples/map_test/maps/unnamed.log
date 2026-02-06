@@ -1,0 +1,13 @@
+---- qbsp / ericw-tools 2.0.0-alpha9 ----
+
+--- Options Summary ---
+
+Input file: /home/chris/Projects/kolibri_engine/examples/map_test/maps/unnamed.map
+Output file: /home/chris/Projects/kolibri_engine/examples/map_test/maps/unnamed.bsp
+
+INFO: using built-in palette.
+************ ERROR ************
+LoadMapFile: Couldn't load map file "unnamed.map".
+
+
+

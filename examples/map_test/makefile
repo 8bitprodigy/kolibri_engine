@@ -36,7 +36,8 @@ TARGET       = $(PROJECTNAME)$(TARGET_EXT)
 
 ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
 # Only include the specific example files needed for this project
-EXAMPLES_SRC = $(EXAMPLESDIR)/mapscene.c $(EXAMPLESDIR)/v220_map_parser.c
+EXAMPLES_SRC  = $(EXAMPLESDIR)/mapscene.c $(EXAMPLESDIR)/v220_map_parser.c
+EXAMPLES_SRC += $(EXAMPLESDIR)/mapscene_bsp.c
 GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
 
 ENGINE_OBJS   = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
