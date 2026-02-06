@@ -10,19 +10,13 @@
 #include "mapscene_types.h"
 
 /*
- * BSP_Build - Build BSP tree with proper inside/outside determination
+ * BSP_Build - Build BSP tree with leaf classification
  * 
- * Algorithm:
- * 1. Validates info_player_start exists and is in playable space
- * 2. Builds BSP tree from all faces, partitioning space into leaves
- * 3. Classifies each leaf as SOLID or EMPTY
- * 4. Flood-fills from player start through EMPTY leaves
- * 5. Culls faces not bordering reachable EMPTY space
+ * Current implementation (Stages 1-2):
+ * 1. Builds BSP tree from all faces, partitioning space into leaves
+ * 2. Classifies each leaf as SOLID (inside brush) or EMPTY (air/playable)
  * 
- * Returns NULL if:
- * - No info_player_start found
- * - Player start is inside solid geometry
- * - Memory allocation fails
+ * Returns NULL if memory allocation fails
  */
 BSPTree *BSP_Build(
     const CompiledFace  *compiled_faces,
@@ -33,6 +27,30 @@ BSPTree *BSP_Build(
     int                  brush_count,
     const MapData       *map_data
 );
+
+/*
+ * BSP_FloodFillAndDetectLeaks - Stage 3: QBSP-style leak detection
+ * 
+ * Algorithm:
+ * 1. Generate portals between adjacent leaves
+ * 2. Mark unbounded leaves as "outside" 
+ * 3. Flood-fill from outside through EMPTY leaves
+ * 4. Check if any point entities are in outside-marked leaves
+ * 5. If leak: trace path from entity to outside for debugging
+ * 6. If no leak: convert outside leaves to SOLID
+ * 
+ * Returns: true if no leak, false if leak detected
+ * 
+ * If leak is detected, call BSP_DrawLeakPath() in your render loop
+ * to visualize the path from the leaked entity to the outside void.
+ */
+bool BSP_FloodFillAndDetectLeaks(BSPTree *tree, const MapData *map_data);
+
+/* Draw the leak path (if one was detected) as a yellow line */
+void BSP_DrawLeakPath(void);
+
+/* Clean up Stage 3 resources (portals, leak path) */
+void BSP_Stage3_Cleanup(void);
 
 void BSP_Free(BSPTree *tree);
 
@@ -45,10 +63,23 @@ PlaneSide BSP_ClassifyPolygon(
     float plane_dist
 );
 
+/* Find which leaf contains the given point */
 const BSPLeaf *BSP_FindLeaf(const BSPTree *tree, Vector3 point);
+
+/* Get the contents (SOLID or EMPTY) of the leaf containing the point */
+LeafContents BSP_GetPointContents(const BSPTree *tree, Vector3 point);
 
 void BSP_PrintStats(const BSPTree *tree);
 
 bool BSP_Validate(const BSPTree *tree);
+
+/* Debug visualization: Draw leaf bounding boxes color-coded by contents
+ * - GREEN: EMPTY leaves (playable space or void)
+ * - RED: SOLID leaves (inside walls/floors/ceilings)
+ * - BLUE: Reachable EMPTY leaves (Stage 3, not yet implemented)
+ * 
+ * Call this in your render loop to visualize the BSP classification.
+ */
+void BSP_DebugDrawLeafBounds(const BSPTree *tree);
 
 #endif /* MAPSCENE_BSP_H */

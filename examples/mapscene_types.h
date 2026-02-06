@@ -97,6 +97,7 @@ struct BSPLeaf {
     
     int leaf_index;
     bool is_reachable;  /* Set by flood-fill from player start */
+    int flood_parent;   /* Parent leaf in flood-fill (for leak path tracing), -1 if none */
 };
 
 /* BSPTree - Complete tree structure */

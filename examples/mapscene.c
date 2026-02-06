@@ -570,7 +570,10 @@ mapscene_RenderBSP(Scene *scene, Head *head)
             }
         }
     }
-
+    
+    BSP_DebugDrawLeafBounds(sd->bsp_tree);
+    BSP_DrawLeakPath();
+    
     /* Entity Submission */
     Entity **entities = Scene_getEntities(scene);
     for (size_t i = 0; i < DynamicArray_length(entities); i++) {
