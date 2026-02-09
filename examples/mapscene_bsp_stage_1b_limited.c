@@ -948,7 +948,7 @@ typedef struct bsp_node_s {
 } bsp_node_t;
 
 static bsp_node_t*
-BuildTreeRecursive(side_t *sides)
+BuildTreeRecursive(side_t *sides, int depth, int max_depth)
 {
     if (!sides) {
         /* Empty - create empty leaf */
@@ -965,8 +965,8 @@ BuildTreeRecursive(side_t *sides)
     /* Stop recursion if:
      * 1. Hit depth limit
      * 2. Very few sides left (≤ 4)
-    */
-    if (/*depth >= max_depth ||*/ count <= 4) {
+     */
+    if (depth >= max_depth || count <= 4) {
         bsp_node_t *leaf = calloc(1, sizeof(bsp_node_t));
         leaf->is_leaf = true;
         leaf->sides = sides;
@@ -993,8 +993,8 @@ BuildTreeRecursive(side_t *sides)
     node->planenum = partition_plane;
     
     /* Recurse */
-    node->children[0] = BuildTreeRecursive(front_sides);
-    node->children[1] = BuildTreeRecursive(back_sides);
+    node->children[0] = BuildTreeRecursive(front_sides, depth + 1, max_depth);
+    node->children[1] = BuildTreeRecursive(back_sides, depth + 1, max_depth);
     
     return node;
 }
@@ -1142,10 +1142,10 @@ BSP_Build(const MapData *map_data)
     }
     
     /* STAGE 1b: Build BSP tree with limited recursion */
-    const int MAX_DEPTH = 999;
+    const int MAX_DEPTH = 5;
     DBG_OUT("[Stage 1b] Building tree with max depth %d...", MAX_DEPTH);
     
-    bsp_node_t *root = BuildTreeRecursive(all_sides);
+    bsp_node_t *root = BuildTreeRecursive(all_sides, 0, MAX_DEPTH);
     
     /* Count nodes and leaves */
     int node_count = 0, leaf_count = 0;
