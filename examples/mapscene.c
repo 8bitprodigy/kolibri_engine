@@ -298,6 +298,70 @@ compile_brush(const MapBrush *brush, TempCompiledFace *temp_faces)
 }
 
 
+void DiagnoseBrushNormals(const CompiledBrush *brushes, int brush_count,
+                         const CompiledFace *faces, const Vector3 *vertices)
+{
+    DBG_OUT("[DIAG] === Testing Brush Normal Directions ===");
+    
+    for (int b = 0; b < 3 && b < brush_count; b++) {  // Test first 3 brushes
+        const CompiledBrush *brush = &brushes[b];
+        
+        DBG_OUT("[DIAG] Brush %d: %d faces", b, brush->face_count);
+        
+        // Calculate brush center (average of all vertices)
+        Vector3 brush_center = {0, 0, 0};
+        int total_verts = 0;
+        
+        for (int f = 0; f < brush->face_count; f++) {
+            const CompiledFace *face = &faces[brush->face_start + f];
+            for (int v = 0; v < face->vertex_count; v++) {
+                Vector3 vert = vertices[face->vertex_start + v];
+                brush_center.x += vert.x;
+                brush_center.y += vert.y;
+                brush_center.z += vert.z;
+                total_verts++;
+            }
+        }
+        
+        if (total_verts > 0) {
+            brush_center.x /= total_verts;
+            brush_center.y /= total_verts;
+            brush_center.z /= total_verts;
+        }
+        
+        DBG_OUT("[DIAG]   Brush center: (%.1f, %.1f, %.1f)",
+                brush_center.x, brush_center.y, brush_center.z);
+        
+        // Test each face: center should be on BACK side if normals point outward
+        int correct_normals = 0;
+        int wrong_normals = 0;
+        
+        for (int f = 0; f < brush->face_count; f++) {
+            const CompiledFace *face = &faces[brush->face_start + f];
+            
+            // Distance from brush center to face plane
+            float dist = Vector3DotProduct(brush_center, face->normal) - face->plane_dist;
+            
+            if (dist < -0.01f) {
+                // Center is on BACK side - correct if normals point outward!
+                correct_normals++;
+            } else if (dist > 0.01f) {
+                // Center is on FRONT side - WRONG, normal points inward!
+                wrong_normals++;
+                DBG_OUT("[DIAG]   Face %d: WRONG DIRECTION! dist=%.3f", f, dist);
+                DBG_OUT("[DIAG]     Normal: (%.3f, %.3f, %.3f)",
+                        face->normal.x, face->normal.y, face->normal.z);
+            }
+        }
+        
+        DBG_OUT("[DIAG]   Result: %d correct, %d wrong", correct_normals, wrong_normals);
+        
+        if (wrong_normals > 0) {
+            DBG_OUT("[DIAG]   *** NORMALS ARE INVERTED! ***");
+        }
+    }
+}
+
 /*****************************
     SCENE VTABLE CALLBACKS
 *****************************/
@@ -430,6 +494,7 @@ mapscene_Setup(Scene *scene, void *map_data)
             face->normal       = temp_face->normal;
             face->plane_dist   = temp_face->plane_dist;
             face->is_visible   = true;
+            face->brush_idx    = b; /* Track which brush each face belongs to */
 
             /* Copy vertices */
             memcpy(&sd->all_vertices[vert_idx], temp_face->verts, 
@@ -450,18 +515,26 @@ mapscene_Setup(Scene *scene, void *map_data)
     */
     DBG_OUT("[MapScene] Building BSP Tree...");
     sd->bsp_tree = BSP_Build(
+/*
             sd->all_faces, 
             sd->face_count, 
             sd->all_vertices,
             sd->vertex_count,
             sd->brushes,
             sd->brush_count,
+*/
             sd->map
         );
 
     if (sd->bsp_tree) {
         BSP_PrintStats(sd->bsp_tree);
         BSP_Validate(sd->bsp_tree);
+        DiagnoseBrushNormals(
+                sd->brushes, 
+                sd->brush_count, 
+                sd->all_faces, 
+                sd->all_vertices
+            );
     }
     else {
         ERR_OUT("[MapScene] Failed to build BSP tree");
@@ -563,7 +636,7 @@ mapscene_RenderBSP(Scene *scene, Head *head)
                 if (face->vertex_count >= 3) {
                     for (int v = 0; v < face->vertex_count; v++) {
                         int next = (v+1) % face->vertex_count;
-                        DrawLine3D(face->vertices[v], face->vertices[next], wire_color);
+                        //DrawLine3D(face->vertices[v], face->vertices[next], wire_color);
                     }
                 }
                 face = face->next;
@@ -572,7 +645,7 @@ mapscene_RenderBSP(Scene *scene, Head *head)
     }
     
     BSP_DebugDrawLeafBounds(sd->bsp_tree);
-    BSP_DrawLeakPath();
+//    BSP_DrawLeakPath();
     
     /* Entity Submission */
     Entity **entities = Scene_getEntities(scene);

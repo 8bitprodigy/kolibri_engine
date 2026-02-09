@@ -1,0 +1,2018 @@
+/*
+    BSP TREE BUILDING - STAGES 1 & 2
+    
+    STAGE 1: Build tree structure
+    - Recursively partition faces into BSP tree
+    - Distribute faces to leaves during splitting
+    - Compute leaf bounds
+    
+    STAGE 2: Classify leaf contents
+    - Test each leaf's center point against all brushes
+    - Mark leaves as SOLID (inside brush) or EMPTY (air/playable space)
+    
+    STILL TODO:
+    - Stage 3: Flood-fill from player start to mark reachable leaves
+    - Stage 4: Cull faces that don't border reachable space
+    
+    This incremental approach lets us verify each stage works before adding complexity.
+*/
+
+#include <float.h>
+#include <limits.h>
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "mapscene_bsp.h"
+#include "mapscene_types.h"
+#include "v220_map_parser.h"
+#include "kolibri.h"
+
+
+#define INITIAL_NODE_CAPACITY 512
+#define INITIAL_LEAF_CAPACITY 256
+#define MIN_FACES_FOR_SPLIT 1      /* Split if we have at least 1 face */
+#define MAX_SPLIT_VERTS 128
+#define SPLIT_SAMPLE_SIZE 16       /* Sample more faces for better splits */
+
+/* ========================================================================
+   SIMPLE FACE LIST - For managing faces during tree building
+   ======================================================================== */
+
+typedef struct {
+    BSPFace **faces;
+    int face_count;
+    int face_capacity;
+} FaceList;
+
+static FaceList *
+FaceList_Create(void)
+{
+    FaceList *list = malloc(sizeof(FaceList));
+    if (!list)
+        return NULL;
+    
+    memset(list, 0, sizeof(FaceList));
+    list->face_capacity = 64;
+    list->faces = calloc(list->face_capacity, sizeof(BSPFace *));
+    if (!list->faces) {
+        free(list);
+        return NULL;
+    }
+    return list;
+}
+
+static void
+FaceList_Add(FaceList *list, BSPFace *face)
+{
+    if (!list || !face)
+        return;
+    
+    if (list->face_count >= list->face_capacity) {
+        int new_capacity = list->face_capacity * 2;
+        BSPFace **new_faces = realloc(list->faces, new_capacity * sizeof(BSPFace *));
+        if (!new_faces)
+            return;
+        list->faces = new_faces;
+        list->face_capacity = new_capacity;
+    }
+    
+    list->faces[list->face_count++] = face;
+}
+
+static void
+FaceList_Free(FaceList *list)
+{
+    if (!list)
+        return;
+    free(list->faces);
+    free(list);
+}
+
+/* ========================================================================
+   BSP FACE HELPERS
+   ======================================================================== */
+
+static BSPFace *
+BSPFace_Create(int vertex_count)
+{
+    if (vertex_count <= 0 || vertex_count > MAX_SPLIT_VERTS)
+        return NULL;
+    
+    BSPFace *face = malloc(sizeof(BSPFace));
+    if (!face)
+        return NULL;
+    
+    face->vertices = malloc(vertex_count * sizeof(Vector3));
+    if (!face->vertices) {
+        free(face);
+        return NULL;
+    }
+    
+    face->vertex_count = vertex_count;
+    face->next = NULL;
+    face->normal = (Vector3){0, 0, 0};
+    face->plane_dist = 0.0f;
+    face->original_face_idx = -1;
+    
+    return face;
+}
+
+static void
+BSPFace_Free(BSPFace *face)
+{
+    if (face) {
+        free(face->vertices);
+        free(face);
+    }
+}
+
+/* ========================================================================
+   PLANE CLASSIFICATION
+   ======================================================================== */
+
+PlaneSide
+BSP_ClassifyPoint(Vector3 point, Vector3 plane_normal, float plane_dist)
+{
+    float d = Vector3DotProduct(point, plane_normal) - plane_dist;
+    
+    if (d > BSP_EPSILON)
+        return SIDE_FRONT;
+    else if (d < -BSP_EPSILON)
+        return SIDE_BACK;
+    else
+        return SIDE_ON;
+}
+
+PlaneSide
+BSP_ClassifyPolygon(
+    const Vector3 *verts,
+    int vert_count,
+    Vector3 plane_normal,
+    float plane_dist)
+{
+    int front_count = 0;
+    int back_count = 0;
+    
+    for (int i = 0; i < vert_count; i++) {
+        PlaneSide side = BSP_ClassifyPoint(verts[i], plane_normal, plane_dist);
+        if (side == SIDE_FRONT)
+            front_count++;
+        else if (side == SIDE_BACK)
+            back_count++;
+    }
+    
+    if (front_count > 0 && back_count > 0)
+        return SIDE_SPLIT;
+    else if (front_count > 0)
+        return SIDE_FRONT;
+    else if (back_count > 0)
+        return SIDE_BACK;
+    else
+        return SIDE_ON;
+}
+
+/* ========================================================================
+   POLYGON SPLITTING
+   ======================================================================== */
+
+static void
+SplitFace(
+    const BSPFace *face,
+    Vector3 split_normal,
+    float split_dist,
+    BSPFace **out_front,
+    BSPFace **out_back)
+{
+    *out_front = NULL;
+    *out_back = NULL;
+    
+    Vector3 front_verts[MAX_SPLIT_VERTS];
+    Vector3 back_verts[MAX_SPLIT_VERTS];
+    int front_count = 0;
+    int back_count = 0;
+    
+    for (int i = 0; i < face->vertex_count; i++) {
+        Vector3 cur = face->vertices[i];
+        Vector3 next = face->vertices[(i + 1) % face->vertex_count];
+        
+        float d_cur = Vector3DotProduct(cur, split_normal) - split_dist;
+        float d_next = Vector3DotProduct(next, split_normal) - split_dist;
+        
+        /* Add current vertex to appropriate side(s) */
+        if (d_cur >= -BSP_EPSILON && front_count < MAX_SPLIT_VERTS)
+            front_verts[front_count++] = cur;
+        if (d_cur <= BSP_EPSILON && back_count < MAX_SPLIT_VERTS)
+            back_verts[back_count++] = cur;
+        
+        /* Check if edge crosses the plane */
+        if ((d_cur > BSP_EPSILON && d_next < -BSP_EPSILON) ||
+            (d_cur < -BSP_EPSILON && d_next > BSP_EPSILON))
+        {
+            float t = d_cur / (d_cur - d_next);
+            Vector3 intersection = Vector3Add(cur, 
+                Vector3Scale(Vector3Subtract(next, cur), t));
+            
+            if (front_count < MAX_SPLIT_VERTS)
+                front_verts[front_count++] = intersection;
+            if (back_count < MAX_SPLIT_VERTS)
+                back_verts[back_count++] = intersection;
+        }
+    }
+    
+    /* Create front piece if valid */
+    if (front_count >= 3) {
+        *out_front = BSPFace_Create(front_count);
+        if (*out_front) {
+            memcpy((*out_front)->vertices, front_verts, 
+                   front_count * sizeof(Vector3));
+            (*out_front)->normal = face->normal;
+            (*out_front)->plane_dist = face->plane_dist;
+            (*out_front)->original_face_idx = face->original_face_idx;
+        }
+    }
+    
+    /* Create back piece if valid */
+    if (back_count >= 3) {
+        *out_back = BSPFace_Create(back_count);
+        if (*out_back) {
+            memcpy((*out_back)->vertices, back_verts, 
+                   back_count * sizeof(Vector3));
+            (*out_back)->normal = face->normal;
+            (*out_back)->plane_dist = face->plane_dist;
+            (*out_back)->original_face_idx = face->original_face_idx;
+        }
+    }
+}
+
+/* ========================================================================
+   SPLIT PLANE SELECTION - Improved heuristic
+   ======================================================================== */
+
+static int
+SelectSplitPlane(const FaceList *face_list, Vector3 *out_normal, float *out_dist)
+{
+    if (!face_list || face_list->face_count == 0)
+        return -1;
+    
+    /* QBSP-style heuristic:
+     * 1. Minimize splits (faces cut by the plane)
+     * 2. Balance front/back distribution
+     * 3. Favor axis-aligned planes slightly
+     */
+    
+    int best_idx = -1;
+    int best_score = INT_MAX;
+    int best_front = 0;
+    int best_back = 0;
+    
+    /* Sample more faces for better quality splits */
+    int sample_count = face_list->face_count;
+    if (sample_count > SPLIT_SAMPLE_SIZE)
+        sample_count = SPLIT_SAMPLE_SIZE;
+    
+    for (int i = 0; i < sample_count; i++) {
+        const BSPFace *candidate = face_list->faces[i];
+        Vector3 normal = candidate->normal;
+        float dist = candidate->plane_dist;
+        
+        int front_count = 0;
+        int back_count = 0;
+        int split_count = 0;
+        int coplanar_count = 0;
+        
+        /* Test ALL faces (including this one) against this plane.
+         * The candidate itself will be classified as coplanar. */
+        for (int j = 0; j < face_list->face_count; j++) {
+            const BSPFace *test = face_list->faces[j];
+            PlaneSide side = BSP_ClassifyPolygon(test->vertices, 
+                                                 test->vertex_count,
+                                                 normal, dist);
+            
+            switch (side) {
+                case SIDE_FRONT: front_count++; break;
+                case SIDE_BACK:  back_count++;  break;
+                case SIDE_SPLIT: split_count++; break;
+                case SIDE_ON:    
+                    /* Coplanar faces will be distributed by normal direction.
+                     * Count them towards the side they'll actually go to. */
+                    if (Vector3DotProduct(normal, test->normal) > 0)
+                        front_count++;
+                    else
+                        back_count++;
+                    coplanar_count++;
+                    break;
+            }
+        }
+        
+        /* CRITICAL: Skip planes that don't actually partition the set.
+         * After distributing coplanar faces, we need both sides non-empty. */
+        if (front_count == 0 || back_count == 0) {
+            continue;
+        }
+        
+        /* Score the split:
+         * - Heavily penalize splits (each split creates 2 faces)
+         * - Moderately penalize imbalance
+         * - Slightly favor axis-aligned planes
+         */
+        int balance = abs(front_count - back_count);
+        int score = split_count * 8 + balance;
+        
+        /* Bonus for axis-aligned planes (helps with boxy architecture) */
+        if (fabsf(normal.x) > 0.99f || fabsf(normal.y) > 0.99f || fabsf(normal.z) > 0.99f)
+            score -= 1;
+        
+        if (score < best_score) {
+            best_score = score;
+            best_idx = i;
+            best_front = front_count;
+            best_back = back_count;
+        }
+    }
+    
+    /* If we didn't find ANY plane that partitions the set, return -1 */
+    if (best_idx < 0) {
+        return -1;
+    }
+    
+    /* Double-check that our best plane actually partitions */
+    if (best_front == 0 || best_back == 0) {
+        return -1;
+    }
+    
+    *out_normal = face_list->faces[best_idx]->normal;
+    *out_dist = face_list->faces[best_idx]->plane_dist;
+    return best_idx;
+}
+
+/* ========================================================================
+   TREE BUILDING - Recursive
+   ======================================================================== */
+
+static int
+AllocNode(BSPTree *tree)
+{
+    if (tree->node_count >= tree->node_capacity) {
+        int new_capacity = tree->node_capacity * 2;
+        BSPNode *new_nodes = realloc(tree->nodes, 
+                                     new_capacity * sizeof(BSPNode));
+        if (!new_nodes)
+            return -1;
+        tree->nodes = new_nodes;
+        tree->node_capacity = new_capacity;
+    }
+    
+    int idx = tree->node_count++;
+    memset(&tree->nodes[idx], 0, sizeof(BSPNode));
+    return idx;
+}
+
+static int
+AllocLeaf(BSPTree *tree)
+{
+    if (tree->leaf_count >= tree->leaf_capacity) {
+        int new_capacity = tree->leaf_capacity * 2;
+        BSPLeaf *new_leaves = realloc(tree->leaves, 
+                                      new_capacity * sizeof(BSPLeaf));
+        if (!new_leaves)
+            return -1;
+        tree->leaves = new_leaves;
+        tree->leaf_capacity = new_capacity;
+    }
+    
+    int idx = tree->leaf_count++;
+    memset(&tree->leaves[idx], 0, sizeof(BSPLeaf));
+    tree->leaves[idx].leaf_index = idx;
+    tree->leaves[idx].bounds_min = (Vector3){FLT_MAX, FLT_MAX, FLT_MAX};
+    tree->leaves[idx].bounds_max = (Vector3){-FLT_MAX, -FLT_MAX, -FLT_MAX};
+    return idx;
+}
+
+static void
+AddFaceToLeaf(BSPTree *tree, int leaf_idx, BSPFace *face)
+{
+    BSPLeaf *leaf = &tree->leaves[leaf_idx];
+    
+    /* Link face into leaf's list */
+    face->next = leaf->faces;
+    leaf->faces = face;
+    leaf->face_count++;
+    
+    /* Update leaf bounds */
+    for (int i = 0; i < face->vertex_count; i++) {
+        Vector3 v = face->vertices[i];
+        if (v.x < leaf->bounds_min.x) leaf->bounds_min.x = v.x;
+        if (v.y < leaf->bounds_min.y) leaf->bounds_min.y = v.y;
+        if (v.z < leaf->bounds_min.z) leaf->bounds_min.z = v.z;
+        if (v.x > leaf->bounds_max.x) leaf->bounds_max.x = v.x;
+        if (v.y > leaf->bounds_max.y) leaf->bounds_max.y = v.y;
+        if (v.z > leaf->bounds_max.z) leaf->bounds_max.z = v.z;
+    }
+}
+
+static int
+BuildTree_Recursive(BSPTree *tree, FaceList *face_list, int depth, bool *is_leaf)
+{
+    /* Track max depth */
+    if (depth > tree->max_tree_depth)
+        tree->max_tree_depth = depth;
+    
+    /* EMERGENCY SAFETY VALVE: If we somehow hit insane depth, bail out.
+     * This prevents stack overflow while we debug. A properly working BSP
+     * should NEVER hit this - if you see this message, there's a bug. */
+    if (depth > 1000) {
+        DBG_OUT("[BSP EMERGENCY] Depth %d: %d faces, creating emergency leaf", 
+                depth, face_list->face_count);
+        
+        /* Diagnose why we got here */
+        if (face_list->face_count > 0) {
+            DBG_OUT("  First face: normal=(%.3f,%.3f,%.3f) dist=%.3f verts=%d",
+                    face_list->faces[0]->normal.x,
+                    face_list->faces[0]->normal.y,
+                    face_list->faces[0]->normal.z,
+                    face_list->faces[0]->plane_dist,
+                    face_list->faces[0]->vertex_count);
+            
+            if (face_list->face_count > 1) {
+                DBG_OUT("  Second face: normal=(%.3f,%.3f,%.3f) dist=%.3f verts=%d",
+                        face_list->faces[1]->normal.x,
+                        face_list->faces[1]->normal.y,
+                        face_list->faces[1]->normal.z,
+                        face_list->faces[1]->plane_dist,
+                        face_list->faces[1]->vertex_count);
+            }
+        }
+        
+        int leaf_idx = AllocLeaf(tree);
+        if (leaf_idx >= 0) {
+            for (int i = 0; i < face_list->face_count; i++) {
+                AddFaceToLeaf(tree, leaf_idx, face_list->faces[i]);
+            }
+        }
+        *is_leaf = true;
+        return leaf_idx;
+    }
+    
+    /* TERMINATION CONDITIONS:
+     * 1. No faces left - create empty leaf
+     * 2. Only 1 face - create leaf with that face
+     */
+    
+    if (face_list->face_count == 0) {
+        /* Empty leaf */
+        if (depth < 5) {
+            DBG_OUT("[BSP]   Depth %d: Empty leaf", depth);
+        }
+        int leaf_idx = AllocLeaf(tree);
+        *is_leaf = true;
+        return leaf_idx;
+    }
+    
+    if (face_list->face_count == 1) {
+        /* Single face - create leaf */
+        if (depth < 5) {
+            DBG_OUT("[BSP]   Depth %d: Single face leaf", depth);
+        }
+        int leaf_idx = AllocLeaf(tree);
+        if (leaf_idx >= 0) {
+            AddFaceToLeaf(tree, leaf_idx, face_list->faces[0]);
+        }
+        *is_leaf = true;
+        return leaf_idx;
+    }
+    
+    /* SELECT SPLIT PLANE
+     * If SelectSplitPlane returns -1, it means no plane can partition the set.
+     * This happens when all faces are coplanar or otherwise inseparable.
+     */
+    Vector3 split_normal;
+    float split_dist;
+    int split_idx = SelectSplitPlane(face_list, &split_normal, &split_dist);
+    
+    if (split_idx < 0) {
+        /* No valid split plane found - create leaf with all faces */
+        if (depth < 5) {
+            DBG_OUT("[BSP]   Depth %d: No valid split (%d faces)", depth, face_list->face_count);
+        }
+        int leaf_idx = AllocLeaf(tree);
+        if (leaf_idx >= 0) {
+            for (int i = 0; i < face_list->face_count; i++) {
+                AddFaceToLeaf(tree, leaf_idx, face_list->faces[i]);
+            }
+        }
+        *is_leaf = true;
+        return leaf_idx;
+    }
+    
+    /* CREATE NODE */
+    int node_idx = AllocNode(tree);
+    if (node_idx < 0) {
+        *is_leaf = false;
+        return -1;
+    }
+    
+    tree->nodes[node_idx].plane_normal = split_normal;
+    tree->nodes[node_idx].plane_dist = split_dist;
+    
+    /* PARTITION FACES */
+    FaceList *front_list = FaceList_Create();
+    FaceList *back_list = FaceList_Create();
+    
+    if (!front_list || !back_list) {
+        FaceList_Free(front_list);
+        FaceList_Free(back_list);
+        *is_leaf = false;
+        return node_idx;
+    }
+    
+    int splits_performed = 0;
+    int faces_classified = 0;
+    
+    for (int i = 0; i < face_list->face_count; i++) {
+        BSPFace *face = face_list->faces[i];
+        
+        PlaneSide side = BSP_ClassifyPolygon(face->vertices, 
+                                             face->vertex_count,
+                                             split_normal, split_dist);
+        
+        switch (side) {
+        case SIDE_FRONT:
+            FaceList_Add(front_list, face);
+            faces_classified++;
+            break;
+        case SIDE_BACK:
+            FaceList_Add(back_list, face);
+            faces_classified++;
+            break;
+        case SIDE_ON:
+            /* Coplanar face - put on the side it faces */
+            if (Vector3DotProduct(split_normal, face->normal) > 0)
+                FaceList_Add(front_list, face);
+            else
+                FaceList_Add(back_list, face);
+            faces_classified++;
+            break;
+        case SIDE_SPLIT: {
+            /* Split the face */
+            BSPFace *front_piece, *back_piece;
+            SplitFace(face, split_normal, split_dist, 
+                     &front_piece, &back_piece);
+            
+            if (front_piece)
+                FaceList_Add(front_list, front_piece);
+            if (back_piece)
+                FaceList_Add(back_list, back_piece);
+            
+            splits_performed++;
+            faces_classified++;
+            
+            /* Free original face since we split it */
+            BSPFace_Free(face);
+            break;
+        }
+        }
+    }
+    
+    /* SAFETY CHECK: If we didn't classify any faces, we have a problem.
+     * This shouldn't happen but prevents infinite recursion. */
+    if (faces_classified == 0) {
+        DBG_OUT("[BSP ERROR] Failed to classify any faces at depth %d", depth);
+        int leaf_idx = AllocLeaf(tree);
+        if (leaf_idx >= 0) {
+            for (int i = 0; i < face_list->face_count; i++) {
+                AddFaceToLeaf(tree, leaf_idx, face_list->faces[i]);
+            }
+        }
+        FaceList_Free(front_list);
+        FaceList_Free(back_list);
+        *is_leaf = true;
+        return leaf_idx;
+    }
+    
+    /* SAFETY CHECK: If both sides are empty somehow, create empty leaf */
+    if (front_list->face_count == 0 && back_list->face_count == 0) {
+        DBG_OUT("[BSP WARNING] Both sides empty at depth %d", depth);
+        FaceList_Free(front_list);
+        FaceList_Free(back_list);
+        int leaf_idx = AllocLeaf(tree);
+        *is_leaf = true;
+        return leaf_idx;
+    }
+    
+    /* Log progress at early depths or when splits happen */
+    if (splits_performed > 0 || depth < 3) {
+        DBG_OUT("[BSP]   Depth %d: %d faces -> %d front, %d back (%d splits)",
+                depth, face_list->face_count, 
+                front_list->face_count, back_list->face_count,
+                splits_performed);
+    }
+    
+    /* RECURSE TO BUILD CHILDREN */
+    bool front_is_leaf = false;
+    bool back_is_leaf = false;
+    
+    int front_child = BuildTree_Recursive(tree, front_list, depth + 1, 
+                                          &front_is_leaf);
+    int back_child = BuildTree_Recursive(tree, back_list, depth + 1, 
+                                         &back_is_leaf);
+    
+    tree->nodes[node_idx].front_child = front_child;
+    tree->nodes[node_idx].back_child = back_child;
+    tree->nodes[node_idx].front_is_leaf = front_is_leaf;
+    tree->nodes[node_idx].back_is_leaf = back_is_leaf;
+    
+    FaceList_Free(front_list);
+    FaceList_Free(back_list);
+    
+    *is_leaf = false;
+    return node_idx;
+}
+
+/* Clear all faces from all leaves */
+static void
+ClearLeafFaces(BSPTree *tree)
+{
+    for (int i = 0; i < tree->leaf_count; i++) {
+        BSPLeaf *leaf = &tree->leaves[i];
+        
+        /* Free all faces in this leaf */
+        BSPFace *face = leaf->faces;
+        while (face) {
+            BSPFace *next = face->next;
+            BSPFace_Free(face);
+            face = next;
+        }
+        
+        leaf->faces = NULL;
+        leaf->face_count = 0;
+    }
+}
+
+/* Test if a leaf's bounds intersect with a face */
+static bool
+LeafIntersectsFace(const BSPLeaf *leaf, const Vector3 *face_verts, int vert_count)
+{
+    /* Simple bounds check first */
+    Vector3 face_min = face_verts[0];
+    Vector3 face_max = face_verts[0];
+    
+    for (int i = 1; i < vert_count; i++) {
+        if (face_verts[i].x < face_min.x) face_min.x = face_verts[i].x;
+        if (face_verts[i].y < face_min.y) face_min.y = face_verts[i].y;
+        if (face_verts[i].z < face_min.z) face_min.z = face_verts[i].z;
+        if (face_verts[i].x > face_max.x) face_max.x = face_verts[i].x;
+        if (face_verts[i].y > face_max.y) face_max.y = face_verts[i].y;
+        if (face_verts[i].z > face_max.z) face_max.z = face_verts[i].z;
+    }
+    
+    /* Check if bounds overlap */
+    if (leaf->bounds_max.x < face_min.x || leaf->bounds_min.x > face_max.x)
+        return false;
+    if (leaf->bounds_max.y < face_min.y || leaf->bounds_min.y > face_max.y)
+        return false;
+    if (leaf->bounds_max.z < face_min.z || leaf->bounds_min.z > face_max.z)
+        return false;
+    
+    return true;
+}
+
+/* Redistribute faces to leaves properly */
+static void
+RedistributeFacesToLeaves(
+    BSPTree *tree,
+    const CompiledFace *compiled_faces,
+    int face_count,
+    const Vector3 *vertices)
+{
+    DBG_OUT("[BSP] Redistributing faces to leaves...");
+    
+    /* Clear existing faces */
+    ClearLeafFaces(tree);
+    
+    /* For each original face, test which leaf(s) it might border */
+    for (int f = 0; f < face_count; f++) {
+        const CompiledFace *cf = &compiled_faces[f];
+        
+        if (!cf->is_visible || cf->vertex_count < 3)
+            continue;
+        
+        /* Get face vertices */
+        const Vector3 *face_verts = &vertices[cf->vertex_start];
+        
+        /* Find the leaf containing the face's center */
+        Vector3 center = {0, 0, 0};
+        for (int v = 0; v < cf->vertex_count; v++) {
+            center = Vector3Add(center, face_verts[v]);
+        }
+        center = Vector3Scale(center, 1.0f / cf->vertex_count);
+        
+        /* Offset slightly along the normal (inward) */
+        Vector3 test_point = Vector3Add(center, 
+            Vector3Scale(cf->normal, -0.1f));  /* Go INTO the brush */
+        
+        const BSPLeaf *leaf = BSP_FindLeaf(tree, test_point);
+        if (!leaf)
+            continue;
+        
+        /* Add this face to that leaf */
+        BSPLeaf *mutable_leaf = &tree->leaves[leaf->leaf_index];
+        
+        BSPFace *bsp_face = BSPFace_Create(cf->vertex_count);
+        if (bsp_face) {
+            memcpy(bsp_face->vertices, face_verts, 
+                   cf->vertex_count * sizeof(Vector3));
+            bsp_face->normal = cf->normal;
+            bsp_face->plane_dist = cf->plane_dist;
+            bsp_face->original_face_idx = f;
+            
+            /* Add to leaf's linked list */
+            bsp_face->next = mutable_leaf->faces;
+            mutable_leaf->faces = bsp_face;
+            mutable_leaf->face_count++;
+        }
+    }
+    
+    /* Count results */
+    int leaves_with_faces = 0;
+    int leaves_without_faces = 0;
+    
+    for (int i = 0; i < tree->leaf_count; i++) {
+        if (tree->leaves[i].face_count > 0)
+            leaves_with_faces++;
+        else
+            leaves_without_faces++;
+    }
+    
+    DBG_OUT("[BSP] Face redistribution complete:");
+    DBG_OUT("[BSP]   %d leaves have faces (SOLID)", leaves_with_faces);
+    DBG_OUT("[BSP]   %d leaves have no faces (EMPTY)", leaves_without_faces);
+}
+
+/* ========================================================================
+   STAGE 2: LEAF CLASSIFICATION HELPERS
+   ======================================================================== */
+
+static bool
+PointInsideBrush(
+    Vector3 point,
+    const CompiledBrush *brush,
+    const CompiledFace *all_faces)
+{
+    /* A point is inside a convex brush if it's on the BACK side of ALL faces.
+     * Face normals point OUTWARD, so back side = inside. */
+    
+    for (int f = 0; f < brush->face_count; f++) {
+        const CompiledFace *face = &all_faces[brush->face_start + f];
+        
+        /* Point-to-plane distance test */
+        float dist = Vector3DotProduct(point, face->normal) - face->plane_dist;
+        
+        /* If point is in front of ANY face, it's outside the brush */
+        if (dist > BSP_EPSILON) {
+            return false;
+        }
+    }
+    
+    /* Point is behind all faces = inside brush */
+    return true;
+}
+
+
+/* ========================================================================
+   STAGE 3: FLOOD-FILL AND LEAK DETECTION
+   ======================================================================== */
+typedef struct Portal {
+    int leaf_front;
+    int leaf_back;
+    struct Portal *next;
+} Portal;
+
+static Portal *g_portals = NULL;
+
+static void
+FreePortals(void)
+{
+    while (g_portals) {
+        Portal *next = g_portals->next;
+        free(g_portals);
+        g_portals = next;
+    }
+}
+
+/* Recursively generate portals at every BSP node that has at least one leaf child */
+static void
+GeneratePortals_Recursive(BSPTree *tree, int node_idx, bool is_leaf)
+{
+    if (is_leaf)
+        return;
+    
+    const BSPNode *node = &tree->nodes[node_idx];
+    
+    /* If both children are leaves, create a portal between them */
+    if (node->front_is_leaf && node->back_is_leaf) {
+        Portal *portal = malloc(sizeof(Portal));
+        if (portal) {
+            portal->leaf_front = node->front_child;
+            portal->leaf_back = node->back_child;
+            portal->next = g_portals;
+            g_portals = portal;
+        }
+    }
+    /* If one child is a leaf, we need to find all descendant leaves on the other side */
+    else if (node->front_is_leaf) {
+        /* Front is leaf, back is node - connect front to all back's descendant leaves */
+        int front_leaf = node->front_child;
+        
+        /* Walk back subtree and create portals */
+        int stack[512];
+        bool is_leaf_stack[512];
+        int stack_ptr = 0;
+        
+        stack[stack_ptr] = node->back_child;
+        is_leaf_stack[stack_ptr] = node->back_is_leaf;
+        stack_ptr++;
+        
+        while (stack_ptr > 0) {
+            stack_ptr--;
+            int idx = stack[stack_ptr];
+            bool is_leaf = is_leaf_stack[stack_ptr];
+            
+            if (is_leaf) {
+                /* Found a back leaf - create portal */
+                Portal *portal = malloc(sizeof(Portal));
+                if (portal) {
+                    portal->leaf_front = front_leaf;
+                    portal->leaf_back = idx;
+                    portal->next = g_portals;
+                    g_portals = portal;
+                }
+            } else {
+                /* Node - push children */
+                const BSPNode *n = &tree->nodes[idx];
+                if (stack_ptr < 512) {
+                    stack[stack_ptr] = n->back_child;
+                    is_leaf_stack[stack_ptr] = n->back_is_leaf;
+                    stack_ptr++;
+                }
+                if (stack_ptr < 512) {
+                    stack[stack_ptr] = n->front_child;
+                    is_leaf_stack[stack_ptr] = n->front_is_leaf;
+                    stack_ptr++;
+                }
+            }
+        }
+    }
+    else if (node->back_is_leaf) {
+        /* Back is leaf, front is node - connect back to all front's descendant leaves */
+        int back_leaf = node->back_child;
+        
+        int stack[512];
+        bool is_leaf_stack[512];
+        int stack_ptr = 0;
+        
+        stack[stack_ptr] = node->front_child;
+        is_leaf_stack[stack_ptr] = node->front_is_leaf;
+        stack_ptr++;
+        
+        while (stack_ptr > 0) {
+            stack_ptr--;
+            int idx = stack[stack_ptr];
+            bool is_leaf = is_leaf_stack[stack_ptr];
+            
+            if (is_leaf) {
+                Portal *portal = malloc(sizeof(Portal));
+                if (portal) {
+                    portal->leaf_front = idx;
+                    portal->leaf_back = back_leaf;
+                    portal->next = g_portals;
+                    g_portals = portal;
+                }
+            } else {
+                const BSPNode *n = &tree->nodes[idx];
+                if (stack_ptr < 512) {
+                    stack[stack_ptr] = n->back_child;
+                    is_leaf_stack[stack_ptr] = n->back_is_leaf;
+                    stack_ptr++;
+                }
+                if (stack_ptr < 512) {
+                    stack[stack_ptr] = n->front_child;
+                    is_leaf_stack[stack_ptr] = n->front_is_leaf;
+                    stack_ptr++;
+                }
+            }
+        }
+    }
+    
+    /* Recurse to children */
+    if (!node->front_is_leaf)
+        GeneratePortals_Recursive(tree, node->front_child, false);
+    if (!node->back_is_leaf)
+        GeneratePortals_Recursive(tree, node->back_child, false);
+}
+
+static void
+GeneratePortals(BSPTree *tree)
+{
+    DBG_OUT("[BSP] Generating portals...");
+    
+    FreePortals();
+    
+    if (tree->root_is_leaf) {
+        DBG_OUT("[BSP] Single leaf tree - no portals needed");
+        return;
+    }
+    
+    GeneratePortals_Recursive(tree, 0, false);
+    
+    /* Count portals */
+    int count = 0;
+    for (Portal *p = g_portals; p; p = p->next)
+        count++;
+    
+    DBG_OUT("[BSP] Generated %d portals", count);
+}
+
+/* ========================================================================
+   ENTITY COLLECTION - Find all point entities
+   ======================================================================== */
+
+typedef struct {
+    Vector3 origin;
+    const char *classname;
+    int leaf_index;
+} EntityInfo;
+
+static EntityInfo *
+CollectPointEntities(const MapData *map_data, int *out_count)
+{
+    *out_count = 0;
+    
+    if (!map_data)
+        return NULL;
+    
+    /* First pass: count point entities */
+    int count = 0;
+    for (int i = 0; i < map_data->entity_count; i++) {
+        const MapEntity *entity = &map_data->entities[i];
+        const char *classname = GetEntityProperty((MapEntity*)entity, "classname");
+        
+        /* Skip worldspawn and brush entities */
+        if (!classname || strcmp(classname, "worldspawn") == 0)
+            continue;
+        
+        /* Check if it has an origin (point entities have origins) */
+        const char *origin_str = GetEntityProperty((MapEntity*)entity, "origin");
+        if (origin_str)
+            count++;
+    }
+    
+    if (count == 0) {
+        DBG_OUT("[BSP] No point entities found!");
+        return NULL;
+    }
+    
+    /* Allocate array */
+    EntityInfo *entities = malloc(count * sizeof(EntityInfo));
+    if (!entities)
+        return NULL;
+    
+    /* Second pass: fill array */
+    int idx = 0;
+    for (int i = 0; i < map_data->entity_count; i++) {
+        const MapEntity *entity = &map_data->entities[i];
+        const char *classname = GetEntityProperty((MapEntity*)entity, "classname");
+        
+        if (!classname || strcmp(classname, "worldspawn") == 0)
+            continue;
+        
+        const char *origin_str = GetEntityProperty((MapEntity*)entity, "origin");
+        if (!origin_str)
+            continue;
+        
+        Vector3 origin;
+        if (sscanf(origin_str, "%f %f %f", &origin.x, &origin.y, &origin.z) == 3) {
+            entities[idx].origin = origin;
+            entities[idx].classname = classname;
+            entities[idx].leaf_index = -1;  /* Will be filled in later */
+            idx++;
+        }
+    }
+    
+    *out_count = idx;
+    DBG_OUT("[BSP] Found %d point entities to use as flood-fill seeds", idx);
+    
+    return entities;
+}
+
+/* ========================================================================
+   FLOOD-FILL FROM ENTITIES (Quake 2 Style)
+   ======================================================================== */
+static void
+DiagnosePortalConnectivity(BSPTree *tree, int player_leaf_idx, Portal *portals)
+{
+    DBG_OUT("[BSP] === PORTAL DIAGNOSTIC ===");
+    DBG_OUT("[BSP] Player is in leaf %d (EMPTY)", player_leaf_idx);
+    
+    /* Find portals connected to player leaf */
+    int portal_count = 0;
+    int empty_connections = 0;
+    int solid_connections = 0;
+    
+    DBG_OUT("[BSP] Portals from player leaf:");
+    
+    for (Portal *p = portals; p; p = p->next) {
+        int neighbor = -1;
+        
+        if (p->leaf_front == player_leaf_idx)
+            neighbor = p->leaf_back;
+        else if (p->leaf_back == player_leaf_idx)
+            neighbor = p->leaf_front;
+        
+        if (neighbor >= 0 && neighbor < tree->leaf_count) {
+            portal_count++;
+            const BSPLeaf *n = &tree->leaves[neighbor];
+            
+            if (n->contents == CONTENTS_EMPTY)
+                empty_connections++;
+            else
+                solid_connections++;
+            
+            if (portal_count <= 10) {
+                DBG_OUT("[BSP]   -> Leaf %d: %s", 
+                        neighbor, 
+                        n->contents == CONTENTS_EMPTY ? "EMPTY" : "SOLID");
+            }
+        }
+    }
+    
+    DBG_OUT("[BSP] Total: %d portals (%d to EMPTY, %d to SOLID)",
+            portal_count, empty_connections, solid_connections);
+    
+    if (empty_connections == 0) {
+        DBG_OUT("[BSP] *** PROBLEM: No portals to EMPTY neighbors! ***");
+        DBG_OUT("[BSP] *** Flood-fill cannot spread beyond this leaf! ***");
+    }
+    
+    /* Sample some reachable leaves to see their portal situation */
+    DBG_OUT("[BSP] Checking a few reachable leaves...");
+    
+    int checked = 0;
+    for (int i = 0; i < tree->leaf_count && checked < 3; i++) {
+        if (!tree->leaves[i].is_reachable || i == player_leaf_idx)
+            continue;
+        
+        /* Count portals for this leaf */
+        int empty_p = 0, solid_p = 0;
+        for (Portal *p = portals; p; p = p->next) {
+            int neighbor = -1;
+            
+            if (p->leaf_front == i)
+                neighbor = p->leaf_back;
+            else if (p->leaf_back == i)
+                neighbor = p->leaf_front;
+            
+            if (neighbor >= 0 && neighbor < tree->leaf_count) {
+                if (tree->leaves[neighbor].contents == CONTENTS_EMPTY)
+                    empty_p++;
+                else
+                    solid_p++;
+            }
+        }
+        
+        DBG_OUT("[BSP]   Leaf %d: %d EMPTY portals, %d SOLID portals",
+                i, empty_p, solid_p);
+        checked++;
+    }
+    
+    /* Count total EMPTY-to-EMPTY vs EMPTY-to-SOLID vs SOLID-to-SOLID portals */
+    int empty_empty = 0, empty_solid = 0, solid_solid = 0;
+    
+    for (Portal *p = portals; p; p = p->next) {
+        if (p->leaf_front < tree->leaf_count && p->leaf_back < tree->leaf_count) {
+            bool front_empty = tree->leaves[p->leaf_front].contents == CONTENTS_EMPTY;
+            bool back_empty = tree->leaves[p->leaf_back].contents == CONTENTS_EMPTY;
+            
+            if (front_empty && back_empty)
+                empty_empty++;
+            else if (front_empty || back_empty)
+                empty_solid++;
+            else
+                solid_solid++;
+        }
+    }
+    
+    DBG_OUT("[BSP] Portal breakdown:");
+    DBG_OUT("[BSP]   EMPTY<->EMPTY: %d (flood can pass)", empty_empty);
+    DBG_OUT("[BSP]   EMPTY<->SOLID: %d (flood stops)", empty_solid);
+    DBG_OUT("[BSP]   SOLID<->SOLID: %d (irrelevant)", solid_solid);
+    
+    if (empty_empty < 10) {
+        DBG_OUT("[BSP] *** PROBLEM: Very few EMPTY-EMPTY portals! ***");
+        DBG_OUT("[BSP] *** Most EMPTY leaves are isolated! ***");
+    }
+}
+
+static void
+FloodFillFromEntities(BSPTree *tree, EntityInfo *entities, int entity_count)
+{
+    if (!entities || entity_count == 0) {
+        DBG_OUT("[BSP WARNING] No entities to flood-fill from!");
+        return;
+    }
+    
+    DBG_OUT("[BSP] Flood-filling from %d point entities (inside-out)...", entity_count);
+    
+    /* Initialize all leaves as unreachable */
+    for (int i = 0; i < tree->leaf_count; i++) {
+        tree->leaves[i].is_reachable = false;
+        tree->leaves[i].flood_parent = -1;
+    }
+    
+    /* Find which leaf each entity is in and mark as reachable */
+    int seeds_placed = 0;
+    for (int i = 0; i < entity_count; i++) {
+        const BSPLeaf *leaf = BSP_FindLeaf(tree, entities[i].origin);
+        
+        if (!leaf) {
+            DBG_OUT("[BSP WARNING] Entity '%s' at (%.0f,%.0f,%.0f) not in any leaf!",
+                    entities[i].classname,
+                    entities[i].origin.x, entities[i].origin.y, entities[i].origin.z);
+            continue;
+        }
+        
+        entities[i].leaf_index = leaf->leaf_index;
+        
+        /* Check if entity is in SOLID leaf (inside a wall) */
+        if (leaf->contents == CONTENTS_SOLID) {
+            fprintf(stderr, "[BSP ERROR] Entity '%s' at (%.0f,%.0f,%.0f) is inside SOLID (leaf %d)!\n",
+                    entities[i].classname,
+                    entities[i].origin.x, entities[i].origin.y, entities[i].origin.z,
+                    leaf->leaf_index);
+            fprintf(stderr, "[BSP ERROR] This entity is embedded in a brush!\n");
+            /* Continue anyway - might just be a mapping error */
+        }
+        
+        /* Mark this leaf as reachable (it's a seed point) */
+        BSPLeaf *mutable_leaf = &tree->leaves[leaf->leaf_index];
+        if (!mutable_leaf->is_reachable) {
+            mutable_leaf->is_reachable = true;
+            seeds_placed++;
+            
+            DBG_OUT("[BSP]   Seed %d: '%s' in leaf %d (contents=%s)",
+                    i, entities[i].classname, leaf->leaf_index,
+                    leaf->contents == CONTENTS_EMPTY ? "EMPTY" : "SOLID");
+        }
+    }
+    
+    DBG_OUT("[BSP] Placed %d flood-fill seeds", seeds_placed);
+    
+    if (seeds_placed == 0) {
+        DBG_OUT("[BSP WARNING] No valid seed points - all entities in SOLID?");
+        return;
+    }
+    
+    if (seeds_placed > 0) {
+        for (int i = 0; i < entity_count; i++) {
+            if (entities[i].leaf_index >= 0) {
+                DiagnosePortalConnectivity(tree, entities[i].leaf_index, g_portals);
+                break;
+            }
+        }
+    }
+    
+    /* Flood-fill through EMPTY leaves via portals */
+    bool changed = true;
+    int iterations = 0;
+    int total_marked = 0;
+    
+    while (changed && iterations < 1000) {
+        changed = false;
+        iterations++;
+        int marked_this_iter = 0;
+        
+        /* Propagate reachability through portals connecting EMPTY leaves */
+        for (Portal *portal = g_portals; portal; portal = portal->next) {
+            BSPLeaf *front = &tree->leaves[portal->leaf_front];
+            BSPLeaf *back = &tree->leaves[portal->leaf_back];
+            
+            /* Only propagate through EMPTY-to-EMPTY portals */
+            if (front->contents != CONTENTS_EMPTY || back->contents != CONTENTS_EMPTY)
+                continue;
+            
+            /* Propagate reachability with parent tracking */
+            if (front->is_reachable && !back->is_reachable) {
+                back->is_reachable = true;
+                back->flood_parent = portal->leaf_front;
+                changed = true;
+                marked_this_iter++;
+                total_marked++;
+            } else if (back->is_reachable && !front->is_reachable) {
+                front->is_reachable = true;
+                front->flood_parent = portal->leaf_back;
+                changed = true;
+                marked_this_iter++;
+                total_marked++;
+            }
+        }
+        
+        if (marked_this_iter > 0 && iterations <= 10) {
+            DBG_OUT("[BSP]   Iteration %d: marked %d more leaves as reachable",
+                    iterations, marked_this_iter);
+        }
+    }
+    
+    DBG_OUT("[BSP] Flood-fill complete in %d iterations", iterations);
+    DBG_OUT("[BSP] Total leaves marked as reachable (interior): %d", total_marked + seeds_placed);
+}
+
+/* ========================================================================
+   LEAK DETECTION (Quake 2 Style)
+   ======================================================================== */
+
+typedef struct {
+    Vector3 *points;
+    int point_count;
+    int capacity;
+} LeakPath;
+
+static LeakPath *g_leak_path = NULL;
+
+static void
+FreeLeakPath(void)
+{
+    if (g_leak_path) {
+        free(g_leak_path->points);
+        free(g_leak_path);
+        g_leak_path = NULL;
+    }
+}
+
+/* Check for unbounded leaves - these indicate the outside void */
+static bool
+IsLeafUnbounded(const BSPLeaf *leaf)
+{
+    const float UNBOUNDED_THRESHOLD = 16384.0f;
+    
+    return (fabsf(leaf->bounds_min.x) > UNBOUNDED_THRESHOLD ||
+            fabsf(leaf->bounds_min.y) > UNBOUNDED_THRESHOLD ||
+            fabsf(leaf->bounds_min.z) > UNBOUNDED_THRESHOLD ||
+            fabsf(leaf->bounds_max.x) > UNBOUNDED_THRESHOLD ||
+            fabsf(leaf->bounds_max.y) > UNBOUNDED_THRESHOLD ||
+            fabsf(leaf->bounds_max.z) > UNBOUNDED_THRESHOLD);
+}
+
+/* Find the nearest unreachable EMPTY leaf (outside) to a given leaf */
+static int
+FindNearestOutsideLeaf(BSPTree *tree, int start_leaf_idx)
+{
+    /* Simple BFS to find closest unreachable EMPTY leaf */
+    int queue[1024];
+    bool visited[1024] = {false};
+    int queue_start = 0;
+    int queue_end = 0;
+    
+    queue[queue_end++] = start_leaf_idx;
+    visited[start_leaf_idx] = true;
+    
+    while (queue_start < queue_end && queue_end < 1024) {
+        int current = queue[queue_start++];
+        
+        const BSPLeaf *leaf = &tree->leaves[current];
+        
+        /* Found an unreachable EMPTY leaf - this is outside! */
+        if (leaf->contents == CONTENTS_EMPTY && !leaf->is_reachable) {
+            return current;
+        }
+        
+        /* Add neighbors via portals */
+        for (Portal *p = g_portals; p; p = p->next) {
+            int neighbor = -1;
+            
+            if (p->leaf_front == current)
+                neighbor = p->leaf_back;
+            else if (p->leaf_back == current)
+                neighbor = p->leaf_front;
+            
+            if (neighbor >= 0 && neighbor < tree->leaf_count && !visited[neighbor]) {
+                visited[neighbor] = true;
+                if (queue_end < 1024)
+                    queue[queue_end++] = neighbor;
+            }
+        }
+    }
+    
+    /* Didn't find any unreachable EMPTY leaf - weird but possible */
+    return -1;
+}
+
+/* Trace path from entity leaf to outside void */
+static void
+TraceLeakPath(BSPTree *tree, int entity_leaf_idx, const char *entity_name)
+{
+    FreeLeakPath();
+    
+    g_leak_path = malloc(sizeof(LeakPath));
+    if (!g_leak_path)
+        return;
+    
+    g_leak_path->capacity = 256;
+    g_leak_path->points = malloc(g_leak_path->capacity * sizeof(Vector3));
+    g_leak_path->point_count = 0;
+    
+    if (!g_leak_path->points) {
+        free(g_leak_path);
+        g_leak_path = NULL;
+        return;
+    }
+    
+    DBG_OUT("[BSP] Tracing leak path from entity '%s'...", entity_name);
+    
+    /* Find the nearest outside (unreachable EMPTY) leaf */
+    int outside_leaf = FindNearestOutsideLeaf(tree, entity_leaf_idx);
+    
+    if (outside_leaf < 0) {
+        DBG_OUT("[BSP] Could not find outside leaf for leak path?!");
+        return;
+    }
+    
+    DBG_OUT("[BSP] Nearest outside leaf is %d", outside_leaf);
+    
+    /* Build path from entity to outside
+     * We'll use a simple BFS to find the shortest path */
+    
+    int parent[1024];
+    for (int i = 0; i < 1024; i++)
+        parent[i] = -1;
+    
+    int queue[1024];
+    int queue_start = 0;
+    int queue_end = 0;
+    
+    queue[queue_end++] = entity_leaf_idx;
+    parent[entity_leaf_idx] = entity_leaf_idx;  /* Mark as visited */
+    
+    bool found = false;
+    
+    while (queue_start < queue_end && queue_end < 1024 && !found) {
+        int current = queue[queue_start++];
+        
+        if (current == outside_leaf) {
+            found = true;
+            break;
+        }
+        
+        /* Add neighbors */
+        for (Portal *p = g_portals; p; p = p->next) {
+            int neighbor = -1;
+            
+            if (p->leaf_front == current)
+                neighbor = p->leaf_back;
+            else if (p->leaf_back == current)
+                neighbor = p->leaf_front;
+            
+            if (neighbor >= 0 && neighbor < tree->leaf_count && parent[neighbor] < 0) {
+                parent[neighbor] = current;
+                if (queue_end < 1024)
+                    queue[queue_end++] = neighbor;
+            }
+        }
+    }
+    
+    if (!found) {
+        DBG_OUT("[BSP] Could not find path to outside?!");
+        return;
+    }
+    
+    /* Walk backwards from outside to entity to build path */
+    int current = outside_leaf;
+    while (current != entity_leaf_idx && g_leak_path->point_count < g_leak_path->capacity) {
+        const BSPLeaf *leaf = &tree->leaves[current];
+        Vector3 center = Vector3Scale(
+            Vector3Add(leaf->bounds_min, leaf->bounds_max), 0.5f);
+        
+        g_leak_path->points[g_leak_path->point_count++] = center;
+        
+        current = parent[current];
+        if (current < 0)
+            break;
+    }
+    
+    /* Add entity leaf */
+    if (g_leak_path->point_count < g_leak_path->capacity) {
+        const BSPLeaf *leaf = &tree->leaves[entity_leaf_idx];
+        Vector3 center = Vector3Scale(
+            Vector3Add(leaf->bounds_min, leaf->bounds_max), 0.5f);
+        g_leak_path->points[g_leak_path->point_count++] = center;
+    }
+    
+    DBG_OUT("[BSP] Leak path has %d waypoints", g_leak_path->point_count);
+}
+
+static bool
+CheckForLeaks(BSPTree *tree)
+{
+    DBG_OUT("[BSP] Checking for leaks (unreachable EMPTY leaves)...");
+    
+    /* Count unreachable EMPTY leaves - these are "outside" the sealed map */
+    int unreachable_empty = 0;
+    int unbounded_unreachable = 0;
+    int first_leak_leaf = -1;
+    
+    for (int i = 0; i < tree->leaf_count; i++) {
+        const BSPLeaf *leaf = &tree->leaves[i];
+        
+        if (leaf->contents == CONTENTS_EMPTY && !leaf->is_reachable) {
+            unreachable_empty++;
+            
+            if (IsLeafUnbounded(leaf)) {
+                unbounded_unreachable++;
+            }
+            
+            if (first_leak_leaf < 0)
+                first_leak_leaf = i;
+        }
+    }
+    
+    if (unreachable_empty > 0) {
+        fprintf(stderr, "\n");
+        fprintf(stderr, "****************************************************\n");
+        fprintf(stderr, "* LEAK DETECTED!                                   *\n");
+        fprintf(stderr, "*                                                  *\n");
+        fprintf(stderr, "* Found %d unreachable EMPTY leaves               *\n", unreachable_empty);
+        fprintf(stderr, "* (%d are unbounded - touching the void)          *\n", unbounded_unreachable);
+        fprintf(stderr, "*                                                  *\n");
+        fprintf(stderr, "* The interior playable space has a gap that       *\n");
+        fprintf(stderr, "* connects to the outside void!                    *\n");
+        fprintf(stderr, "*                                                  *\n");
+        fprintf(stderr, "* The map is not properly sealed.                  *\n");
+        fprintf(stderr, "****************************************************\n");
+        fprintf(stderr, "\n");
+        
+        /* Trace a leak path from any reachable leaf to the first unreachable leaf */
+        if (first_leak_leaf >= 0) {
+            /* Find a reachable leaf to start from */
+            for (int i = 0; i < tree->leaf_count; i++) {
+                if (tree->leaves[i].is_reachable) {
+                    TraceLeakPath(tree, i, "interior");
+                    break;
+                }
+            }
+        }
+        
+        return false;  /* LEAK! */
+    }
+    
+    DBG_OUT("[BSP] No leaks detected - all EMPTY space is reachable from entities!");
+    return true;  /* No leaks */
+}
+
+/* ========================================================================
+   LEAK PATH VISUALIZATION
+   ======================================================================== */
+
+void
+BSP_DrawLeakPath(void)
+{
+    if (!g_leak_path || g_leak_path->point_count < 2)
+        return;
+    
+    /* Draw the leak path as a bright RED line */
+    Color leak_color = RED;
+    
+    for (int i = 0; i < g_leak_path->point_count - 1; i++) {
+        DrawLine3D(g_leak_path->points[i], g_leak_path->points[i + 1], leak_color);
+        
+        /* Draw spheres at waypoints */
+        DrawSphereWires(
+                g_leak_path->points[i], 
+                0.1f, 
+                3, 
+                8, 
+                leak_color
+            );
+    }
+    
+    /* Draw final waypoint */
+    if (g_leak_path->point_count > 0) {
+        DrawSphereWires(
+                g_leak_path->points[g_leak_path->point_count - 1], 
+                0.2f, 
+                3, 
+                8,
+                RED
+            );
+    }
+}
+
+/* Test if a point is inside a convex brush */
+static bool
+IsPointInsideBrush(Vector3 point, const CompiledBrush *brush,
+                   const CompiledFace *all_faces, const Vector3 *vertices)
+{
+    /* A convex brush is the intersection of half-spaces defined by its faces.
+     * A point is inside if it's on the BACK side of ALL faces.
+     * 
+     * Face normals in Valve format point OUTWARD from the brush,
+     * so we want: dot(point - face_center, normal) < 0 for all faces
+     */
+    
+    for (int f = 0; f < brush->face_count; f++) {
+        const CompiledFace *face = &all_faces[brush->face_start + f];
+        
+        /* Face plane equation: dot(point, normal) - distance = 0
+         * Point is in front if: dot(point, normal) > distance
+         * Point is behind if: dot(point, normal) < distance
+         * 
+         * For a brush face pointing outward, we want the point BEHIND (inside)
+         */
+        float dist = Vector3DotProduct(point, face->normal) - face->plane_dist;
+        
+        /* If point is in FRONT of any face, it's outside this brush */
+        if (dist > 0.01f) {  /* Small epsilon for floating point */
+            return false;
+        }
+    }
+    
+    /* Point is behind all faces = inside the brush */
+    return true;
+}
+
+static void
+ClassifyLeaves_Simple(BSPTree *tree)
+{
+    DBG_OUT("[BSP] Stage 2: Classifying leaf contents...");
+    
+    int solid_count = 0;
+    int empty_count = 0;
+    
+    for (int i = 0; i < tree->leaf_count; i++) {
+        BSPLeaf *leaf = &tree->leaves[i];
+        
+        if (leaf->face_count > 0) {
+            /* Leaf has faces from BSP splitting = inside solid brush */
+            leaf->contents = CONTENTS_SOLID;
+            solid_count++;
+        } else {
+            /* Leaf has no faces = air/void space
+             * (Stage 3 will distinguish interior from outside void) */
+            leaf->contents = CONTENTS_EMPTY;
+            empty_count++;
+        }
+    }
+    
+    DBG_OUT("[BSP] Stage 2 complete:");
+    DBG_OUT("[BSP]   SOLID leaves: %d (have faces)", solid_count);
+    DBG_OUT("[BSP]   EMPTY leaves: %d (no faces)", empty_count);
+}
+
+/* Classify leaves based on brush containment */
+static void
+ClassifyLeaves_BrushBased(
+    BSPTree *tree,
+    const CompiledBrush *brushes,
+    int brush_count,
+    const CompiledFace *all_faces,
+    const Vector3 *vertices)
+{
+    DBG_OUT("[BSP] Stage 2: Classifying leaves (brush-based)...");
+    
+    int solid_count = 0;
+    int empty_count = 0;
+    
+    for (int i = 0; i < tree->leaf_count; i++) {
+        BSPLeaf *leaf = &tree->leaves[i];
+        
+        /* Compute leaf center */
+        Vector3 center = Vector3Scale(
+            Vector3Add(leaf->bounds_min, leaf->bounds_max), 0.5f);
+        
+        /* Test if center is inside ANY brush */
+        bool inside_brush = false;
+        
+        for (int b = 0; b < brush_count && !inside_brush; b++) {
+            if (IsPointInsideBrush(center, &brushes[b], all_faces, vertices)) {
+                inside_brush = true;
+            }
+        }
+        
+        /* Classify leaf */
+        if (inside_brush) {
+            leaf->contents = CONTENTS_SOLID;
+            solid_count++;
+        } else {
+            leaf->contents = CONTENTS_EMPTY;
+            empty_count++;
+        }
+    }
+    
+    DBG_OUT("[BSP] Stage 2 complete:");
+    DBG_OUT("[BSP]   SOLID leaves: %d (inside brushes)", solid_count);
+    DBG_OUT("[BSP]   EMPTY leaves: %d (not inside brushes)", empty_count);
+}
+
+/* ========================================================================
+   STAGE 3 MAIN FUNCTION (Quake 2 Style)
+   
+   Call this after Stage 2 (leaf classification) in BSP_Build
+   ======================================================================== */
+
+bool
+BSP_FloodFillAndDetectLeaks(BSPTree *tree, const MapData *map_data)
+{
+    /* Step 1: Generate portals between adjacent leaves */
+    GeneratePortals(tree);
+    
+    /* Step 2: Collect all point entities to use as flood-fill seeds */
+    int entity_count;
+    EntityInfo *entities = CollectPointEntities(map_data, &entity_count);
+    
+    if (!entities || entity_count == 0) {
+        DBG_OUT("[BSP ERROR] No point entities found - cannot flood-fill!");
+        DBG_OUT("[BSP] Add at least one info_player_start to your map");
+        return false;
+    }
+    
+    /* Step 3: Flood-fill FROM entities (inside-out) */
+    FloodFillFromEntities(tree, entities, entity_count);
+    
+    free(entities);
+    
+    /* Step 4: Check for unreachable EMPTY leaves (these are leaks) */
+    bool no_leak = CheckForLeaks(tree);
+    
+    if (!no_leak) {
+        /* Leak detected - keep portals and leak path for debugging */
+        return false;
+    }
+    
+    /* No leak - convert unreachable EMPTY leaves to SOLID (outside void) */
+    DBG_OUT("[BSP] Converting unreachable EMPTY leaves to SOLID (outside void)...");
+    
+    int converted = 0;
+    for (int i = 0; i < tree->leaf_count; i++) {
+        BSPLeaf *leaf = &tree->leaves[i];
+        
+        if (leaf->contents == CONTENTS_EMPTY && !leaf->is_reachable) {
+            leaf->contents = CONTENTS_SOLID;
+            converted++;
+        }
+    }
+    
+    DBG_OUT("[BSP] Converted %d unreachable EMPTY leaves to SOLID", converted);
+    
+    /* Count final leaf distribution */
+    int solid = 0, empty_reachable = 0;
+    for (int i = 0; i < tree->leaf_count; i++) {
+        if (tree->leaves[i].contents == CONTENTS_SOLID)
+            solid++;
+        else if (tree->leaves[i].is_reachable)
+            empty_reachable++;
+    }
+    
+    DBG_OUT("[BSP] Final classification: %d SOLID (walls+outside), %d EMPTY (interior)",
+            solid, empty_reachable);
+    
+    /* Don't free portals yet - we'll need them for Stage 4 (face culling) */
+    
+    return true;  /* Success */
+}
+
+/* ========================================================================
+   CLEANUP
+   ======================================================================== */
+
+void
+BSP_Stage3_Cleanup(void)
+{
+    FreePortals();
+    FreeLeakPath();
+}
+
+/* ========================================================================
+   MAIN BUILD FUNCTION - STAGES 1 & 2
+   ======================================================================== */
+
+BSPTree *
+BSP_Build(
+    const CompiledFace  *compiled_faces,
+    int                  face_count,
+    const Vector3       *vertices,
+    int                  vertex_count,
+    const CompiledBrush *brushes,
+    int                  brush_count,
+    const MapData       *map_data)
+{
+    DBG_OUT("[BSP] Stage 1: Building tree from %d faces...", face_count);
+    
+    /* Allocate tree */
+    BSPTree *tree = malloc(sizeof(BSPTree));
+    if (!tree)
+        return NULL;
+    
+    memset(tree, 0, sizeof(BSPTree));
+    tree->node_capacity = INITIAL_NODE_CAPACITY;
+    tree->leaf_capacity = INITIAL_LEAF_CAPACITY;
+    tree->nodes = malloc(tree->node_capacity * sizeof(BSPNode));
+    tree->leaves = malloc(tree->leaf_capacity * sizeof(BSPLeaf));
+    
+    if (!tree->nodes || !tree->leaves) {
+        free(tree->nodes);
+        free(tree->leaves);
+        free(tree);
+        return NULL;
+    }
+    
+    tree->total_faces = face_count;
+    
+    /* Convert CompiledFaces to BSPFaces */
+    FaceList *initial_faces = FaceList_Create();
+    if (!initial_faces) {
+        free(tree->nodes);
+        free(tree->leaves);
+        free(tree);
+        return NULL;
+    }
+    
+    for (int i = 0; i < face_count; i++) {
+        const CompiledFace *cf = &compiled_faces[i];
+        
+        /* Skip invisible or degenerate faces */
+        if (!cf->is_visible || cf->vertex_count < 3)
+            continue;
+        
+        BSPFace *bsp_face = BSPFace_Create(cf->vertex_count);
+        if (!bsp_face)
+            continue;
+        
+        /* Copy vertices */
+        for (int v = 0; v < cf->vertex_count; v++)
+            bsp_face->vertices[v] = vertices[cf->vertex_start + v];
+        
+        bsp_face->normal = cf->normal;
+        bsp_face->plane_dist = cf->plane_dist;
+        bsp_face->original_face_idx = i;
+        
+        FaceList_Add(initial_faces, bsp_face);
+    }
+    
+    DBG_OUT("[BSP] Building tree with %d valid faces...", 
+            initial_faces->face_count);
+    
+    /* Build the tree recursively */
+    if (initial_faces->face_count > 0) {
+        BuildTree_Recursive(tree, initial_faces, 0, &tree->root_is_leaf);
+    } else {
+        /* No faces - create single empty leaf */
+        tree->root_is_leaf = true;
+        AllocLeaf(tree);
+    }
+    
+    FaceList_Free(initial_faces);
+    
+    //RedistributeFacesToLeaves(tree, compiled_faces, face_count, vertices);
+    
+    DBG_OUT("[BSP] Stage 1 complete:");
+    DBG_OUT("  Nodes: %d", tree->node_count);
+    DBG_OUT("  Leaves: %d", tree->leaf_count);
+    DBG_OUT("  Max depth: %d", tree->max_tree_depth);
+    DBG_OUT("  Total faces: %d", tree->total_faces);
+    
+    /* ===================================================================
+       STAGE 2: CLASSIFY LEAVES AS SOLID OR EMPTY
+       =================================================================== */
+    
+    //ClassifyLeaves_Simple(tree);
+    //ClassifyLeaves_BrushBased(tree, brushes, brush_count, compiled_faces, vertices);
+    for (int i = 0; i < tree->leaf_count; i++) {
+        tree->leaves[i].contents = CONTENTS_EMPTY;
+    }
+    
+    /* For now, mark all faces as visible (Stage 4 will cull) */
+    tree->visible_faces = tree->total_faces;
+    
+    /* ===================================================================
+       STAGE 3: FLOOD-FILL AND LEAK DETECTION
+       =================================================================== */
+    if (!BSP_FloodFillAndDetectLeaks(tree, map_data)) {
+        /* Leak detected! User should fix their map */
+        fprintf(stderr, "[BSP] BUILD FAILED - Map has leaks\n");
+        fprintf(stderr, "[BSP] The leak path will be drawn in yellow\n");
+        fprintf(stderr, "[BSP] Follow it to find the gap in your geometry\n");
+        /* Don't return NULL - let the map render so they can see the leak */
+    }
+    
+    DBG_OUT(
+            "[BSP] Build complete: %d nodes, %d leaves, %d visible faces",
+            tree->node_count, 
+            tree->leaf_count, 
+            tree->visible_faces
+        );
+    
+    return tree;
+}
+
+/* ========================================================================
+   UTILITY FUNCTIONS
+   ======================================================================== */
+
+void
+BSP_Free(BSPTree *tree)
+{
+    if (!tree)
+        return;
+    
+    /* Free all faces in all leaves */
+    for (int i = 0; i < tree->leaf_count; i++) {
+        BSPFace *face = tree->leaves[i].faces;
+        while (face) {
+            BSPFace *next = face->next;
+            BSP_Stage3_Cleanup();
+            BSPFace_Free(face);
+            face = next;
+        }
+    }
+    
+    free(tree->nodes);
+    free(tree->leaves);
+    free(tree);
+}
+
+const BSPLeaf *
+BSP_FindLeaf(const BSPTree *tree, Vector3 point)
+{
+    if (!tree)
+        return NULL;
+    
+    if (tree->root_is_leaf)
+        return &tree->leaves[0];
+    
+    int node_idx = 0;
+    bool is_leaf = false;
+    
+    while (!is_leaf) {
+        const BSPNode *node = &tree->nodes[node_idx];
+        PlaneSide side = BSP_ClassifyPoint(point, node->plane_normal, 
+                                           node->plane_dist);
+        
+        if (side == SIDE_FRONT || side == SIDE_ON) {
+            node_idx = node->front_child;
+            is_leaf = node->front_is_leaf;
+        } else {
+            node_idx = node->back_child;
+            is_leaf = node->back_is_leaf;
+        }
+    }
+    
+    return &tree->leaves[node_idx];
+}
+
+LeafContents
+BSP_GetPointContents(const BSPTree *tree, Vector3 point)
+{
+    const BSPLeaf *leaf = BSP_FindLeaf(tree, point);
+    if (!leaf)
+        return CONTENTS_SOLID;  /* Safe default */
+    
+    return leaf->contents;
+}
+
+void
+BSP_PrintStats(const BSPTree *tree)
+{
+    if (!tree)
+        return;
+    
+    DBG_OUT("=== BSP Tree Statistics ===");
+    DBG_OUT("  Nodes: %d", tree->node_count);
+    DBG_OUT("  Leaves: %d", tree->leaf_count);
+    DBG_OUT("  Total faces: %d", tree->total_faces);
+    DBG_OUT("  Visible faces: %d", tree->visible_faces);
+    DBG_OUT("  Max depth: %d", tree->max_tree_depth);
+    
+    /* Count faces per leaf */
+    int total_leaf_faces = 0;
+    int min_faces = INT_MAX;
+    int max_faces = 0;
+    int solid_leaves = 0;
+    int empty_leaves = 0;
+    
+    for (int i = 0; i < tree->leaf_count; i++) {
+        int count = tree->leaves[i].face_count;
+        total_leaf_faces += count;
+        if (count < min_faces) min_faces = count;
+        if (count > max_faces) max_faces = count;
+        
+        if (tree->leaves[i].contents == CONTENTS_SOLID)
+            solid_leaves++;
+        else
+            empty_leaves++;
+    }
+    
+    DBG_OUT("  Faces in leaves: %d total (%d min, %d max, %.1f avg)",
+            total_leaf_faces, min_faces, max_faces,
+            (float)total_leaf_faces / (tree->leaf_count ? tree->leaf_count : 1));
+    DBG_OUT("  Leaf classification: %d SOLID, %d EMPTY",
+            solid_leaves, empty_leaves);
+}
+
+bool
+BSP_Validate(const BSPTree *tree)
+{
+    if (!tree)
+        return false;
+    
+    /* Validate node references */
+    for (int i = 0; i < tree->node_count; i++) {
+        const BSPNode *node = &tree->nodes[i];
+        
+        if (node->front_is_leaf) {
+            if (node->front_child < 0 || node->front_child >= tree->leaf_count) {
+                DBG_OUT("[BSP ERROR] Node %d: invalid front leaf %d", 
+                        i, node->front_child);
+                return false;
+            }
+        } else {
+            if (node->front_child < 0 || node->front_child >= tree->node_count) {
+                DBG_OUT("[BSP ERROR] Node %d: invalid front node %d", 
+                        i, node->front_child);
+                return false;
+            }
+        }
+        
+        if (node->back_is_leaf) {
+            if (node->back_child < 0 || node->back_child >= tree->leaf_count) {
+                DBG_OUT("[BSP ERROR] Node %d: invalid back leaf %d", 
+                        i, node->back_child);
+                return false;
+            }
+        } else {
+            if (node->back_child < 0 || node->back_child >= tree->node_count) {
+                DBG_OUT("[BSP ERROR] Node %d: invalid back node %d", 
+                        i, node->back_child);
+                return false;
+            }
+        }
+    }
+    
+    DBG_OUT("[BSP] Tree validation passed");
+    return true;
+}
+
+void
+BSP_DebugDrawLeafBounds(const BSPTree *tree)
+{
+    if (!tree)
+        return;
+    
+    for (int i = 0; i < tree->leaf_count; i++) {
+        const BSPLeaf *leaf = &tree->leaves[i];
+        
+        /* Skip leaves with invalid bounds */
+        if (leaf->bounds_min.x > leaf->bounds_max.x)
+            continue;
+        
+        /* Color code by contents:
+         * - GREEN: EMPTY (playable space)
+         * - ORANGE: SOLID (inside walls)
+         * - BLUE: Reachable EMPTY (Stage 3, not yet implemented)
+         */
+        Color color;
+        if (leaf->contents == CONTENTS_SOLID) {
+            color = ORANGE;
+        } else if (leaf->is_reachable) {
+            color = BLUE;      // Blue (will use in Stage 3)
+        } else {
+            color = GREEN;
+        }
+        
+        /* Draw the 12 edges of the axis-aligned bounding box */
+        Vector3 min = Vector3Add(
+                leaf->bounds_min,
+                (Vector3){0.01f,0.01f,0.01f}
+            );
+        Vector3 max = Vector3Subtract(
+                leaf->bounds_max,
+                (Vector3){0.01f,0.01f,0.01f}
+            );
+        
+        /* Bottom face (4 edges) */
+        DrawLine3D((Vector3){min.x, min.y, min.z}, (Vector3){max.x, min.y, min.z}, color);
+        DrawLine3D((Vector3){max.x, min.y, min.z}, (Vector3){max.x, min.y, max.z}, color);
+        DrawLine3D((Vector3){max.x, min.y, max.z}, (Vector3){min.x, min.y, max.z}, color);
+        DrawLine3D((Vector3){min.x, min.y, max.z}, (Vector3){min.x, min.y, min.z}, color);
+        
+        /* Top face (4 edges) */
+        DrawLine3D((Vector3){min.x, max.y, min.z}, (Vector3){max.x, max.y, min.z}, color);
+        DrawLine3D((Vector3){max.x, max.y, min.z}, (Vector3){max.x, max.y, max.z}, color);
+        DrawLine3D((Vector3){max.x, max.y, max.z}, (Vector3){min.x, max.y, max.z}, color);
+        DrawLine3D((Vector3){min.x, max.y, max.z}, (Vector3){min.x, max.y, min.z}, color);
+        
+        /* Vertical edges (4 edges) */
+        DrawLine3D((Vector3){min.x, min.y, min.z}, (Vector3){min.x, max.y, min.z}, color);
+        DrawLine3D((Vector3){max.x, min.y, min.z}, (Vector3){max.x, max.y, min.z}, color);
+        DrawLine3D((Vector3){max.x, min.y, max.z}, (Vector3){max.x, max.y, max.z}, color);
+        DrawLine3D((Vector3){min.x, min.y, max.z}, (Vector3){min.x, max.y, max.z}, color);
+    }
+}

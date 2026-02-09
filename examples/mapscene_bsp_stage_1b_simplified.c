@@ -1141,37 +1141,6 @@ BSP_DebugDrawLeafBounds(const BSPTree *tree)
     DrawText(TextFormat("Front leaf: %d faces | Back leaf: %d faces", 
              tree->leaves[0].face_count, tree->leaves[1].face_count), 10, 35, 20, WHITE);
     
-    
-    /* Draw leaves */
-    for (int i = 0; i < tree->leaf_count; i++) {
-        const BSPLeaf *leaf = &tree->leaves[i];
-        
-        /* Color: green for front (leaf 0), red for back (leaf 1) */
-        Color box_color = (i == 0) ? (Color){0, 255, 0, 255} : (Color){255, 0, 0, 255};
-        Color face_color = (i == 0) ? (Color){0, 255, 0, 128} : (Color){255, 0, 0, 128};
-        
-        if (leaf->face_count == 0) {
-            /* Empty leaf - draw bounds only */
-            DrawBoundingBox((BoundingBox){leaf->bounds_min, leaf->bounds_max}, 
-                           (Color){100, 100, 100, 255});
-            continue;
-        }
-        
-        /* Draw leaf bounding box */
-        DrawBoundingBox((BoundingBox){leaf->bounds_min, leaf->bounds_max}, box_color);
-        
-        /* Draw faces within this leaf */
-        for (BSPFace *face = leaf->faces; face; face = face->next) {
-            if (face->vertex_count < 3) continue;
-            
-            /* Draw wireframe */
-            for (int v = 0; v < face->vertex_count; v++) {
-                int next = (v + 1) % face->vertex_count;
-                DrawLine3D(face->vertices[v], face->vertices[next], face_color);
-            }
-        }
-    }
-    
     /* Draw partition plane as a big quad */
     if (tree->node_count > 0) {
         BSPNode *root = &tree->nodes[0];
@@ -1206,5 +1175,35 @@ BSP_DebugDrawLeafBounds(const BSPTree *tree)
         /* Draw normal */
         Vector3 normal_end = Vector3Add(center, Vector3Scale(normal, 2.0f));
         DrawLine3D(center, normal_end, YELLOW);
+    }
+    
+    /* Draw leaves */
+    for (int i = 0; i < tree->leaf_count; i++) {
+        const BSPLeaf *leaf = &tree->leaves[i];
+        
+        /* Color: green for front (leaf 0), red for back (leaf 1) */
+        Color box_color = (i == 0) ? (Color){0, 255, 0, 255} : (Color){255, 0, 0, 255};
+        Color face_color = (i == 0) ? (Color){0, 255, 0, 128} : (Color){255, 0, 0, 128};
+        
+        if (leaf->face_count == 0) {
+            /* Empty leaf - draw bounds only */
+            DrawBoundingBox((BoundingBox){leaf->bounds_min, leaf->bounds_max}, 
+                           (Color){100, 100, 100, 255});
+            continue;
+        }
+        
+        /* Draw leaf bounding box */
+        DrawBoundingBox((BoundingBox){leaf->bounds_min, leaf->bounds_max}, box_color);
+        
+        /* Draw faces within this leaf */
+        for (BSPFace *face = leaf->faces; face; face = face->next) {
+            if (face->vertex_count < 3) continue;
+            
+            /* Draw wireframe */
+            for (int v = 0; v < face->vertex_count; v++) {
+                int next = (v + 1) % face->vertex_count;
+                DrawLine3D(face->vertices[v], face->vertices[next], face_color);
+            }
+        }
     }
 }

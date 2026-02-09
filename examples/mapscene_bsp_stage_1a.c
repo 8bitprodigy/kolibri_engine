@@ -51,19 +51,6 @@ FreeWinding(winding_t *w)
     free(w);
 }
 
-static winding_t*
-CopyWinding(winding_t *w)
-{
-    if (!w) return NULL;
-    
-    winding_t *copy = AllocWinding(w->numpoints);
-    copy->numpoints = w->numpoints;
-    for (int i = 0; i < w->numpoints; i++) {
-        copy->points[i] = w->points[i];
-    }
-    return copy;
-}
-
 /* Create a huge winding on a plane */
 static winding_t*
 BaseWindingForPlane(Vector3 normal, float dist)
@@ -115,14 +102,6 @@ BaseWindingForPlane(Vector3 normal, float dist)
 static winding_t*
 ClipWindingToPlane(winding_t *in, Vector3 normal, float dist)
 {
-    /* Safety check */
-    if (!in || in->numpoints < 3 || in->numpoints > MAX_POINTS_ON_WINDING) {
-        DBG_OUT("[ERROR] ClipWindingToPlane: Invalid winding (numpoints=%d, max=%d)", 
-                in ? in->numpoints : -1, MAX_POINTS_ON_WINDING);
-        if (in) FreeWinding(in);
-        return NULL;
-    }
-    
     float dists[MAX_POINTS_ON_WINDING + 1];
     int sides[MAX_POINTS_ON_WINDING + 1];
     int counts[3] = {0, 0, 0};
@@ -282,8 +261,9 @@ MakeSidesFromBrush(const MapBrush *brush, int brush_idx)
     for (int i = 0; i < brush->plane_count; i++) {
         const MapPlane *mp = &brush->planes[i];
         
-        /* Valve 220 planes point OUTWARD from solid.
-         * Keep them that way - we'll negate during clipping instead. */
+        /* Valve 220 planes point OUTWARD from solid
+         * QBSP expects planes to point INWARD (toward solid)
+         * So we invert the plane */
         Vector3 normal = mp->normal;
         float dist = mp->distance;
         
@@ -358,13 +338,8 @@ MakeWindingsForBrush(side_t *brush_sides)
             }
             
             /* Negate plane to clip to inside of brush */
-            Vector3 neg_normal = {
-                -g_plane_normals[clip->planenum].x,
-                -g_plane_normals[clip->planenum].y,
-                -g_plane_normals[clip->planenum].z
-            };
+            Vector3 neg_normal = Vector3Negate(g_plane_normals[clip->planenum]);
             float neg_dist = -g_plane_dists[clip->planenum];
-            
             s->winding = ClipWindingToPlane(
                 s->winding,
                 neg_normal,
@@ -831,111 +806,6 @@ ClassifyLeaves(BSPTree *tree, const MapData *map_data)
 }
 
 /* ========================================================================
-   SIDE SPLITTING
-   ======================================================================== */
-
-/* Split sides into front and back lists based on a partition plane
- * This is the QBSP way: windings that cross the plane are CLIPPED into two pieces */
-static void
-SplitSides(side_t *sides, int planenum, side_t **front, side_t **back)
-{
-    *front = NULL;
-    *back = NULL;
-    
-    while (sides) {
-        side_t *next = sides->next;
-        sides->next = NULL;
-        
-        if (!sides->winding) {
-            /* No winding - put in back */
-            sides->next = *back;
-            *back = sides;
-            sides = next;
-            continue;
-        }
-        
-        /* Classify winding against partition plane */
-        int front_count = 0, back_count = 0;
-        
-        for (int i = 0; i < sides->winding->numpoints; i++) {
-            float d = Vector3DotProduct(sides->winding->points[i], g_plane_normals[planenum])
-                    - g_plane_dists[planenum];
-            
-            if (d > EPSILON) front_count++;
-            else if (d < -EPSILON) back_count++;
-        }
-        
-        /* Decide what to do with this side */
-        if (front_count == 0 && back_count == 0) {
-            /* On plane - put in back */
-            sides->next = *back;
-            *back = sides;
-        }
-        else if (back_count == 0) {
-            /* Entirely in front */
-            sides->next = *front;
-            *front = sides;
-        }
-        else if (front_count == 0) {
-            /* Entirely in back */
-            sides->next = *back;
-            *back = sides;
-        }
-        else {
-            /* Crosses plane - SPLIT IT (the QBSP way) */
-            
-            /* Create front side */
-            side_t *front_side = calloc(1, sizeof(side_t));
-            front_side->planenum = sides->planenum;
-            front_side->brush_idx = sides->brush_idx;
-            
-            /* Clip a COPY of the winding to front side of partition plane */
-            winding_t *front_winding = CopyWinding(sides->winding);
-            front_side->winding = ClipWindingToPlane(
-                front_winding,
-                g_plane_normals[planenum],
-                g_plane_dists[planenum]
-            );
-            
-            /* Clip original winding to back side of partition plane
-             * Negate plane to keep back side */
-            Vector3 neg_normal = {
-                -g_plane_normals[planenum].x,
-                -g_plane_normals[planenum].y,
-                -g_plane_normals[planenum].z
-            };
-            float neg_dist = -g_plane_dists[planenum];
-            
-            winding_t *back_winding = ClipWindingToPlane(
-                sides->winding,
-                neg_normal,
-                neg_dist
-            );
-            
-            /* Original winding is now consumed/freed */
-            sides->winding = back_winding;
-            
-            /* Add both to their respective lists */
-            if (front_side->winding) {
-                front_side->next = *front;
-                *front = front_side;
-            } else {
-                free(front_side);
-            }
-            
-            if (sides->winding) {
-                sides->next = *back;
-                *back = sides;
-            } else {
-                free(sides);
-            }
-        }
-        
-        sides = next;
-    }
-}
-
-/* ========================================================================
    PUBLIC API (STUBS FOR NOW)
    ======================================================================== */
 
@@ -977,74 +847,26 @@ BSP_Build(const MapData *map_data)
     DBG_OUT("[Stage 1a] Generated %d sides, %d planes, %d valid windings",
             map_data->world_brush_count * 6, g_num_planes, valid_count);
     
-    if (valid_count == 0) {
-        DBG_OUT("[Stage 1a] ERROR: No valid windings! Cannot build tree.");
-        return NULL;
-    }
-    
-    /* STAGE 1b-simple: Test ONE partition, don't recurse */
-    DBG_OUT("[Stage 1b-simple] Testing single partition...");
-    
-    /* Pick first partition plane */
-    int partition_plane = SelectPartition(all_sides);
-    if (partition_plane == -1) {
-        DBG_OUT("[Stage 1b-simple] ERROR: No partition plane selected!");
-        return NULL;
-    }
-    
-    DBG_OUT("[Stage 1b-simple] Selected partition plane %d: normal=(%.2f,%.2f,%.2f) dist=%.2f",
-            partition_plane,
-            g_plane_normals[partition_plane].x,
-            g_plane_normals[partition_plane].y,
-            g_plane_normals[partition_plane].z,
-            g_plane_dists[partition_plane]);
-    
-    /* Split sides by this plane */
-    side_t *front_sides = NULL, *back_sides = NULL;
-    SplitSides(all_sides, partition_plane, &front_sides, &back_sides);
-    
-    /* Count results */
-    int front_count = 0, back_count = 0;
-    for (side_t *s = front_sides; s; s = s->next) front_count++;
-    for (side_t *s = back_sides; s; s = s->next) back_count++;
-    
-    DBG_OUT("[Stage 1b-simple] Split result:");
-    DBG_OUT("[Stage 1b-simple]   Front: %d sides", front_count);
-    DBG_OUT("[Stage 1b-simple]   Back: %d sides", back_count);
-    DBG_OUT("[Stage 1b-simple]   Total: %d (started with %d)", 
-            front_count + back_count, valid_count);
-    
-    /* Create a simple tree: 1 node, 2 leaves */
+    /* STAGE 1a STOP HERE - Return a minimal tree for visualization */
     BSPTree *tree = calloc(1, sizeof(BSPTree));
     tree->node_capacity = 1;
-    tree->leaf_capacity = 2;
+    tree->leaf_capacity = 1;
     tree->nodes = calloc(1, sizeof(BSPNode));
-    tree->leaves = calloc(2, sizeof(BSPLeaf));
-    tree->root_is_leaf = false;
+    tree->leaves = calloc(1, sizeof(BSPLeaf));
     
-    tree->node_count = 1;
-    tree->leaf_count = 2;
+    /* Create single leaf containing all windings for visualization */
+    tree->node_count = 0;
+    tree->leaf_count = 1;
+    tree->root_is_leaf = true;
     
-    /* Setup root node */
-    BSPNode *root_node = &tree->nodes[0];
-    root_node->plane_normal = g_plane_normals[partition_plane];
-    root_node->plane_dist = g_plane_dists[partition_plane];
-    root_node->front_child = 0;
-    root_node->back_child = 1;
-    root_node->front_is_leaf = true;
-    root_node->back_is_leaf = true;
+    BSPLeaf *leaf = &tree->leaves[0];
+    leaf->leaf_index = 0;
+    leaf->contents = CONTENTS_EMPTY;
+    leaf->face_count = 0;
+    leaf->faces = NULL;
     
-    /* Setup front leaf */
-    BSPLeaf *front_leaf = &tree->leaves[0];
-    front_leaf->leaf_index = 0;
-    front_leaf->contents = CONTENTS_EMPTY;
-    front_leaf->face_count = 0;
-    front_leaf->faces = NULL;
-    front_leaf->bounds_min = (Vector3){FLT_MAX, FLT_MAX, FLT_MAX};
-    front_leaf->bounds_max = (Vector3){-FLT_MAX, -FLT_MAX, -FLT_MAX};
-    
-    /* Convert front sides to faces */
-    for (side_t *s = front_sides; s; s = s->next) {
+    /* Convert all valid windings to faces for visualization */
+    for (side_t *s = all_sides; s; s = s->next) {
         if (!s->winding) continue;
         
         BSPFace *face = malloc(sizeof(BSPFace));
@@ -1053,76 +875,41 @@ BSP_Build(const MapData *map_data)
         
         for (int i = 0; i < s->winding->numpoints; i++) {
             face->vertices[i] = s->winding->points[i];
-            
-            /* Update bounds */
-            Vector3 v = s->winding->points[i];
-            front_leaf->bounds_min.x = fminf(front_leaf->bounds_min.x, v.x);
-            front_leaf->bounds_min.y = fminf(front_leaf->bounds_min.y, v.y);
-            front_leaf->bounds_min.z = fminf(front_leaf->bounds_min.z, v.z);
-            front_leaf->bounds_max.x = fmaxf(front_leaf->bounds_max.x, v.x);
-            front_leaf->bounds_max.y = fmaxf(front_leaf->bounds_max.y, v.y);
-            front_leaf->bounds_max.z = fmaxf(front_leaf->bounds_max.z, v.z);
         }
         
         face->normal = g_plane_normals[s->planenum];
         face->plane_dist = g_plane_dists[s->planenum];
         face->original_face_idx = s->brush_idx;
         
-        face->next = front_leaf->faces;
-        front_leaf->faces = face;
-        front_leaf->face_count++;
+        /* Add to leaf face list */
+        face->next = leaf->faces;
+        leaf->faces = face;
+        leaf->face_count++;
         tree->total_faces++;
     }
     
-    /* Setup back leaf */
-    BSPLeaf *back_leaf = &tree->leaves[1];
-    back_leaf->leaf_index = 1;
-    back_leaf->contents = CONTENTS_EMPTY;
-    back_leaf->face_count = 0;
-    back_leaf->faces = NULL;
-    back_leaf->bounds_min = (Vector3){FLT_MAX, FLT_MAX, FLT_MAX};
-    back_leaf->bounds_max = (Vector3){-FLT_MAX, -FLT_MAX, -FLT_MAX};
+    DBG_OUT("[Stage 1a] Created visualization tree: 1 leaf, %d faces", tree->total_faces);
     
-    /* Convert back sides to faces */
-    for (side_t *s = back_sides; s; s = s->next) {
-        if (!s->winding) continue;
-        
-        BSPFace *face = malloc(sizeof(BSPFace));
-        face->vertices = malloc(s->winding->numpoints * sizeof(Vector3));
-        face->vertex_count = s->winding->numpoints;
-        
-        for (int i = 0; i < s->winding->numpoints; i++) {
-            face->vertices[i] = s->winding->points[i];
-            
-            /* Update bounds */
-            Vector3 v = s->winding->points[i];
-            back_leaf->bounds_min.x = fminf(back_leaf->bounds_min.x, v.x);
-            back_leaf->bounds_min.y = fminf(back_leaf->bounds_min.y, v.y);
-            back_leaf->bounds_min.z = fminf(back_leaf->bounds_min.z, v.z);
-            back_leaf->bounds_max.x = fmaxf(back_leaf->bounds_max.x, v.x);
-            back_leaf->bounds_max.y = fmaxf(back_leaf->bounds_max.y, v.y);
-            back_leaf->bounds_max.z = fmaxf(back_leaf->bounds_max.z, v.z);
+    /* Compute bounds */
+    leaf->bounds_min = (Vector3){FLT_MAX, FLT_MAX, FLT_MAX};
+    leaf->bounds_max = (Vector3){-FLT_MAX, -FLT_MAX, -FLT_MAX};
+    for (BSPFace *f = leaf->faces; f; f = f->next) {
+        for (int i = 0; i < f->vertex_count; i++) {
+            Vector3 v = f->vertices[i];
+            leaf->bounds_min.x = fminf(leaf->bounds_min.x, v.x);
+            leaf->bounds_min.y = fminf(leaf->bounds_min.y, v.y);
+            leaf->bounds_min.z = fminf(leaf->bounds_min.z, v.z);
+            leaf->bounds_max.x = fmaxf(leaf->bounds_max.x, v.x);
+            leaf->bounds_max.y = fmaxf(leaf->bounds_max.y, v.y);
+            leaf->bounds_max.z = fmaxf(leaf->bounds_max.z, v.z);
         }
-        
-        face->normal = g_plane_normals[s->planenum];
-        face->plane_dist = g_plane_dists[s->planenum];
-        face->original_face_idx = s->brush_idx;
-        
-        face->next = back_leaf->faces;
-        back_leaf->faces = face;
-        back_leaf->face_count++;
-        tree->total_faces++;
     }
-    
-    DBG_OUT("[Stage 1b-simple] Created tree:");
-    DBG_OUT("[Stage 1b-simple]   Front leaf: %d faces", front_leaf->face_count);
-    DBG_OUT("[Stage 1b-simple]   Back leaf: %d faces", back_leaf->face_count);
-    DBG_OUT("[Stage 1b-simple]   Total: %d faces", tree->total_faces);
     
     return tree;
     
-    /* TODO: Next - verify this ONE split works correctly
-     * TODO: Then add recursion with depth limit
+    /* TODO: Stage 1b - Build tree structure
+     * TODO: Stage 1c - Classify leaves
+     * TODO: Stage 1d - Validation & stats
      */
 }
 
@@ -1136,75 +923,54 @@ BSP_DebugDrawLeafBounds(const BSPTree *tree)
 {
     if (!tree) return;
     
-    /* Stage 1b-simple: Show the partition and two leaves */
-    DrawText(TextFormat("Stage 1b-simple: 1 partition, 2 leaves"), 10, 10, 20, WHITE);
-    DrawText(TextFormat("Front leaf: %d faces | Back leaf: %d faces", 
-             tree->leaves[0].face_count, tree->leaves[1].face_count), 10, 35, 20, WHITE);
+    /* Stage 1a: Just draw all windings, color-coded by brush */
+    Color brush_colors[] = {
+        {255, 0, 0, 255},     // Red
+        {0, 255, 0, 255},     // Green
+        {0, 0, 255, 255},     // Blue
+        {255, 255, 0, 255},   // Yellow
+        {255, 0, 255, 255},   // Magenta
+        {0, 255, 255, 255},   // Cyan
+        {255, 128, 0, 255},   // Orange
+        {128, 0, 255, 255},   // Purple
+    };
     
-    
-    /* Draw leaves */
     for (int i = 0; i < tree->leaf_count; i++) {
         const BSPLeaf *leaf = &tree->leaves[i];
         
-        /* Color: green for front (leaf 0), red for back (leaf 1) */
-        Color box_color = (i == 0) ? (Color){0, 255, 0, 255} : (Color){255, 0, 0, 255};
-        Color face_color = (i == 0) ? (Color){0, 255, 0, 128} : (Color){255, 0, 0, 128};
-        
         if (leaf->face_count == 0) {
-            /* Empty leaf - draw bounds only */
-            DrawBoundingBox((BoundingBox){leaf->bounds_min, leaf->bounds_max}, 
-                           (Color){100, 100, 100, 255});
+            DrawText("Stage 1a: No valid windings generated!", 10, 10, 20, RED);
             continue;
         }
         
-        /* Draw leaf bounding box */
-        DrawBoundingBox((BoundingBox){leaf->bounds_min, leaf->bounds_max}, box_color);
+        DrawText(TextFormat("Stage 1a: %d valid windings", leaf->face_count), 10, 10, 20, WHITE);
         
-        /* Draw faces within this leaf */
         for (BSPFace *face = leaf->faces; face; face = face->next) {
             if (face->vertex_count < 3) continue;
+            
+            /* Color by brush index */
+            int brush_idx = face->original_face_idx;
+            Color color = brush_colors[brush_idx % 8];
             
             /* Draw wireframe */
             for (int v = 0; v < face->vertex_count; v++) {
                 int next = (v + 1) % face->vertex_count;
-                DrawLine3D(face->vertices[v], face->vertices[next], face_color);
+                DrawLine3D(face->vertices[v], face->vertices[next], color);
             }
+            
+            /* Draw normal from face center */
+            Vector3 center = {0, 0, 0};
+            for (int v = 0; v < face->vertex_count; v++) {
+                center.x += face->vertices[v].x;
+                center.y += face->vertices[v].y;
+                center.z += face->vertices[v].z;
+            }
+            center.x /= face->vertex_count;
+            center.y /= face->vertex_count;
+            center.z /= face->vertex_count;
+            
+            Vector3 normal_end = Vector3Add(center, Vector3Scale(face->normal, 0.3f));
+            DrawLine3D(center, normal_end, WHITE);
         }
-    }
-    
-    /* Draw partition plane as a big quad */
-    if (tree->node_count > 0) {
-        BSPNode *root = &tree->nodes[0];
-        Vector3 normal = root->plane_normal;
-        float dist = root->plane_dist;
-        
-        /* Find tangent vectors */
-        Vector3 up = {0, 0, 1};
-        if (fabsf(normal.z) > 0.9f) up = (Vector3){1, 0, 0};
-        
-        float d = Vector3DotProduct(up, normal);
-        Vector3 tangent1 = Vector3Normalize((Vector3){
-            up.x - normal.x * d,
-            up.y - normal.y * d,
-            up.z - normal.z * d
-        });
-        Vector3 tangent2 = Vector3CrossProduct(normal, tangent1);
-        
-        Vector3 center = Vector3Scale(normal, dist);
-        float size = 20.0f;
-        
-        /* Draw partition plane as translucent yellow quad */
-        Vector3 corners[4];
-        corners[0] = Vector3Add(center, Vector3Add(Vector3Scale(tangent1, size), Vector3Scale(tangent2, size)));
-        corners[1] = Vector3Add(center, Vector3Add(Vector3Scale(tangent1, -size), Vector3Scale(tangent2, size)));
-        corners[2] = Vector3Add(center, Vector3Add(Vector3Scale(tangent1, -size), Vector3Scale(tangent2, -size)));
-        corners[3] = Vector3Add(center, Vector3Add(Vector3Scale(tangent1, size), Vector3Scale(tangent2, -size)));
-        
-        DrawTriangle3D(corners[0], corners[1], corners[2], (Color){255, 255, 0, 64});
-        DrawTriangle3D(corners[0], corners[2], corners[3], (Color){255, 255, 0, 64});
-        
-        /* Draw normal */
-        Vector3 normal_end = Vector3Add(center, Vector3Scale(normal, 2.0f));
-        DrawLine3D(center, normal_end, YELLOW);
     }
 }

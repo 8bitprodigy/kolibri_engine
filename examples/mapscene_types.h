@@ -13,11 +13,13 @@
 
 /* CompiledFace - A polygon face from brush compilation */
 typedef struct CompiledFace {
-    int     vertex_start;   /* Index into vertex array */
-    int     vertex_count;   /* Number of vertices in this face */
-    Vector3 normal;         /* Face plane normal */
-    float   plane_dist;     /* Face plane distance from origin */
-    bool    is_visible;     /* Visibility flag (used before BSP) */
+    int     
+            vertex_start, /* Index into vertex array */
+            vertex_count, /* Number of vertices in this face */
+            brush_idx;    /* Track brush index */
+    Vector3 normal;       /* Face plane normal */
+    float   plane_dist;   /* Face plane distance from origin */
+    bool    is_visible;   /* Visibility flag (used before BSP) */
 } CompiledFace;
 
 
@@ -67,10 +69,11 @@ typedef struct BSPTree BSPTree;
 /* BSPFace - A polygon in the BSP tree */
 typedef struct BSPFace {
     Vector3 *vertices;
-    int vertex_count;
-    Vector3 normal;
-    float plane_dist;
-    int original_face_idx;
+    int 
+             vertex_count,
+             original_face_idx;
+    Vector3  normal;
+    float    plane_dist;
     struct BSPFace *next;
 } BSPFace;
 

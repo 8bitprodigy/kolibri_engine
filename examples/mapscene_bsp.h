@@ -16,41 +16,24 @@
  * 1. Builds BSP tree from all faces, partitioning space into leaves
  * 2. Classifies each leaf as SOLID (inside brush) or EMPTY (air/playable)
  * 
+ * TODO (Stages 3-4):
+ * 3. Validate info_player_start exists and is in EMPTY space
+ * 4. Flood-fill from player start through EMPTY leaves to mark reachable
+ * 5. Cull faces not bordering reachable EMPTY space
+ * 
  * Returns NULL if memory allocation fails
  */
 BSPTree *BSP_Build(
+/*
     const CompiledFace  *compiled_faces,
     int                  face_count,
     const Vector3       *vertices,
     int                  vertex_count,
     const CompiledBrush *brushes,
     int                  brush_count,
+*/
     const MapData       *map_data
 );
-
-/*
- * BSP_FloodFillAndDetectLeaks - Stage 3: QBSP-style leak detection
- * 
- * Algorithm:
- * 1. Generate portals between adjacent leaves
- * 2. Mark unbounded leaves as "outside" 
- * 3. Flood-fill from outside through EMPTY leaves
- * 4. Check if any point entities are in outside-marked leaves
- * 5. If leak: trace path from entity to outside for debugging
- * 6. If no leak: convert outside leaves to SOLID
- * 
- * Returns: true if no leak, false if leak detected
- * 
- * If leak is detected, call BSP_DrawLeakPath() in your render loop
- * to visualize the path from the leaked entity to the outside void.
- */
-bool BSP_FloodFillAndDetectLeaks(BSPTree *tree, const MapData *map_data);
-
-/* Draw the leak path (if one was detected) as a yellow line */
-void BSP_DrawLeakPath(void);
-
-/* Clean up Stage 3 resources (portals, leak path) */
-void BSP_Stage3_Cleanup(void);
 
 void BSP_Free(BSPTree *tree);
 

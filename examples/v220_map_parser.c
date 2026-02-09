@@ -147,11 +147,13 @@ ParseBrushPlane(Tokenizer *tok, MapPlane *plane)
     if (!GetToken(tok)) return false; p3.z = atof(tok->token);
     if (!GetToken(tok) || strcmp(tok->token, ")") != 0) return false;
 
+    // CRITICAL FIX: Remap points FIRST
     p1 = RemapVector3(p1, true);
     p2 = RemapVector3(p2, true);
     p3 = RemapVector3(p3, true);
     
-    // Calculate plane equation
+    // THEN calculate plane from remapped points
+    // This ensures normal matches the actual geometry
     CalculatePlane(p1, p2, p3, plane);
     
     // Parse texture name
