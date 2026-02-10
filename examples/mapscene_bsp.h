@@ -59,10 +59,35 @@ bool BSP_Validate(const BSPTree *tree);
 /* Debug visualization: Draw leaf bounding boxes color-coded by contents
  * - GREEN: EMPTY leaves (playable space or void)
  * - RED: SOLID leaves (inside walls/floors/ceilings)
- * - BLUE: Reachable EMPTY leaves (Stage 3, not yet implemented)
+ * - YELLOW: Outside leaves (touching world boundary)
+ * - CYAN: Flooded leaves (void-connected)
  * 
- * Call this in your render loop to visualize the BSP classification.
+ * Call this in 3D rendering mode.
  */
 void BSP_DebugDrawLeafBounds(const BSPTree *tree);
+
+/* Debug visualization: Draw text overlay with BSP stats
+ * Shows node/leaf counts, SOLID/EMPTY/OUTSIDE/FLOODED counts, and color legend.
+ * 
+ * Call this in 2D rendering mode (after EndMode3D, before EndDrawing).
+ */
+void BSP_DebugDrawText(const BSPTree *tree);
+
+/* Debug visualization: Draw leak path with wireframe spheres
+ * - RED sphere: Leaked entity position
+ * - YELLOW sphere: Outside void destination
+ * - ORANGE spheres: Intermediate steps
+ * - MAGENTA lines: Path connections
+ * 
+ * Only draws if tree->has_leak is true. Call this in 3D rendering mode.
+ */
+void BSP_DebugDrawLeak(const BSPTree *tree);
+
+/* Debug visualization: Draw leak text overlay
+ * Shows "LEAK DETECTED!" warning and path information.
+ * 
+ * Only draws if tree->has_leak is true. Call this in 2D rendering mode.
+ */
+void BSP_DebugDrawLeakText(const BSPTree *tree);
 
 #endif /* MAPSCENE_BSP_H */

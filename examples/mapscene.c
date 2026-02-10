@@ -646,6 +646,7 @@ mapscene_RenderBSP(Scene *scene, Head *head)
     
     BSP_DebugDrawLeafBounds(sd->bsp_tree);
 //    BSP_DrawLeakPath();
+    BSP_DebugDrawLeak(sd->bsp_tree);   
     
     /* Entity Submission */
     Entity **entities = Scene_getEntities(scene);
