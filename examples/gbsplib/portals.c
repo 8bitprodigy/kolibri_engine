@@ -2,35 +2,24 @@
 /*  portals.c - Portal creation and management                                         */
 /*  Converted from Genesis3D PORTALS.CPP to C99/raylib                                 */
 /****************************************************************************************/
+#include <assert.h>
+#include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
-#include <stdbool.h>
-#include <raymath.h>
+
 #include "bsp.h"
 #include "mathlib.h"
 #include "poly.h"
+#include "portals.h"
+#include <raymath.h>
 
 /****************************************************************************************/
 /*  Portals.cpp                                                                         */
 /*                                                                                      */
 /*  Author: John Pollard                                                                */
 /*  Description: Creates and manages portals (passages from leaf-to-leaf)               */
-/*                                                                                      */
-/*  The contents of this file are subject to the Genesis3D Public License               */
-/*  Version 1.01 (the "License"); you may not use this file except in                   */
-/*  compliance with the License. You may obtain a copy of the License at                */
-/*  http://www.genesis3d.com                                                            */
-/*                                                                                      */
-/*  Software distributed under the License is distributed on an "AS IS"                 */
-/*  basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See                */
-/*  the License for the specific language governing rights and limitations              */
-/*  under the License.                                                                  */
-/*                                                                                      */
-/*  The Original Code is Genesis3D, released March 25, 1999.                            */
-/*Genesis3D Version 1.1 released November 15, 1999                            */
-/*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
 
@@ -59,7 +48,7 @@ bool CreatePolyOnNode (GBSP_Node *Node, GBSP_Poly **Out)
 
 	if (!Poly)
 	{
-		fprintf(stderr, "ERROR: "CreatePolyOnNode:  Could not create poly.\n");
+		fprintf(stderr, "ERROR: CreatePolyOnNode:  Could not create poly.\n");
 		return false;
 	}
 
@@ -101,13 +90,13 @@ bool CreatePortals(GBSP_Node *RootNode, GBSP_Model *Model, bool Vis)
 
 	if (!CreateAllOutsidePortals(RootNode))
 	{
-		fprintf(stderr, "ERROR: "CreatePortals:  Could not create bbox portals.\n");
+		fprintf(stderr, "ERROR: CreatePortals:  Could not create bbox portals.\n");
 		return false;
 	}
 
 	if (!PartitionPortals_r(RootNode))
 	{
-		fprintf(stderr, "ERROR: "CreatePortals:  Could not partition portals.\n");
+		fprintf(stderr, "ERROR: CreatePortals:  Could not partition portals.\n");
 		return false;
 	}
 
@@ -135,7 +124,7 @@ GBSP_Portal *CreateOutsidePortal(GBSP_Plane *Plane, GBSP_Node *Node)
 
 	if (NewPortal->PlaneNum == -1)
 	{
-		fprintf(stderr, "ERROR: "CreateOutsidePortal:  Could not create plane.\n");
+		fprintf(stderr, "ERROR: CreateOutsidePortal:  Could not create plane.\n");
 		return NULL;
 	}
 
@@ -176,7 +165,7 @@ bool CreateAllOutsidePortals(GBSP_Node *Node)
 	{
 		if (VectorToSUB(NodeMins, k)-128 <= -MIN_MAX_BOUNDS || VectorToSUB(NodeMaxs, k)+128 >= MIN_MAX_BOUNDS)
 		{
-			fprintf(stderr, "ERROR: "CreateAllOutsidePortals:  World BOX out of range...\n");
+			fprintf(stderr, "ERROR: CreateAllOutsidePortals:  World BOX out of range...\n");
 			return false;
 		}
 
@@ -218,13 +207,13 @@ bool CreateAllOutsidePortals(GBSP_Node *Node)
 
 			if (!ClipPoly(Portals[i]->Poly, &PPlanes[k], false, &Portals[i]->Poly))
 			{
-				fprintf(stderr, "ERROR: "CreateAllOutsidePortals:  There was an error clipping the portal.\n");
+				fprintf(stderr, "ERROR: CreateAllOutsidePortals:  There was an error clipping the portal.\n");
 				return false;
 			}
 
 			if (!Portals[i]->Poly)
 			{
-				fprintf(stderr, "ERROR: "CreateAllOutsidePortals:  Portal was clipped away.\n");
+				fprintf(stderr, "ERROR: CreateAllOutsidePortals:  Portal was clipped away.\n");
 				return false;
 			}
 		}
@@ -248,7 +237,7 @@ bool CheckPortal(GBSP_Portal *Portal)
 
 	if (Poly->NumVerts < 3)
 	{
-		fprintf(stderr, "ERROR: "CheckPortal:  NumVerts < 3.\n");
+		fprintf(stderr, "ERROR: CheckPortal:  NumVerts < 3.\n");
 		return false;
 	}
 
@@ -260,13 +249,13 @@ bool CheckPortal(GBSP_Portal *Portal)
 
 			if (Val == MIN_MAX_BOUNDS)
 			{
-				fprintf(stderr, "ERROR: "CheckPortal:  Portal was not clipped on all sides!!!\n");
+				fprintf(stderr, "ERROR: CheckPortal:  Portal was not clipped on all sides!!!\n");
 				return false;
 			}
 		
 			if (Val == -MIN_MAX_BOUNDS)
 			{
-				fprintf(stderr, "ERROR: "CheckPortal:  Portal was not clipped on all sides!!!\n");
+				fprintf(stderr, "ERROR: CheckPortal:  Portal was not clipped on all sides!!!\n");
 				return false;
 			}
 		}
@@ -279,7 +268,8 @@ bool CheckPortal(GBSP_Portal *Portal)
 //	CalcNodeBoundsFromPortals
 //	Calcs bounds for nodes, and leafs
 //=======================================================================================
-void CalcNodeBoundsFromPortals(GBSP_Node *Node)
+void 
+CalcNodeBoundsFromPortals(GBSP_Node *Node)
 {
 	GBSP_Portal		*p;
 	int32_t			s, i;
@@ -298,13 +288,26 @@ void CalcNodeBoundsFromPortals(GBSP_Node *Node)
 //=====================================================================================
 //	PartitionPortals_r
 //=====================================================================================
-bool PartitionPortals_r(GBSP_Node *Node)
+bool 
+PartitionPortals_r(GBSP_Node *Node)
 {
-	GBSP_Poly		*NewPoly, *FPoly, *BPoly;
-	GBSP_Plane		*pPlane, *pPlane2;
-	GBSP_Portal		*Portal, *NewPortal, *Next;
-	GBSP_Node		*Front, *Back, *OtherNode;
-	int32_t			Side;
+	GBSP_Poly
+		*NewPoly, 
+		*FPoly, 
+		*BPoly;
+	GBSP_Plane 
+		*pPlane, 
+		*pPlane2;
+	GBSP_Portal 
+		*Portal, 
+		*NewPortal, 
+		*Next;
+	GBSP_Node 
+		*Front, 
+		*Back, 
+		*OtherNode;
+	int32_t
+		Side;
 
 	CalcNodeBoundsFromPortals(Node);
 
@@ -327,7 +330,7 @@ bool PartitionPortals_r(GBSP_Node *Node)
 	// Create a new portal
 	if (!CreatePolyOnNode (Node, &NewPoly))
 	{
-		fprintf(stderr, "ERROR: "PartitionPortals_r:  CreatePolyOnNode failed.\n");
+		fprintf(stderr, "ERROR: PartitionPortals_r:  CreatePolyOnNode failed.\n");
 		return false;
 	}
 
@@ -340,7 +343,7 @@ bool PartitionPortals_r(GBSP_Node *Node)
 			Side = 1;
 		else
 		{
-			fprintf(stderr, "ERROR: "PartitionPortals_r:  Portal does not look at either node.\n");
+			fprintf(stderr, "ERROR: PartitionPortals_r:  Portal does not look at either node.\n");
 			return false;
 		}
 
@@ -348,7 +351,7 @@ bool PartitionPortals_r(GBSP_Node *Node)
 
 		if (!ClipPolyEpsilon(NewPoly, 0.001f, pPlane2, Side, &NewPoly))
 		{
-			fprintf(stderr, "ERROR: "PartitionPortals_r:  There was an error clipping the poly.\n");
+			fprintf(stderr, "ERROR: PartitionPortals_r:  There was an error clipping the poly.\n");
 			return false;
 		}
 
@@ -370,7 +373,7 @@ bool PartitionPortals_r(GBSP_Node *Node)
 		NewPortal = AllocPortal();
 		if (!NewPortal)
 		{
-			fprintf(stderr, "ERROR: "PartitionPortals_r:  Out of memory for portal.\n");
+			fprintf(stderr, "ERROR: PartitionPortals_r:  Out of memory for portal.\n");
 			return false;
 		}
 		NewPortal->Poly = NewPoly;
@@ -379,7 +382,7 @@ bool PartitionPortals_r(GBSP_Node *Node)
 
 		if (!CheckPortal(NewPortal))
 		{
-			fprintf(stderr, "ERROR: "PartiionPortals_r:  Check Portal failed.\n");
+			fprintf(stderr, "ERROR: PartiionPortals_r:  Check Portal failed.\n");
 			return false;
 		}
 		else
@@ -396,7 +399,7 @@ bool PartitionPortals_r(GBSP_Node *Node)
 			Side = 1;
 		else
 		{
-			fprintf(stderr, "ERROR: "PartitionPortals_r:  Portal does not look at either node.\n");
+			fprintf(stderr, "ERROR: PartitionPortals_r:  Portal does not look at either node.\n");
 			return false;
 		}
 
@@ -409,7 +412,7 @@ bool PartitionPortals_r(GBSP_Node *Node)
 
 		if (!SplitPolyEpsilon(Portal->Poly, 0.001f, pPlane, &FPoly, &BPoly, false))
 		{
-			fprintf(stderr, "ERROR: "PartitionPortals_r:  Could not split portal.\n");
+			fprintf(stderr, "ERROR: PartitionPortals_r:  Could not split portal.\n");
 			return false;
 		}
 		
@@ -452,7 +455,7 @@ bool PartitionPortals_r(GBSP_Node *Node)
 		NewPortal = AllocPortal();
 		if (!NewPortal)
 		{
-			fprintf(stderr, "ERROR: "PartitionPortals_r:  Out of memory for portal.\n");
+			fprintf(stderr, "ERROR: PartitionPortals_r:  Out of memory for portal.\n");
 			return false;
 		}
 		Portal->Poly = FPoly;
@@ -492,7 +495,7 @@ bool AddPortalToNodes(GBSP_Portal *Portal, GBSP_Node *Front, GBSP_Node *Back)
 {
 	if (Portal->Nodes[0] || Portal->Nodes[1])
 	{
-		fprintf(stderr, "ERROR: "LinkPortal:  Portal allready looks at one of the nodes.\n");
+		fprintf(stderr, "ERROR: LinkPortal:  Portal allready looks at one of the nodes.\n");
 		return false;
 	}
 
@@ -552,7 +555,7 @@ GBSP_Portal *AllocPortal(void)
 
 	if (!NewPortal)
 	{
-		fprintf(stderr, "ERROR: "AllocPortal:  Out of memory!\n");
+		fprintf(stderr, "ERROR: AllocPortal:  Out of memory!\n");
 		return NULL;
 	}
 
@@ -568,7 +571,7 @@ bool FreePortal(GBSP_Portal *Portal)
 {
 	if (!Portal->Poly)
 	{
-		fprintf(stderr, "ERROR: "FreePortal:  Portal with NULL Poly.\n");
+		fprintf(stderr, "ERROR: FreePortal:  Portal with NULL Poly.\n");
 		return false;
 	}
 
@@ -598,7 +601,7 @@ bool FreePortals_r(GBSP_Node *Node)
 			Side = 1;
 		else
 		{
-			fprintf(stderr, "ERROR: "FreePortals_r:  Portal does not look at either node.\n");
+			fprintf(stderr, "ERROR: FreePortals_r:  Portal does not look at either node.\n");
 			return false;
 		}
 
@@ -661,7 +664,7 @@ bool GetLeafBBoxFromPortals(GBSP_Node *Node, Vector3 *Mins, Vector3 *Maxs)
 
 	if (Node->PlaneNum != PLANENUM_LEAF)
 	{
-		fprintf(stderr, "ERROR: "GetLeafBBoxFromPortals:  Not a leaf.\n");
+		fprintf(stderr, "ERROR: GetLeafBBoxFromPortals:  Not a leaf.\n");
 		return false;
 	}
 

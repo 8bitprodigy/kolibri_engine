@@ -297,6 +297,7 @@ typedef struct
 //====================================================================================
 #define MAX_BSP_MODELS          2048
 #define MAX_BSP_PLANES          32000
+#define MAX_WELDED_VERTS        64000
 
 #define PSIDE_FRONT             1
 #define PSIDE_BACK              2

@@ -2,15 +2,16 @@
 /*  poly.c                                                                              */
 /*  Converted from Genesis3D POLY.CPP to C99/raylib                                     */
 /****************************************************************************************/
+#include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
-#include <stdbool.h>
-#include <raymath.h>
+
 #include "bsp.h"
 #include "mathlib.h"
 #include "poly.h"
+#include <raymath.h>
 
 /****************************************************************************************/
 /*  Poly.Cpp                                                                            */
@@ -18,22 +19,7 @@
 /*  Author: John Pollard                                                                */
 /*  Description: Various Poly routines (clipping, splitting, etc)                       */
 /*                                                                                      */
-/*  The contents of this file are subject to the Genesis3D Public License               */
-/*  Version 1.01 (the "License"); you may not use this file except in                   */
-/*  compliance with the License. You may obtain a copy of the License at                */
-/*  http://www.genesis3d.com                                                            */
-/*                                                                                      */
-/*  Software distributed under the License is distributed on an "AS IS"                 */
-/*  basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See                */
-/*  the License for the specific language governing rights and limitations              */
-/*  under the License.                                                                  */
-/*                                                                                      */
-/*  The Original Code is Genesis3D, released March 25, 1999.                            */
-/*Genesis3D Version 1.1 released November 15, 1999                            */
-/*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
-/*                                                                                      */
 /****************************************************************************************/
-#include <math.h>
 
 
 
@@ -153,31 +139,31 @@ bool TextureAxisFromPlane(GBSP_Plane *Pln, Vector3 *Xv, Vector3 *Yv)
 	switch(BestAxis)
 	{
 		case 0:						// X
-			Xv->X = (float)0;
-			Xv->Y = (float)0;
-			Xv->Z = (float)1;
+			Xv->x = (float)0;
+			Xv->y = (float)0;
+			Xv->z = (float)1;
 
-			Yv->X = (float)0;
-			Yv->Y = (float)-1;
-			Yv->Z = (float)0;
+			Yv->x = (float)0;
+			Yv->y = (float)-1;
+			Yv->z = (float)0;
 			break;
 		case 1:						// Y
-			Xv->X = (float)1;
-			Xv->Y = (float)0;
-			Xv->Z = (float)0;
+			Xv->x = (float)1;
+			Xv->y = (float)0;
+			Xv->z = (float)0;
 
-			Yv->X = (float)0;
-			Yv->Y = (float)0;
-			Yv->Z = (float)1;
+			Yv->x = (float)0;
+			Yv->y = (float)0;
+			Yv->z = (float)1;
 			break;
 		case 2:						// Z
-			Xv->X = (float)1;
-			Xv->Y = (float)0;
-			Xv->Z = (float)0;
+			Xv->x = (float)1;
+			Xv->y = (float)0;
+			Xv->z = (float)0;
 
-			Yv->X = (float)0;
-			Yv->Y = (float)-1;
-			Yv->Z = (float)0;
+			Yv->x = (float)0;
+			Yv->y = (float)-1;
+			Yv->z = (float)0;
 			break;
 		default:
 			fprintf(stderr, "ERROR: TextureAxisFromPlane: No Axis found.\n");
@@ -352,9 +338,9 @@ bool ClipPoly(GBSP_Poly *InPoly, GBSP_Plane *Plane, bool FlipTest, GBSP_Poly **O
 		Vert2 = Verts[NextVert];
 		Scale = VDist[i] / (VDist[i] - VDist[NextVert]);
 
-		pFrontVert->X = Vert1.x + (Vert2.x - Vert1.x) * Scale;
-		pFrontVert->Y = Vert1.y + (Vert2.y - Vert1.y) * Scale;
-		pFrontVert->Z = Vert1.z + (Vert2.z - Vert1.z) * Scale;
+		pFrontVert->x = Vert1.x + (Vert2.x - Vert1.x) * Scale;
+		pFrontVert->y = Vert1.y + (Vert2.y - Vert1.y) * Scale;
+		pFrontVert->z = Vert1.z + (Vert2.z - Vert1.z) * Scale;
 
 		pFrontVert++;
 	}
@@ -473,9 +459,9 @@ bool ClipPolyEpsilon(GBSP_Poly *InPoly, float Epsilon, GBSP_Plane *Plane, bool F
 		Vert2 = Verts[NextVert];
 		Scale = VDist[i] / (VDist[i] - VDist[NextVert]);
 
-		pFrontVert->X = Vert1.x + (Vert2.x - Vert1.x) * Scale;
-		pFrontVert->Y = Vert1.y + (Vert2.y - Vert1.y) * Scale;
-		pFrontVert->Z = Vert1.z + (Vert2.z - Vert1.z) * Scale;
+		pFrontVert->x = Vert1.x + (Vert2.x - Vert1.x) * Scale;
+		pFrontVert->y = Vert1.y + (Vert2.y - Vert1.y) * Scale;
+		pFrontVert->z = Vert1.z + (Vert2.z - Vert1.z) * Scale;
 
 		pFrontVert++;
 	}
@@ -633,9 +619,9 @@ bool SplitPoly(GBSP_Poly *InPoly, GBSP_Plane *Plane, GBSP_Poly **Front, GBSP_Pol
 		Vert2 = Verts[NextVert];
 		Scale = VDist[i] / (VDist[i] - VDist[NextVert]);
 
-		pFrontVert->X = Vert1.x + (Vert2.x - Vert1.x) * Scale;
-		pFrontVert->Y = Vert1.y + (Vert2.y - Vert1.y) * Scale;
-		pFrontVert->Z = Vert1.z + (Vert2.z - Vert1.z) * Scale;
+		pFrontVert->x = Vert1.x + (Vert2.x - Vert1.x) * Scale;
+		pFrontVert->y = Vert1.y + (Vert2.y - Vert1.y) * Scale;
+		pFrontVert->z = Vert1.z + (Vert2.z - Vert1.z) * Scale;
 
 		*pBackVert = *pFrontVert;
 		pFrontVert++;
@@ -808,9 +794,9 @@ bool SplitPolyEpsilon(GBSP_Poly *InPoly, float Epsilon, GBSP_Plane *Plane, GBSP_
 		Vert2 = Verts[NextVert];
 		Scale = VDist[i] / (VDist[i] - VDist[NextVert]);
 
-		pFrontVert->X = Vert1.x + (Vert2.x - Vert1.x) * Scale;
-		pFrontVert->Y = Vert1.y + (Vert2.y - Vert1.y) * Scale;
-		pFrontVert->Z = Vert1.z + (Vert2.z - Vert1.z) * Scale;
+		pFrontVert->x = Vert1.x + (Vert2.x - Vert1.x) * Scale;
+		pFrontVert->y = Vert1.y + (Vert2.y - Vert1.y) * Scale;
+		pFrontVert->z = Vert1.z + (Vert2.z - Vert1.z) * Scale;
 
 		*pBackVert = *pFrontVert;
 		pFrontVert++;
@@ -1065,12 +1051,12 @@ void PolyCenter(GBSP_Poly *Poly, Vector3 *Center)
 	geVec3d_Clear(Center);
 
 	for (i=0; i< Poly->NumVerts; i++)
-		Vector3Add(Center, &Poly->Verts[i], Center);
+		*Center = Vector3Add(Poly->Verts[i], *Center);
 
-	Vector3Scale(Center, (float)1.0/(float)Poly->NumVerts, Center);
+	*Center = Vector3Scale(*Center, 1.0f/(float)Poly->NumVerts);
 }
 
-#define EDGE_LENGTH			(float)0.1
+#define EDGE_LENGTH 0.1f
 
 //====================================================================================
 //	PolyIsTiny
@@ -1547,8 +1533,8 @@ void FanFace_r(GBSP_Node *Node, GBSP_Face *Face)
 //====================================================================================
 uint32_t GetLog(uint32_t P2)
 {
-	U32		p = 0;
-	S32		i = 0;
+	uint32_t p = 0;
+	int32_t  i = 0;
 
 	if (!P2)
 	{
@@ -1595,6 +1581,7 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 		return;
 
 	// Special (non-surface cached) faces don't need subdivision
+/* We need to handle this later when we support lightmapping
 	Tex = &TexInfo[Face->TexInfo];
 
 	//if ( Tex->Flags & TEXINFO_GOURAUD)
@@ -1602,7 +1589,7 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 
 	if ( Tex->Flags & TEXINFO_NO_LIGHTMAP)
 		return;
-
+//*/
 	for (Axis = 0 ; Axis < 2 ; Axis++)
 	{
 		while (1)
@@ -1812,20 +1799,20 @@ void GetFaceListBOX(GBSP_Face *Faces, Vector3 *Mins, Vector3 *Maxs)
 			Vert = Poly->Verts[i];
 
 			// First get maxs
-			if (Vert.x > Maxs->X)
-				Maxs->X = Vert.x;
-			if (Vert.y > Maxs->Y)
-				Maxs->Y = Vert.y;
-			if (Vert.z > Maxs->Z)
-				Maxs->Z = Vert.z;
+			if (Vert.x > Maxs->x)
+				Maxs->x = Vert.x;
+			if (Vert.y > Maxs->y)
+				Maxs->y = Vert.y;
+			if (Vert.z > Maxs->z)
+				Maxs->z = Vert.z;
 
 			// Then check mins
-			if (Vert.x < Mins->X)
-				Mins->X = Vert.x;
-			if (Vert.y < Mins->Y)
-				Mins->Y = Vert.y;
-			if (Vert.z < Mins->Z)
-				Mins->Z = Vert.z;
+			if (Vert.x < Mins->x)
+				Mins->x = Vert.x;
+			if (Vert.y < Mins->y)
+				Mins->y = Vert.y;
+			if (Vert.z < Mins->z)
+				Mins->z = Vert.z;
 		}
 	}
 }

@@ -2,35 +2,23 @@
 /*  tjunct.c - T-junction fixing                                                       */
 /*  Converted from Genesis3D TJunct.cpp to C99/raylib                                  */
 /****************************************************************************************/
+#include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
-#include <stdbool.h>
-#include <raymath.h>
+
 #include "bsp.h"
+#include "common.h"
 #include "mathlib.h"
 #include "poly.h"
+#include <raymath.h>
 
 /****************************************************************************************/
 /*  TJunct.cpp                                                                          */
 /*                                                                                      */
 /*  Author: John Pollard                                                                */
 /*  Description: Removes T-Juncts                                                       */
-/*                                                                                      */
-/*  The contents of this file are subject to the Genesis3D Public License               */
-/*  Version 1.01 (the "License"); you may not use this file except in                   */
-/*  compliance with the License. You may obtain a copy of the License at                */
-/*  http://www.genesis3d.com                                                            */
-/*                                                                                      */
-/*  Software distributed under the License is distributed on an "AS IS"                 */
-/*  basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See                */
-/*  the License for the specific language governing rights and limitations              */
-/*  under the License.                                                                  */
-/*                                                                                      */
-/*  The Original Code is Genesis3D, released March 25, 1999.                            */
-/*Genesis3D Version 1.1 released November 15, 1999                            */
-/*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
 
@@ -75,13 +63,13 @@ bool FinalizeFace(GBSP_Face *Face, int32_t Base)
 
 	if (NumTempIndexVerts == Face->NumIndexVerts)
 		return true;
-
+/*
 	if (TexInfo[Face->TexInfo].Flags & TEXINFO_MIRROR)
 		return true;
 
 	if (TexInfo[Face->TexInfo].Flags & TEXINFO_SKY)
 		return true;
-
+//*/
 	if (Face->IndexVerts)
 		free(Face->IndexVerts); Face->IndexVerts = NULL;
 
@@ -149,7 +137,7 @@ bool TestEdge_r(float Start, float End, int32_t p1, int32_t p2, int32_t StartVer
 
 	if (NumTempIndexVerts >= MAX_TEMP_INDEX_VERTS)
 	{
-		fprintf(stderr, "ERROR: "Max Temp Index Verts.\n");
+		fprintf(stderr, "ERROR: Max Temp Index Verts.\n");
 		return false;
 	}
 
@@ -165,10 +153,10 @@ void FindEdgeVerts(Vector3 *V1, Vector3 *V2)
 	int32_t	x1, y1, x2, y2;
 	int32_t	t, x, y, Index;
 
-	x1 = (HASH_SIZE2 + (int32_t)(V1->X+0.5)) >> HASH_SHIFT;
-	y1 = (HASH_SIZE2 + (int32_t)(V1->Y+0.5)) >> HASH_SHIFT;
-	x2 = (HASH_SIZE2 + (int32_t)(V2->X+0.5)) >> HASH_SHIFT;
-	y2 = (HASH_SIZE2 + (int32_t)(V2->Y+0.5)) >> HASH_SHIFT;
+	x1 = (HASH_SIZE2 + (int32_t)(V1->x+0.5)) >> HASH_SHIFT;
+	y1 = (HASH_SIZE2 + (int32_t)(V1->y+0.5)) >> HASH_SHIFT;
+	x2 = (HASH_SIZE2 + (int32_t)(V2->x+0.5)) >> HASH_SHIFT;
+	y2 = (HASH_SIZE2 + (int32_t)(V2->y+0.5)) >> HASH_SHIFT;
 
 	if (x1 > x2)
 	{
@@ -233,7 +221,8 @@ bool FixFaceTJunctions(GBSP_Node *Node, GBSP_Face *Face)
 		FindEdgeVerts(&EdgeStart, &Edge2);
 
 		EdgeDir = Vector3Subtract(Edge2, EdgeStart);
-		Len = EdgeDir = Vector3Normalize(EdgeDir);
+		Len     = Vector3Length(EdgeDir);
+		EdgeDir = Vector3Normalize(EdgeDir);
 
 		Start[i] = NumTempIndexVerts;
 
@@ -307,12 +296,12 @@ int32_t HashVert(Vector3 *Vert)
 {
 	int32_t	x, y;
 
-	x = (HASH_SIZE2 + (int32_t)(Vert->X + 0.5)) >> HASH_SHIFT;
-	y = (HASH_SIZE2 + (int32_t)(Vert->Y + 0.5)) >> HASH_SHIFT;
+	x = (HASH_SIZE2 + (int32_t)(Vert->x + 0.5)) >> HASH_SHIFT;
+	y = (HASH_SIZE2 + (int32_t)(Vert->y + 0.5)) >> HASH_SHIFT;
 
 	if ( x < 0 || x >= HASH_SIZE || y < 0 || y >= HASH_SIZE )
 	{
-		GHook.Error ("HashVert: Vert outside valid range");
+		ERR_OUT("HashVert: Vert outside valid range");
 		return -1;
 	}
 	
@@ -342,7 +331,7 @@ int32_t WeldVert(Vector3 *Vert)
 	{
 		if (i >= MAX_WELDED_VERTS)
 		{
-			fprintf(stderr, "ERROR: "WeldVert:  Invalid hash vert.\n");
+			fprintf(stderr, "ERROR: WeldVert:  Invalid hash vert.\n");
 			return -1;
 		}
 
@@ -352,7 +341,7 @@ int32_t WeldVert(Vector3 *Vert)
 
 	if (NumWeldedVerts >= MAX_WELDED_VERTS)
 	{
-		fprintf(stderr, "ERROR: "WeldVert:  Max welded verts.\n");
+		fprintf(stderr, "ERROR: WeldVert:  Max welded verts.\n");
 		return -1;
 	}
 
@@ -383,7 +372,7 @@ int32_t WeldVert(Vector3 *Vert)
 
 	if (i >= MAX_WELDED_VERTS)
 	{
-		fprintf(stderr, "ERROR: "WeldVert:  Max welded verts.\n");
+		fprintf(stderr, "ERROR: WeldVert:  Max welded verts.\n");
 		return -1;
 	}
 
@@ -410,7 +399,7 @@ bool GetFaceVertIndexNumbers(GBSP_Face *Face)
 	{
 		if (NumTempIndexVerts >= MAX_TEMP_INDEX_VERTS)
 		{
-			fprintf(stderr, "ERROR: "GetFaceVertIndexNumbers:  Max Temp Index Verts.\n");
+			fprintf(stderr, "ERROR: GetFaceVertIndexNumbers:  Max Temp Index Verts.\n");
 			return false;
 		}
 
@@ -418,7 +407,7 @@ bool GetFaceVertIndexNumbers(GBSP_Face *Face)
 
 		if (Index == -1)
 		{
-			fprintf(stderr, "ERROR: "GetFaceVertIndexNumbers:  Could not FindVert.\n");
+			fprintf(stderr, "ERROR: GetFaceVertIndexNumbers:  Could not FindVert.\n");
 			return false;
 		}
 
@@ -433,7 +422,7 @@ bool GetFaceVertIndexNumbers(GBSP_Face *Face)
 
 	if (!Face->IndexVerts)
 	{
-		fprintf(stderr, "ERROR: "GetFaceVertIndexNumbers:  Out of memory for index list.\n");
+		fprintf(stderr, "ERROR: GetFaceVertIndexNumbers:  Out of memory for index list.\n");
 		return false;
 	}
 
