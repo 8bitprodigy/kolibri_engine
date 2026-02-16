@@ -11,6 +11,8 @@
 #include "bsp.h"
 #include "mathlib.h"
 #include "poly.h"
+
+extern GFX_TexInfo *GFXTexInfo;
 #include <raymath.h>
 
 /****************************************************************************************/
@@ -229,7 +231,7 @@ GBSP_Poly *CreatePolyFromPlane(GBSP_Plane *Plane)
 	
 	Normal = Plane->Normal;
 	
-	if (!geVec3d_Compare(&Normal, &Normal2, VCOMPARE_EPSILON))
+	if (!(fabsf(Normal.x-Normal2.x)<VCOMPARE_EPSILON && fabsf(Normal.y-Normal2.y)<VCOMPARE_EPSILON && fabsf(Normal.z-Normal2.z)<VCOMPARE_EPSILON))
 	{
 		fprintf(stderr, "ERROR: Normal1 X:%2.2f, Y:%2.2f, Z:%2.2f\n", Normal.x, Normal.y, Normal.z);
 		fprintf(stderr, "ERROR: Normal2 X:%2.2f, Y:%2.2f, Z:%2.2f\n", Normal2.x, Normal2.y, Normal2.z);
@@ -868,7 +870,7 @@ void RemoveDegenerateEdges(GBSP_Poly *Poly)
 
 		Vec = Vector3Subtract(V1, V2);
 
-		if (geVec3d_Length(&Vec) > DEGENERATE_EPSILON)
+		if (Vector3Length(Vec) > DEGENERATE_EPSILON)
 		{
 			NVerts[NumNVerts++] = V1;	
 		}
@@ -908,7 +910,7 @@ bool RemoveDegenerateEdges2(GBSP_Poly *Poly)
 
 		Vec = Vector3Subtract(V1, V2);
 
-		if (geVec3d_Length(&Vec) > DEGENERATE_EPSILON)
+		if (Vector3Length(Vec) > DEGENERATE_EPSILON)
 		{
 			NVerts[NumNVerts++] = V1;	
 		}
@@ -946,8 +948,8 @@ float PolyArea(GBSP_Poly *Poly)
 	{
 		Vect1 = Vector3Subtract(Poly->Verts[i-1], Poly->Verts[0]);
 		Vect2 = Vector3Subtract(Poly->Verts[i]  , Poly->Verts[0]);
-		geVec3d_CrossProduct (&Vect1, &Vect2, &Cross);
-		Total += (float)0.5 * geVec3d_Length(&Cross);
+		Cross = Vector3CrossProduct(Vect1, Vect2);
+		Total += (float)0.5 * Vector3Length(Cross);
 	}
 
 	return (float)Total;
@@ -1048,7 +1050,7 @@ void PolyCenter(GBSP_Poly *Poly, Vector3 *Center)
 {
 	int32_t	i;
 
-	geVec3d_Clear(Center);
+	*Center = (Vector3){0.0f, 0.0f, 0.0f};
 
 	for (i=0; i< Poly->NumVerts; i++)
 		*Center = Vector3Add(Poly->Verts[i], *Center);
@@ -1078,7 +1080,7 @@ bool PolyIsTiny (GBSP_Poly *Poly)
 
 		Delta = Vector3Subtract(Poly->Verts[j], Poly->Verts[i]);
 
-		Len = geVec3d_Length(&Delta);
+		Len = Vector3Length(Delta);
 
 		if (Len > EDGE_LENGTH)
 		{
@@ -1318,8 +1320,8 @@ int32_t EdgeExist(Vector3 *Edge1, GBSP_Poly *Poly, int32_t *EdgeIndexOut)
 		Edge2[0] = Verts[i];
 		Edge2[1] = Verts[(i+1)%NumVerts];
 
-		if (geVec3d_Compare(Edge1, Edge2, VCOMPARE_EPSILON))
-		if (geVec3d_Compare(Edge1+1, Edge2+1, VCOMPARE_EPSILON))
+		if ((fabsf(Edge1->x-Edge2->x)<VCOMPARE_EPSILON && fabsf(Edge1->y-Edge2->y)<VCOMPARE_EPSILON && fabsf(Edge1->z-Edge2->z)<VCOMPARE_EPSILON))
+		if ((fabsf((Edge1+1)->x-(Edge2+1)->x)<VCOMPARE_EPSILON && fabsf((Edge1+1)->y-(Edge2+1)->y)<VCOMPARE_EPSILON && fabsf((Edge1+1)->z-(Edge2+1)->z)<VCOMPARE_EPSILON))
 		{
 			EdgeIndexOut[0] = i;
 			EdgeIndexOut[1] = (i+1)%NumVerts;
@@ -1590,6 +1592,8 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 	if ( Tex->Flags & TEXINFO_NO_LIGHTMAP)
 		return;
 //*/
+	Tex = &GFXTexInfo[Face->TexInfo];
+	if (!Tex) return;  // Safety check
 	for (Axis = 0 ; Axis < 2 ; Axis++)
 	{
 		while (1)
@@ -1600,11 +1604,11 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 			Mins = 999999.0f;
 			Maxs = -999999.0f;
 			
-			geVec3d_Copy(&Tex->Vecs[Axis], &Temp);
+			Temp = Tex->Vecs[Axis];
 
 			for (i=0 ; i<Face->Poly->NumVerts ; i++)
 			{
-				v = geVec3d_DotProduct (&Face->Poly->Verts[i], &Temp);
+				v = Vector3DotProduct(Face->Poly->Verts[i], Temp);
 				if (v < Mins)
 					Mins = v;
 				if (v > Maxs)
@@ -1655,7 +1659,7 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 			// Split it
 			NumSubdivided++;
 			
-			v = geVec3d_Normalize (&Temp);	
+			v = Vector3NormalizeEx(&Temp);
 
 			Dist = (Mins + SplitDist - 16)/v;
 			//Dist = (Mins16 + SplitDist)/v;
@@ -1741,7 +1745,7 @@ bool CheckFace(GBSP_Face *Face, bool Verb)
 
 		//	Check for degenreate edge
 		Vect1 = Vector3Subtract(V2, V1);
-		Dist = geVec3d_Length(&Vect1);
+		Dist = Vector3Length(Vect1);
 		if (fabs(Dist) < DEGENERATE_EPSILON)
 		{
 			if (Verb)

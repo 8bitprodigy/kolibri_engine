@@ -119,9 +119,9 @@ bool TestEdge_r(float Start, float End, int32_t p1, int32_t p2, int32_t StartVer
 		if (Dist <= Start || Dist >= End)
 			continue;	
 		
-		geVec3d_AddScaled(&EdgeStart, &EdgeDir, Dist, &Exact);
+		Exact = Vector3Add(EdgeStart, Vector3Scale(EdgeDir, Dist));
 		Off = Vector3Subtract(p, Exact);
-		Error = geVec3d_Length(&Off);
+		Error = Vector3Length(Off);
 
 		if (fabs(Error) > OFF_EPSILON)
 			continue;		
@@ -221,8 +221,7 @@ bool FixFaceTJunctions(GBSP_Node *Node, GBSP_Face *Face)
 		FindEdgeVerts(&EdgeStart, &Edge2);
 
 		EdgeDir = Vector3Subtract(Edge2, EdgeStart);
-		Len     = Vector3Length(EdgeDir);
-		EdgeDir = Vector3Normalize(EdgeDir);
+		Len = Vector3NormalizeEx(&EdgeDir);
 
 		Start[i] = NumTempIndexVerts;
 
@@ -335,7 +334,7 @@ int32_t WeldVert(Vector3 *Vert)
 			return -1;
 		}
 
-		if (geVec3d_Compare(Vert, &WeldedVerts[i], VCOMPARE_EPSILON))
+		if ((fabsf(Vert->x-WeldedVerts[i].x)<VCOMPARE_EPSILON && fabsf(Vert->y-WeldedVerts[i].y)<VCOMPARE_EPSILON && fabsf(Vert->z-WeldedVerts[i].z)<VCOMPARE_EPSILON))
 			return i;
 	}
 
@@ -364,7 +363,7 @@ int32_t WeldVert(Vector3 *Vert)
 
 	for (i=0; i< NumWeldedVerts; i++)
 	{
-		if (geVec3d_Compare(Vert, pWeldedVerts, VCOMPARE_EPSILON))
+		if ((fabsf(Vert->x-pWeldedVerts->x)<VCOMPARE_EPSILON && fabsf(Vert->y-pWeldedVerts->y)<VCOMPARE_EPSILON && fabsf(Vert->z-pWeldedVerts->z)<VCOMPARE_EPSILON))
 			return i;
 
 		pWeldedVerts++;

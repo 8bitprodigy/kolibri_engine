@@ -399,14 +399,13 @@ build_bsp_from_mapdata(MapSceneData *sd)
         const MapBrush *src = &map->world_brushes[bi];
 
         int num_sides = src->plane_count;
-
+/*
         if (num_sides > NUM_BRUSH_DEFAULT_SIDES) {
             DBG_OUT("[BSP] Brush %d: %d sides > %d, clamping",
                     bi, num_sides, NUM_BRUSH_DEFAULT_SIDES);
             num_sides = NUM_BRUSH_DEFAULT_SIDES;
         }
-
-
+//*/
         MAP_Brush *mb = AllocMapBrush(num_sides);
         if (!mb) { ERR_OUT("[BSP] AllocMapBrush failed"); continue; }
 
@@ -420,9 +419,14 @@ build_bsp_from_mapdata(MapSceneData *sd)
             plane.Normal = src->planes[si].normal;
             plane.Dist   = src->planes[si].distance;
             plane.Type   = PlaneType(&plane.Normal);
-
+            
             int32_t pside = 0;
             int32_t pnum  = FindPlane(&plane, &pside);
+            
+            // Debug: check if planes are getting flipped
+            if (pside != 0) {
+                DBG_OUT("[BSP] Brush %d side %d: plane FLIPPED (pside=%d)", bi, si, pside);
+            }
 
             mb->OriginalSides[si].PlaneNum  = pnum;
             mb->OriginalSides[si].PlaneSide = (uint8_t)pside;
@@ -433,6 +437,16 @@ build_bsp_from_mapdata(MapSceneData *sd)
 
         /* Build side polygons and brush bounds */
         MakeMapBrushPolys(mb);
+        
+        // Check if brush has valid volume
+        Vector3 size = Vector3Subtract(mb->Maxs, mb->Mins);
+        float volume = size.x * size.y * size.z;
+
+        if (volume < 0.01f) {  // Essentially zero volume
+            DBG_OUT("[BSP] Brush %d: degenerate (volume %.6f) - skipping", bi, volume);
+            FreeMapBrush(mb);
+            continue;
+        }
 
         mb->Next = NULL;
         if (!head) { head = mb; tail = mb; }
@@ -455,6 +469,39 @@ build_bsp_from_mapdata(MapSceneData *sd)
     memset(model, 0, sizeof(*model));
     NumBSPModels = 1;
 
+    Vector3 entity_origins[MAX_MAP_ENTITIES];
+    int32_t entity_flags[MAX_MAP_ENTITIES];
+    int num_entities = map->entity_count < MAX_MAP_ENTITIES ? map->entity_count : MAX_MAP_ENTITIES;
+
+    for (int i = 0; i < num_entities; i++) {
+        const char *origin_str = GetEntityProperty(&map->entities[i], "origin");
+        
+        if (i == 0) {
+            // World entity - no origin
+            entity_origins[i] = (Vector3){0, 0, 0};
+            entity_flags[i] = 0;
+        } else if (origin_str) {
+            // Parse origin string "x y z"
+            if (sscanf(origin_str, "%f %f %f", 
+                    &entity_origins[i].x, 
+                    &entity_origins[i].y, 
+                    &entity_origins[i].z) == 3) {
+                entity_flags[i] = ENTITY_HAS_ORIGIN;
+            } else {
+                // Parsing failed - no origin
+                entity_origins[i] = (Vector3){0, 0, 0};
+                entity_flags[i] = 0;
+            }
+        } else {
+            // No origin property
+            entity_origins[i] = (Vector3){0, 0, 0};
+            entity_flags[i] = 0;
+        }
+    }
+
+    // Pass entities to BSP system
+    SetBSPEntities(num_entities, entity_origins, entity_flags);
+
     if (!ProcessWorldModel(model, head)) {
         ERR_OUT("[BSP] ProcessWorldModel failed");
         FreeMapBrushList(head);
@@ -476,6 +523,28 @@ build_bsp_from_mapdata(MapSceneData *sd)
 
     return true;
 }
+
+
+// Recursive function to draw all faces in BSP tree
+void DrawBSPNode(GBSP_Node *node) {
+    if (!node) return;
+    if (node->PlaneNum == PLANENUM_LEAF) return;
+    
+    for (GBSP_Face *face = node->Faces; face; face = face->Next) {
+        if (!face->Poly || face->Poly->NumVerts < 3) continue;
+        
+        for (int i = 0; i < face->Poly->NumVerts; i++) {
+            int next = (i + 1) % face->Poly->NumVerts;
+            Vector3 a = Vector3Scale(face->Poly->Verts[i],    MAP_SCALE);
+            Vector3 b = Vector3Scale(face->Poly->Verts[next], MAP_SCALE);
+            DrawLine3D(a, b, GREEN);
+        }
+    }
+    
+    DrawBSPNode(node->Children[0]);
+    DrawBSPNode(node->Children[1]);
+}
+
 
 /*****************************
     SCENE VTABLE CALLBACKS
@@ -712,7 +781,7 @@ mapscene_RenderBSP(Scene *scene, Head *head)
     Camera       *camera   = Head_getCamera(head);
     (void)camera;
 
-    /* BSP face wireframe (GREEN) */
+    /* BSP face wireframe (GREEN)
     if (sd && sd->bsp_built && sd->model && sd->model->RootNode[0]) {
         GBSP_Node *root = sd->model->RootNode[0];
         for (GBSP_Face *f = root->Faces; f; f = f->Next) {
@@ -723,7 +792,35 @@ mapscene_RenderBSP(Scene *scene, Head *head)
             }
         }
     }
-
+ */
+    if (sd && sd->bsp_built && sd->model && sd->model->RootNode[0]) {
+        DrawBSPNode(sd->model->RootNode[0]);  // ← Replace your existing loop
+    }
+    /* Debug: Draw spheres at degenerate brush positions
+    if (sd && sd->map) {
+        MapData *map = sd->map;
+        for (int b = 0; b < map->world_brush_count; b++) {
+            MapBrush *brush = &map->world_brushes[b];
+            
+            // Calculate brush center from planes
+            Vector3 center = {0, 0, 0};
+            int point_count = 0;
+            
+            for (int p = 0; p < brush->plane_count && p < 8; p++) {
+                // Get any point on the plane
+                MapPlane *plane = &brush->planes[p];
+                Vector3 point = Vector3Scale(plane->normal, plane->distance);
+                center = Vector3Add(center, point);
+                point_count++;
+            }
+            
+            if (point_count > 0) {
+                center = Vector3Scale(center, 1.0f / point_count);
+                DrawSphereWires(center, 0.1f, 1, 4, RED);
+            }
+        }
+    }
+   */  
     /* Brush wireframe fallback (MAGENTA) */
     if (sd && sd->brushes && sd->all_faces && sd->all_vertices) {
         for (int b = 0; b < sd->brush_count; b++) {
@@ -734,7 +831,7 @@ mapscene_RenderBSP(Scene *scene, Head *head)
                 Vector3 *verts = &sd->all_vertices[face->vertex_start];
                 for (int v = 0; v < face->vertex_count; v++) {
                     int next = (v + 1) % face->vertex_count;
-                    DrawLine3D(verts[v], verts[next], MAGENTA);
+                    //DrawLine3D(verts[v], verts[next], MAGENTA);
                 }
             }
         }

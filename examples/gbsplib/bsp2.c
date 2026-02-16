@@ -10,7 +10,6 @@
 #include <assert.h>
 #include <stdint.h>
 #include <raylib.h>
-#include <raymath.h>
 #include "mathlib.h"
 #include "poly.h"
 #include "bsp.h"
@@ -23,6 +22,80 @@
 // External declarations
 extern int32_t NumTexInfo;
 extern int32_t FindTextureIndex(const char *name, int32_t flags);
+
+
+
+
+// Track if entities have been set
+static bool entities_initialized = false;
+
+// Set entities from map data before calling ProcessWorldModel
+void SetBSPEntities(int num_entities, Vector3 *origins, int32_t *flags) {
+    memset(Entities, 0, sizeof(MAP_Entity) * MAX_MAP_ENTITIES);
+    NumEntities = num_entities < MAX_MAP_ENTITIES ? num_entities : MAX_MAP_ENTITIES;
+    
+    for (int i = 0; i < NumEntities; i++) {
+        Entities[i].Flags = flags ? flags[i] : 0;
+        Entities[i].Origin = origins ? origins[i] : (Vector3){0, 0, 0};
+        Entities[i].ModelNum = 0;
+        
+        if (i > 0) {
+            printf("[SetBSPEntities] Entity %d at (%.1f, %.1f, %.1f) flags=0x%x\n",
+                   i, Entities[i].Origin.x, Entities[i].Origin.y, Entities[i].Origin.z, Entities[i].Flags);
+        }
+    }
+    
+    entities_initialized = true;
+}
+
+// Initialize entities for BSP - only runs if SetBSPEntities wasn't called
+
+// Initialize default texture info
+GFX_TexInfo *GFXTexInfo = NULL;
+int32_t NumGFXTexInfo = 0;
+
+void InitBSPTexInfo(void) {
+    if (!GFXTexInfo) {
+        GFXTexInfo = (GFX_TexInfo*)malloc(sizeof(GFX_TexInfo) * 1);
+        if (!GFXTexInfo) {
+            printf("[InitBSPTexInfo] Failed to allocate texture info\n");
+            return;
+        }
+        NumGFXTexInfo = 1;
+        NumTexInfo = 1;
+        
+        // Set up default texinfo
+        GFXTexInfo[0].Vecs[0] = (Vector3){1, 0, 0};  // U axis
+        GFXTexInfo[0].Vecs[1] = (Vector3){0, 1, 0};  // V axis
+        GFXTexInfo[0].Shift[0] = 0;
+        GFXTexInfo[0].Shift[1] = 0;
+        GFXTexInfo[0].DrawScale[0] = 1;
+        GFXTexInfo[0].DrawScale[1] = 1;
+        GFXTexInfo[0].Flags = 0;
+        GFXTexInfo[0].FaceLight = 0;
+        GFXTexInfo[0].ReflectiveScale = 0;
+        GFXTexInfo[0].Alpha = 1.0f;
+        GFXTexInfo[0].MipMapBias = 0;
+        GFXTexInfo[0].Texture = -1;
+        
+        printf("[InitBSPTexInfo] Initialized default texture info\n");
+    }
+}
+void InitBSPEntities(void) {
+    if (entities_initialized) {
+        // Already initialized by SetBSPEntities - don't overwrite
+        return;
+    }
+    
+    // Fallback: use dummy entities
+    printf("[InitBSPEntities] WARNING: No entities set, using dummy\n");
+    NumEntities = 2;
+    Entities[0].Flags = 0;
+    Entities[1].Flags = ENTITY_HAS_ORIGIN;
+    Entities[1].Origin = (Vector3){0, 0, 0};
+    entities_initialized = true;
+}
+
 
 // Sky data structure - stub for now
 typedef struct {
@@ -47,7 +120,9 @@ extern int32_t	NumSubdivided;
 
 int32_t	NumMakeFaces = 0;
 
-#define PLANESIDE_EPSILON	0.001f
+#define PLANESIDE_EPSILON 0.001f
+
+
 
 //=======================================================================================
 //	VisibleContents
@@ -1191,8 +1266,9 @@ void FreeBSP_r(GBSP_Node *Node)
 //=======================================================================================
 bool ProcessWorldModel(GBSP_Model *Model, MAP_Brush *MapBrushes)
 {
+	GBSP_Node	*Node;
+	InitBSPTexInfo();
 	GBSP_Brush		*Brushes;
-	GBSP_Node		*Node;
 
 	// Make the bsp brush list
 	Brushes = MakeBSPBrushes(MapBrushes);
@@ -1224,6 +1300,7 @@ bool ProcessWorldModel(GBSP_Model *Model, MAP_Brush *MapBrushes)
 	}
 
 	// Remove "unseen" leafs so MarkVisibleSides won't reach unseeen areas
+	InitBSPEntities();
 	if (RemoveHiddenLeafs(Node, &BSPModels[0].OutsideNode) == -1)
 	{
 		printf("Failed to remove hidden leafs.\n");
@@ -1268,6 +1345,7 @@ bool ProcessWorldModel(GBSP_Model *Model, MAP_Brush *MapBrushes)
 	}
 
 	// Remove hidden leafs one last time
+	InitBSPEntities();
 	if (RemoveHiddenLeafs(Node, &BSPModels[0].OutsideNode) == -1)
 	{
 		printf("Failed to remove hidden leafs.\n");

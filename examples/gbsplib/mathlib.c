@@ -5,7 +5,10 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "bsp.h"
 #include "mathlib.h"
+#include <raymath.h>
 
 /****************************************************************************************/
 /*  MathLib.cpp                                                                         */
@@ -67,7 +70,7 @@ float ColorNormalizeBSP(Vector3 *C1, Vector3 *C2)
 	if (Max == 0.0f)
 		return 0.0f;
 	
-	Vector3Scale(C1, 1.0f/Max, C2);
+	*C2 = Vector3Scale(*C1, 1.0f / Max);
 
 	return Max;
 }
@@ -99,15 +102,15 @@ float ColorClamp(Vector3 *C1, float Clamp, Vector3 *C2)
 	if (Max2 > Clamp)
 		Max2 = Clamp;
 
-	Vector3Scale(C1, Max2/Max, C2);
+	*C2 = Vector3Scale(*C1, Max2 / Max);
 
 	return Max;
 }
 
 //=======================================================================================
-//	geVec3d_PlaneType
+//	PlaneType
 //=======================================================================================
-int32_t geVec3d_PlaneType(Vector3 *V1)
+int PlaneType(Vector3 *V1)
 {
 	float	X, Y, Z;
 
@@ -117,21 +120,45 @@ int32_t geVec3d_PlaneType(Vector3 *V1)
 
 	if (X == 1.0f)
 		return PLANE_X;
-
 	else if (Y == 1.0f)
 		return PLANE_Y;
-
 	else if (Z == 1.0f)
 		return PLANE_Z;
 
 	if (X >= Y && X >= Z)
 		return PLANE_ANYX;
-
 	else if (Y >= X && Y >= Z)
 		return PLANE_ANYY;
-
 	else
 		return PLANE_ANYZ;
 }
 
+// Backward-compat alias used internally by bsp.c
+int32_t geVec3d_PlaneType(Vector3 *V1) { return PlaneType(V1); }
 
+//=======================================================================================
+//	PlanePointDistance
+//	Signed distance from a point to a plane (positive = front side).
+//=======================================================================================
+float PlanePointDistance(GBSP_Plane *Plane, Vector3 *Point)
+{
+	return Vector3DotProduct(Plane->Normal, *Point) - Plane->Dist;
+}
+
+
+
+//=======================================================================================
+//	Vector3NormalizeEx
+//	Normalizes vector in-place and returns original length (like geVec3d_Normalize)
+//=======================================================================================
+float Vector3NormalizeEx(Vector3 *v)
+{
+	float len = Vector3Length(*v);
+	if (len > 0.0f) {
+		float inv = 1.0f / len;
+		v->x *= inv;
+		v->y *= inv;
+		v->z *= inv;
+	}
+	return len;
+}

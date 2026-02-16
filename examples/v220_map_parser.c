@@ -148,9 +148,9 @@ ParseBrushPlane(Tokenizer *tok, MapPlane *plane)
     if (!GetToken(tok) || strcmp(tok->token, ")") != 0) return false;
 
     // CRITICAL FIX: Remap points FIRST
-    p1 = RemapVector3(p1, true);
-    p2 = RemapVector3(p2, true);
-    p3 = RemapVector3(p3, true);
+    p1 = RemapVector3(p1, false);
+    p2 = RemapVector3(p2, false);
+    p3 = RemapVector3(p3, false);
     
     // THEN calculate plane from remapped points
     // This ensures normal matches the actual geometry

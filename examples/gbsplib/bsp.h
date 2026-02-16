@@ -16,6 +16,12 @@
 #include "mathlib.h"
 
 
+
+#ifndef MAP_SCALE
+    #define MAP_SCALE (1.0f / 64.0f)
+#endif
+
+
 #define GBSP_VERSION                15
 
 #define GBSP_CHUNK_HEADER           0
@@ -295,9 +301,13 @@ typedef struct
 //====================================================================================
 // Global defines
 //====================================================================================
-#define MAX_BSP_MODELS          2048
-#define MAX_BSP_PLANES          32000
-#define MAX_WELDED_VERTS        64000
+#define MAX_BSP_MODELS   2048
+#define MAX_BSP_PLANES   32000
+#define MAX_WELDED_VERTS 64000
+#define MAX_MAP_ENTITIES 4096
+#define MAX_MAP_TEXINFO  8192
+#define MAX_MAP_TEXTURES 1024
+
 
 #define PSIDE_FRONT             1
 #define PSIDE_BACK              2
@@ -320,6 +330,7 @@ typedef struct GBSP_Face GBSP_Face;
 typedef struct GBSP_Poly GBSP_Poly;
 typedef struct GBSP_Plane GBSP_Plane;
 typedef struct GBSP_Model GBSP_Model;
+
 typedef struct MAP_Brush MAP_Brush;
 
 //====================================================================================
@@ -366,18 +377,6 @@ typedef struct
 	int32	PlaneSide;
 } 
 GBSP_LeafSide;
-
-typedef struct 
-GBSP_Node2
-{
-	struct GBSP_Node2		*Children[2];
-	int32			PlaneNum;			// -1 == Leaf
-	
-	// For leafs
-	int32			Contents;
-} 
-GBSP_Node2;
-
 
 //====================================================================================
 // Face (renderable polygon)
@@ -528,10 +527,7 @@ float PlanePointDistance(GBSP_Plane *Plane, Vector3 *Point);
 
 
 // Fast point-to-plane distance (inline version)
-static inline float Plane_PointDistanceFast(GBSP_Plane *Plane, Vector3 *Point)
-{
-    return PlanePointDistance(Plane, Point);
-}
+float Plane_PointDistanceFast(GBSP_Plane *Plane, Vector3 *Point);
 
 //====================================================================================
 // Entity System (from MAP.H)
@@ -564,12 +560,15 @@ typedef struct MAP_Entity
 
 // Entity globals
 extern int32_t NumEntities;
-extern MAP_Entity *Entities;
+extern MAP_Entity Entities[MAX_MAP_ENTITIES];
 
 // Entity functions
-extern char *ValueForKey(MAP_Entity *ent, const char *key);
-extern void SetKeyValue(MAP_Entity *ent, const char *key, const char *value);
 extern float FloatForKey(MAP_Entity *ent, const char *key);
-extern bool GetVectorForKey2(MAP_Entity *ent, const char *key, Vector3 *vec);
 
 #endif
+
+// Set entities before calling ProcessWorldModel
+void SetBSPEntities(int num_entities, Vector3 *origins, int32_t *flags);
+
+// Initialize texture info
+void InitBSPTexInfo(void);

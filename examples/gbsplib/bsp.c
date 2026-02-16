@@ -9,6 +9,7 @@
 #include <stdbool.h>
 
 #include "bsp.h"
+#include "map.h"
 #include "mathlib.h"
 #include "brush2.h"
 
@@ -28,15 +29,6 @@ extern void *GFXEntData;
 extern int32_t NumGFXEntData;
 
 // Stub function declarations
-extern bool LoadBrushFile(const char *filename);
-extern void BeginGBSPModels(void);
-extern bool ProcessEntities(void);
-extern void FreeAllEntities(void);
-extern bool LoadGBSPFile(const char *filename);
-extern bool SaveGBSPFile(const char *filename);
-extern bool ConvertEntitiesToGFXEntData(void);
-extern void FreeGBSPFile(void);
-extern void FreeFace(GBSP_Face *face);
 extern bool FreePortals(GBSP_Node *node);
 extern void FreeBSP_r(GBSP_Node *Node);
 
@@ -45,20 +37,6 @@ extern void FreeBSP_r(GBSP_Node *Node);
 /*                                                                                      */
 /*  Author: John Pollard                                                                */
 /*  Description: Module distributes code to all the other modules                       */
-/*                                                                                      */
-/*  The contents of this file are subject to the Genesis3D Public License               */
-/*  Version 1.01 (the "License"); you may not use this file except in                   */
-/*  compliance with the License. You may obtain a copy of the License at                */
-/*  http://www.genesis3d.com                                                            */
-/*                                                                                      */
-/*  Software distributed under the License is distributed on an "AS IS"                 */
-/*  basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See                */
-/*  the License for the specific language governing rights and limitations              */
-/*  under the License.                                                                  */
-/*                                                                                      */
-/*  The Original Code is Genesis3D, released March 25, 1999.                            */
-/*Genesis3D Version 1.1 released November 15, 1999                            */
-/*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
 
@@ -347,14 +325,14 @@ void SnapVector(Vector3 *Normal)
 	{
 		if ( fabs(VectorToSUB(*Normal,i) - (float)1) < ANGLE_EPSILON )
 		{
-			geVec3d_Clear(Normal);
+			*Normal = (Vector3){0.0f, 0.0f, 0.0f};
 			VectorToSUB(*Normal,i) = (float)1;
 			break;
 		}
 
 		if ( fabs(VectorToSUB(*Normal,i) - (float)-1) < ANGLE_EPSILON )
 		{
-			geVec3d_Clear(Normal);
+			*Normal = (Vector3){0.0f, 0.0f, 0.0f};
 			VectorToSUB(*Normal,i) = (float)-1;
 			break;
 		}
@@ -381,7 +359,7 @@ void SnapPlane(Vector3 *Normal, float *Dist)
 }
 
 
-//=======================================================================================
+//====================================================================================
 //	PlaneInverse
 //=======================================================================================
 void PlaneInverse(GBSP_Plane *Plane)
@@ -400,7 +378,7 @@ int32_t FindPlane(GBSP_Plane *Plane, int32_t *Side)
 	GBSP_Plane	*Plane2;
 	//float		Dot;
 	int32_t		i;
-
+//	*Side = 0;
 	SnapPlane(&Plane->Normal, &Plane->Dist);
 
 	Plane1 = *Plane;
@@ -426,4 +404,14 @@ int32_t FindPlane(GBSP_Plane *Plane, int32_t *Side)
 	Planes[NumPlanes++] = Plane1;
 
 	return i;
+}
+
+//====================================================================================
+//	Plane_PointDistanceFast
+//	Signed distance from a point to a plane. Equivalent to Genesis3D's
+//	_fastcall Plane_PointDistanceFast in BSP.CPP.
+//====================================================================================
+float Plane_PointDistanceFast(GBSP_Plane *Plane, Vector3 *Point)
+{
+	return Vector3DotProduct(Plane->Normal, *Point) - Plane->Dist;
 }

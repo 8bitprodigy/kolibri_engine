@@ -11,6 +11,7 @@
 #include <raylib.h>
 
 #include "bsp.h"
+#include "map.h"
 #include "leaf.h"
 #include "mathlib.h"
 #include "portals.h"

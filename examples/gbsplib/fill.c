@@ -13,7 +13,6 @@
 #include "mathlib.h"
 #include "portals.h"
 #include "poly.h"
-#include <raymath.h>
 
 // External declarations
 extern GBSP_Node *FindLeaf(GBSP_Node *Node, Vector3 *Origin);

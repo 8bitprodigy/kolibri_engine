@@ -28,9 +28,9 @@
 #define MAX_LEAF_SIDES	64000*2
 
 
-extern int32_t				NumLeafClusters;
-extern int32_t				NumLeafSides;
-extern int32_t				NumLeafBevels;
+extern int32_t       NumLeafClusters;
+extern int32_t       NumLeafSides;
+extern int32_t       NumLeafBevels;
 
 extern GBSP_LeafSide LeafSides[];
 

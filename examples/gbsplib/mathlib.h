@@ -12,6 +12,9 @@
 #include <math.h>
 #include <stdbool.h>
 
+#include "bsp.h"
+
+
 // Epsilon values for floating point comparisons
 #define ON_EPSILON          0.1f
 #define VCOMPARE_EPSILON    ON_EPSILON 
@@ -54,4 +57,10 @@ static inline bool Vector3Compare(Vector3 a, Vector3 b, float epsilon)
             fabsf(a.z - b.z) < epsilon);
 }
 
-#endif
+// Helper: geVec3d_Normalize normalized in-place AND returned original length
+// raylib's Vector3Normalize only returns the normalized vector
+
+// Helper: geVec3d_Normalize normalized in-place AND returned original length
+float Vector3NormalizeEx(Vector3 *v);
+
+#endif /* MATHLIB_H */
