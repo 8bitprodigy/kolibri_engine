@@ -11,7 +11,8 @@
 #include "kolibri.h"
 #include "v220_map_parser.h"
 #include "mapscene.h"
-#include "mapscene_bsp.h"
+#include "bsp.h"
+#include "brush2.h"
 
 
 #define PLANE_EPSILON  0.01f
@@ -362,6 +363,120 @@ void DiagnoseBrushNormals(const CompiledBrush *brushes, int brush_count,
     }
 }
 
+
+/*
+    build_bsp_from_mapdata
+        Bridges the v220 map parser output to the GBSPLib pipeline.
+
+        For each world brush we:
+          1. Register all planes into the global Planes[] table via FindPlane,
+             keeping track of PlaneSide for flipped planes.
+          2. Call MakeMapBrushPolys to clip each side poly from the full-brush
+             plane set — this is the same clipping the original loader did.
+          3. Set Contents = BSP_CONTENTS_SOLID2 for every brush (all world
+             brushes are solid structural geometry; no detail/hint in a v220 map
+             without extended flags).
+          4. Link the resulting MAP_Brush list and hand it to ProcessWorldModel,
+             which owns the full two-pass BSP build, portal creation, flood fill,
+             visible-side marking, face generation and node merging.
+
+        On success, BSPModels[0].RootNode[0] is the finished draw-hull tree and
+        sd->model points at BSPModels[0].
+*/
+static bool
+build_bsp_from_mapdata(MapSceneData *sd)
+{
+    MapData *map = sd->map;
+    if (!map || map->world_brush_count == 0) {
+        ERR_OUT("[BSP] No world brushes");
+        return false;
+    }
+
+    MAP_Brush *head = NULL;
+    MAP_Brush *tail = NULL;
+
+    for (int bi = 0; bi < map->world_brush_count; bi++) {
+        const MapBrush *src = &map->world_brushes[bi];
+
+        int num_sides = src->plane_count;
+
+        if (num_sides > NUM_BRUSH_DEFAULT_SIDES) {
+            DBG_OUT("[BSP] Brush %d: %d sides > %d, clamping",
+                    bi, num_sides, NUM_BRUSH_DEFAULT_SIDES);
+            num_sides = NUM_BRUSH_DEFAULT_SIDES;
+        }
+
+
+        MAP_Brush *mb = AllocMapBrush(num_sides);
+        if (!mb) { ERR_OUT("[BSP] AllocMapBrush failed"); continue; }
+
+        mb->EntityNum = 0;
+        mb->BrushNum  = bi;
+        mb->Contents  = BSP_CONTENTS_SOLID2;
+        mb->NumSides  = num_sides;
+
+        for (int si = 0; si < num_sides; si++) {
+            GBSP_Plane plane;
+            plane.Normal = src->planes[si].normal;
+            plane.Dist   = src->planes[si].distance;
+            plane.Type   = PlaneType(&plane.Normal);
+
+            int32_t pside = 0;
+            int32_t pnum  = FindPlane(&plane, &pside);
+
+            mb->OriginalSides[si].PlaneNum  = pnum;
+            mb->OriginalSides[si].PlaneSide = (uint8_t)pside;
+            mb->OriginalSides[si].TexInfo   = 0;
+            mb->OriginalSides[si].Flags     = 0;
+            mb->OriginalSides[si].Poly      = NULL;
+        }
+
+        /* Build side polygons and brush bounds */
+        MakeMapBrushPolys(mb);
+
+        mb->Next = NULL;
+        if (!head) { head = mb; tail = mb; }
+        else        { tail->Next = mb; tail = mb; }
+    }
+
+    if (!head) {
+        ERR_OUT("[BSP] No MAP_Brush nodes created");
+        return false;
+    }
+
+    DBG_OUT("[BSP] Converted %d brushes — running ProcessWorldModel",
+            map->world_brush_count);
+
+    /* ProcessWorldModel drives the complete two-pass pipeline:
+         CSGBrushes → BuildBSP → CreatePortals → RemoveHiddenLeafs
+         → MarkVisibleSides → MakeFaces → MakeLeafFaces → MergeNodes
+       The finished tree lands in BSPModels[0].RootNode[0].              */
+    GBSP_Model *model = &BSPModels[0];
+    memset(model, 0, sizeof(*model));
+    NumBSPModels = 1;
+
+    if (!ProcessWorldModel(model, head)) {
+        ERR_OUT("[BSP] ProcessWorldModel failed");
+        FreeMapBrushList(head);
+        return false;
+    }
+
+    FreeMapBrushList(head);
+
+    sd->model     = model;
+    sd->bsp_built = true;
+
+    /* Count draw-hull faces for a quick sanity print */
+    int nfaces = 0;
+    if (model->RootNode[0]) {
+        for (GBSP_Face *f = model->RootNode[0]->Faces; f; f = f->Next)
+            nfaces++;
+    }
+    DBG_OUT("[BSP] Done — %d faces on draw-hull root", nfaces);
+
+    return true;
+}
+
 /*****************************
     SCENE VTABLE CALLBACKS
 *****************************/
@@ -509,37 +624,12 @@ mapscene_Setup(Scene *scene, void *map_data)
     }
 
     /*
-        PASS 3: Build BSP tree
-        The BSP builder will determin which faces are actually visible
-        (those bordering empty space) and handle app splitting/clipping
+        PASS 3: Build BSP tree via GBSPLib
     */
-    DBG_OUT("[MapScene] Building BSP Tree...");
-    sd->bsp_tree = BSP_Build(
-/*
-            sd->all_faces, 
-            sd->face_count, 
-            sd->all_vertices,
-            sd->vertex_count,
-            sd->brushes,
-            sd->brush_count,
-*/
-            sd->map
-        );
-
-    if (sd->bsp_tree) {
-        BSP_PrintStats(sd->bsp_tree);
-        BSP_Validate(sd->bsp_tree);
-        DiagnoseBrushNormals(
-                sd->brushes, 
-                sd->brush_count, 
-                sd->all_faces, 
-                sd->all_vertices
-            );
-    }
-    else {
-        ERR_OUT("[MapScene] Failed to build BSP tree");
-    }
-}
+    DBG_OUT("[MapScene] Building BSP tree...");
+    if (!build_bsp_from_mapdata(sd))
+        ERR_OUT("[MapScene] BSP build failed");
+} /* mapscene_Setup */
 
 
 
@@ -606,12 +696,13 @@ mapscene_RenderMap(Scene *scene, Head *head)
 }
 
 /*
-    mapscene_Render
+    mapscene_RenderBSP
         SceneRenderCallback - called once per frame.
-        
-        Now renders from the BSP tree instead of the flat face arrays.
-        This shows only the visible faces (those in EMPTY leaves) and
-        prepares us for future PVS-based culling.
+
+        Draws the finished GBSPLib BSP faces from the draw-hull root node in
+        GREEN wireframe.  Falls back to the compiled-brush magenta wireframe so
+        geometry is always visible even if the BSP build hasn't finished or has
+        produced no faces yet.
 */
 static void
 mapscene_RenderBSP(Scene *scene, Head *head)
@@ -619,40 +710,40 @@ mapscene_RenderBSP(Scene *scene, Head *head)
     Renderer     *renderer = Engine_getRenderer(Scene_getEngine(scene));
     MapSceneData *sd       = (MapSceneData*)Scene_getData(scene);
     Camera       *camera   = Head_getCamera(head);
+    (void)camera;
 
-    if (sd && sd->bsp_tree) {
-        Color    wire_color = MAGENTA;
-        BSPTree *tree       = sd->bsp_tree;
-
-        /* Iterate ALL leaves - faces are in SOLID leaves after culling */
-        for (int i = 0; i < tree->leaf_count; i++) {
-            const BSPLeaf *leaf = &tree->leaves[i];
-
-            if (leaf->face_count == 0) 
-                continue;
-
-            const BSPFace *face = leaf->faces;
-            while (face) {
-                if (face->vertex_count >= 3) {
-                    for (int v = 0; v < face->vertex_count; v++) {
-                        int next = (v+1) % face->vertex_count;
-                        //DrawLine3D(face->vertices[v], face->vertices[next], wire_color);
-                    }
-                }
-                face = face->next;
+    /* BSP face wireframe (GREEN) */
+    if (sd && sd->bsp_built && sd->model && sd->model->RootNode[0]) {
+        GBSP_Node *root = sd->model->RootNode[0];
+        for (GBSP_Face *f = root->Faces; f; f = f->Next) {
+            if (!f->Poly || f->Poly->NumVerts < 3) continue;
+            for (int v = 0; v < f->Poly->NumVerts; v++) {
+                int next = (v + 1) % f->Poly->NumVerts;
+                DrawLine3D(f->Poly->Verts[v], f->Poly->Verts[next], GREEN);
             }
         }
     }
-    
-    BSP_DebugDrawLeafBounds(sd->bsp_tree);
-//    BSP_DrawLeakPath();
-    BSP_DebugDrawLeak(sd->bsp_tree);   
-    
-    /* Entity Submission */
-    Entity **entities = Scene_getEntities(scene);
-    for (size_t i = 0; i < DynamicArray_length(entities); i++) {
-        Renderer_submitEntity(renderer, entities[i]);
+
+    /* Brush wireframe fallback (MAGENTA) */
+    if (sd && sd->brushes && sd->all_faces && sd->all_vertices) {
+        for (int b = 0; b < sd->brush_count; b++) {
+            CompiledBrush *brush = &sd->brushes[b];
+            for (int f = 0; f < brush->face_count; f++) {
+                CompiledFace *face = &sd->all_faces[brush->face_start + f];
+                if (face->vertex_count < 3 || !face->is_visible) continue;
+                Vector3 *verts = &sd->all_vertices[face->vertex_start];
+                for (int v = 0; v < face->vertex_count; v++) {
+                    int next = (v + 1) % face->vertex_count;
+                    DrawLine3D(verts[v], verts[next], MAGENTA);
+                }
+            }
+        }
     }
+
+    /* Entity submission */
+    Entity **entities = Scene_getEntities(scene);
+    for (size_t i = 0; i < DynamicArray_length(entities); i++)
+        Renderer_submitEntity(renderer, entities[i]);
 }
 
 
@@ -662,9 +753,10 @@ mapscene_Free(Scene *scene)
     MapSceneData *sd = (MapSceneData*)Scene_getData(scene);
     if (!sd) return;
 
-    if (sd->bsp_tree) {
-        BSP_Free(sd->bsp_tree);
-        sd->bsp_tree = NULL;
+    if (sd->bsp_built) {
+        FreeAllGBSPData();
+        sd->model     = NULL;
+        sd->bsp_built = false;
     }
 
     /* Free flat arrays */

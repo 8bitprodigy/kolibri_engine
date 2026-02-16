@@ -1,7 +1,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -Wpedantic -g3 -O0  -DDEBUG#-DHEAD_USE_RENDER_TEXTURE
 LIBS    = -lraylib -lGL -lm
-INCLUDE = -I../../include -I/usr/local/include 
+INCLUDE = -I../../include -I/usr/local/include -I../gbsplib
 LIBDIR  = -L/usr/local/lib
 
 PROJECTNAME = V220map_example
@@ -37,7 +37,7 @@ TARGET       = $(PROJECTNAME)$(TARGET_EXT)
 ENGINE_SRC   = $(wildcard $(SRCDIR)/*.c)
 # Only include the specific example files needed for this project
 EXAMPLES_SRC  = $(EXAMPLESDIR)/mapscene.c $(EXAMPLESDIR)/v220_map_parser.c
-EXAMPLES_SRC += $(EXAMPLESDIR)/mapscene_bsp.c
+EXAMPLES_SRC += $(wildcard $(EXAMPLESDIR)/gbsplib/*.c)
 GAME_SRC     = $(wildcard $(GAMESRCDIR)/*.c)
 
 ENGINE_OBJS   = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)
@@ -61,6 +61,7 @@ prepare:
 	mkdir -p $(OBJDIR)
 	mkdir -p $(OBJDIR)/engine
 	mkdir -p $(OBJDIR)/examples
+	mkdir -p $(OBJDIR)/examples/gbsplib
 	mkdir -p $(OBJDIR)/game
 
 $(OBJDIR)/engine/%.o: $(SRCDIR)/%.c
