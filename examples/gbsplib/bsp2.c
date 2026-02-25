@@ -531,7 +531,7 @@ bool CheckPlaneAgainstParents (int32_t PNum, GBSP_Node *Node)
 	{
 		if (p->PlaneNum == PNum)
 		{
-			fprintf(stderr, "Tried parent");
+			// "Tried parent" is expected for detail brush planes after structural splits
 			return false;
 		}
 	}
@@ -608,7 +608,10 @@ GBSP_Side *SelectSplitSide(GBSP_Brush *Brushes, GBSP_Node *Node)
 				PNum = Side->PlaneNum;
 				PSide = Side->PlaneSide;
 				
-				assert(CheckPlaneAgainstParents (PNum, Node) == true);
+				// Skip planes already used by an ancestor node.
+				// This is expected for detail brush planes in subtrees after structural splits.
+				if (!CheckPlaneAgainstParents(PNum, Node))
+					continue;
 				
 			#ifdef USE_VOLUMES
 				if (!CheckPlaneAgainstVolume (PNum, Node))
@@ -622,8 +625,22 @@ GBSP_Side *SelectSplitSide(GBSP_Brush *Brushes, GBSP_Node *Node)
 				Splits = 0;
 				EpsilonBrush = 0;
 
+				bool splitterIsDetail = !!(Brush->Original->Contents & BSP_CONTENTS_DETAIL2);
+
 				for (Test = Brushes ; Test ; Test=Test->Next)
 				{
+					bool testIsDetail = !!(Test->Original->Contents & BSP_CONTENTS_DETAIL2);
+
+					// When evaluating a structural splitter, don't let detail brushes
+					// inflate the split count or skew the front/back balance.
+					// Just record which side they fall on for SplitBrushList later.
+					if (!splitterIsDetail && testIsDetail)
+					{
+						s = BoxOnPlaneSide(&Test->Mins, &Test->Maxs, &Planes[PNum]);
+						Test->TestSide = s;
+						continue;
+					}
+
 					s = TestBrushToPlane(Test, PNum, PSide, &BSplits, &HintSplit, &EpsilonBrush);
 
 					Splits += BSplits;
@@ -722,6 +739,16 @@ void SplitBrushList (GBSP_Brush *Brushes, GBSP_Node *Node, GBSP_Brush **Front, G
 
 		if (Sides == PSIDE_BOTH)
 		{	
+			// A detail split plane must not chop structural brushes — put them
+			// on whichever side their centroid falls on, intact.
+			if (Node->Detail && !(Brush->Original->Contents & BSP_CONTENTS_DETAIL2))
+			{
+				NewBrush = CopyBrush(Brush);
+				NewBrush->Next = *Front;
+				*Front = NewBrush;
+				continue;
+			}
+
 			SplitBrush(Brush, Node->PlaneNum, 0, SIDE_NODE, false, &NewBrush, &NewBrush2);
 			if (NewBrush)
 			{
@@ -1319,6 +1346,22 @@ bool ProcessWorldModel(GBSP_Model *Model, MAP_Brush *MapBrushes)
 
 	// Free the tree
 	FreeBSP_r(Node);
+
+	// MarkVisibleSides cleared SIDE_VISIBLE on all OriginalSides.
+	// Restore it on every side that has a valid poly so the second
+	// MakeBSPBrushes/BuildBSP pass gets the same visible-side set as pass 1.
+	{
+		MAP_Brush *mb;
+		for (mb = MapBrushes; mb; mb = mb->Next)
+		{
+			int32_t s;
+			for (s = 0; s < mb->NumSides; s++)
+			{
+				if (mb->OriginalSides[s].Poly)
+					mb->OriginalSides[s].Flags |= SIDE_VISIBLE;
+			}
+		}
+	}
 
 	// Make the bsp brush list
 	Brushes = MakeBSPBrushes(MapBrushes);

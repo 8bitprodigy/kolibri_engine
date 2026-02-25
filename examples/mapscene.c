@@ -392,6 +392,10 @@ build_bsp_from_mapdata(MapSceneData *sd)
         return false;
     }
 
+    /* All brushes — structural and detail alike — go into a single list.
+       The BSP compiler's SelectSplitSide already handles the distinction:
+       even passes (0, 2) skip detail brushes as splitter candidates;
+       odd passes (1, 3) allow them only after structural splits are exhausted. */
     MAP_Brush *head = NULL;
     MAP_Brush *tail = NULL;
 
@@ -453,6 +457,72 @@ build_bsp_from_mapdata(MapSceneData *sd)
         else        { tail->Next = mb; tail = mb; }
     }
 
+    /* Include brushes from brush entities.
+       Contents are determined first by spawnflags, then by classname fallback. */
+    for (int ei = 1; ei < map->entity_count; ei++) {
+        MapEntity *ent = &map->entities[ei];
+        const char *classname = GetEntityProperty(ent, "classname");
+        if (!classname) continue;
+        if (ent->brush_count == 0) continue;
+
+        int32_t contents = -1;
+        const char *spawnflags_str = GetEntityProperty(ent, "spawnflags");
+        if (spawnflags_str) {
+            int flags = atoi(spawnflags_str);
+            if      (flags & 32) contents = BSP_CONTENTS_CLIP2;
+            else if (flags & 4)  contents = BSP_CONTENTS_EMPTY2;
+            else if (flags & 2)  contents = BSP_CONTENTS_WINDOW2;
+            else if (flags & 1)  contents = (int32_t)BSP_CONTENTS_DETAIL2;
+            else                 contents = BSP_CONTENTS_SOLID2;
+        }
+
+        if (contents == -1) {
+            if      (strcmp(classname, "func_detail")      == 0) contents = (int32_t)BSP_CONTENTS_DETAIL2;
+            else if (strcmp(classname, "func_wall")        == 0) contents = BSP_CONTENTS_SOLID2;
+            else if (strcmp(classname, "func_group")       == 0) contents = BSP_CONTENTS_SOLID2;
+            else if (strcmp(classname, "func_illusionary") == 0) contents = BSP_CONTENTS_EMPTY2;
+            else if (strcmp(classname, "func_window")      == 0) contents = BSP_CONTENTS_WINDOW2;
+            else if (strcmp(classname, "func_clip")        == 0) contents = BSP_CONTENTS_CLIP2;
+            else if (strcmp(classname, "func_brush")       == 0) contents = BSP_CONTENTS_SOLID2;
+            else continue;
+        }
+
+        for (int bi = 0; bi < ent->brush_count; bi++) {
+            const MapBrush *src = &ent->brushes[bi];
+            int num_sides = src->plane_count;
+
+            MAP_Brush *mb = AllocMapBrush(num_sides);
+            if (!mb) continue;
+
+            mb->EntityNum = ei;
+            mb->BrushNum  = bi;
+            mb->Contents  = contents;
+            mb->NumSides  = num_sides;
+
+            for (int si = 0; si < num_sides; si++) {
+                GBSP_Plane plane;
+                plane.Normal = src->planes[si].normal;
+                plane.Dist   = src->planes[si].distance;
+                plane.Type   = PlaneType(&plane.Normal);
+
+                int32_t pside = 0;
+                int32_t pnum  = FindPlane(&plane, &pside);
+
+                mb->OriginalSides[si].PlaneNum  = pnum;
+                mb->OriginalSides[si].PlaneSide = (uint8_t)pside;
+                mb->OriginalSides[si].TexInfo   = 0;
+                mb->OriginalSides[si].Flags     = 0;
+                mb->OriginalSides[si].Poly      = NULL;
+            }
+
+            MakeMapBrushPolys(mb);
+
+            mb->Next = NULL;
+            if (!head) { head = mb; tail = mb; }
+            else        { tail->Next = mb; tail = mb; }
+        }
+    }
+
     if (!head) {
         ERR_OUT("[BSP] No MAP_Brush nodes created");
         return false;
@@ -481,14 +551,14 @@ build_bsp_from_mapdata(MapSceneData *sd)
             entity_origins[i] = (Vector3){0, 0, 0};
             entity_flags[i] = 0;
         } else if (origin_str) {
-            // Parse origin string "x y z"
-            if (sscanf(origin_str, "%f %f %f", 
-                    &entity_origins[i].x, 
-                    &entity_origins[i].y, 
-                    &entity_origins[i].z) == 3) {
+            /* The parser (ParseValve220Map) already applied AXIS_REMAP_RAYLIB_NOSCALE
+               to the "origin" value and stored the result back into the property string.
+               Read it directly — no further remapping needed. */
+            float ox, oy, oz;
+            if (sscanf(origin_str, "%f %f %f", &ox, &oy, &oz) == 3) {
+                entity_origins[i] = (Vector3){ ox, oy, oz };
                 entity_flags[i] = ENTITY_HAS_ORIGIN;
             } else {
-                // Parsing failed - no origin
                 entity_origins[i] = (Vector3){0, 0, 0};
                 entity_flags[i] = 0;
             }
@@ -499,7 +569,7 @@ build_bsp_from_mapdata(MapSceneData *sd)
         }
     }
 
-    // Pass entities to BSP system
+    // Pass entities to BSP system (origins are now in BSP/engine space)
     SetBSPEntities(num_entities, entity_origins, entity_flags);
 
     if (!ProcessWorldModel(model, head)) {
@@ -567,7 +637,10 @@ mapscene_Setup(Scene *scene, void *map_data)
     MapSceneData *sd = (MapSceneData *)map_data;
 
     /* Parse the .map file */
-    sd->map = ParseValve220Map(sd->source_path, AXIS_REMAP_RAYLIB);
+    /* Parse with axis-swap + flip but NO scale.  Scale (1/64) is applied at
+       render time via MAP_SCALE so the BSP compiler works in un-scaled map
+       units and the sealing hull remains geometrically consistent.          */
+    sd->map = ParseValve220Map(sd->source_path, AXIS_REMAP_RAYLIB_NOSCALE);
     if (!sd->map)
     {
         DBG_OUT(
@@ -746,10 +819,13 @@ mapscene_RenderMap(Scene *scene, Head *head)
                 /* Get pointer to this face's vertices in the flat array */
                 Vector3 *face_verts = &sd->all_vertices[face->vertex_start];
                 
-                /* Draw wireframe edges */
+                /* Draw wireframe edges — apply MAP_SCALE since vertices are
+                   now in un-scaled map units (scale deferred from parse time) */
                 for (int v = 0; v < face->vertex_count; v++) {
                     int next = (v + 1) % face->vertex_count;
-                    DrawLine3D(face_verts[v], face_verts[next], wire_color);
+                    Vector3 a = Vector3Scale(face_verts[v],    MAP_SCALE);
+                    Vector3 b = Vector3Scale(face_verts[next], MAP_SCALE);
+                    DrawLine3D(a, b, wire_color);
                 }
             }
         }

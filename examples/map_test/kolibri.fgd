@@ -1,0 +1,367 @@
+// GBSP (Genesis3D-derived) FGD for TrenchBroom
+// Based on GBSP Version 15 / bsp.h
+// Units: 1 unit = 1/64 metre (MAP_SCALE = 1/64)
+//
+// Surface / Content flags are encoded in GFX_TexInfo.Flags and GFX_Leaf.Contents.
+// The flag values below match the BSP_CONTENTS_* defines in bsp.h.
+
+// ---------------------------------------------------------------------------
+// Surface flags  (GFX_TexInfo.Flags)
+// ---------------------------------------------------------------------------
+// No dedicated surface-flag defines were found in bsp.h; if your compiler
+// exposes them add them here.  The TexInfo struct carries FaceLight,
+// ReflectiveScale, Alpha, and MipMapBias which are per-face properties rather
+// than boolean flags, so they are exposed as entity keys where relevant.
+
+// ---------------------------------------------------------------------------
+// Content flags  (GFX_Leaf.Contents / BSP_CONTENTS_* in bsp.h)
+// ---------------------------------------------------------------------------
+//   Bit 0  (1)      SOLID       – Solid + visible
+//   Bit 1  (2)      WINDOW      – Window (visible, non-solid glass-like)
+//   Bit 2  (4)      EMPTY       – Empty but visible (water, lava …)
+//   Bit 3  (8)      TRANSLUCENT – Vis will see through it
+//   Bit 4  (16)     WAVY        – Wavy surface (visible)
+//   Bit 5  (32)     DETAIL      – Won't occlude vis
+//   Bit 6  (64)     CLIP        – Structural, invisible clip brush
+//   Bit 7  (128)    HINT        – Primary BSP splitter (invisible)
+//   Bit 8  (256)    AREA        – Area-separator leaf (invisible)
+//   Bit 9  (512)    FLOCKING    – Flocking flag (not a true content)
+//   Bit 10 (1024)   SHEET       – Sheet (single-sided face)
+//   Bits 16-31      USER1-16    – Game-defined user content flags
+
+
+// ===========================================================================
+//  Base classes
+// ===========================================================================
+
+@BaseClass = Targetable
+[
+    targetname(target_source) : "Name" :
+]
+
+@BaseClass = Targeteer
+[
+    target(target_destination) : "Target" :
+]
+
+@BaseClass = Angles
+[
+    angle(float) : "Yaw angle" : "0"
+]
+
+@BaseClass = Light_base
+[
+    light(integer)  : "Intensity"   : "200"
+    ltype(choices)  : "Light style" : "0"
+    [
+        0 : "Normal (steady)"
+        1 : "Flicker A"
+        2 : "Slow strong pulse"
+        3 : "Candle A"
+        4 : "Fast strobe"
+        5 : "Gentle pulse 1"
+        6 : "Flicker B"
+        7 : "Candle B"
+        8 : "Candle C"
+        9 : "Slow strobe"
+        10 : "Fluorescent flicker"
+        11 : "Slow pulse, not dark"
+    ]
+]
+
+
+// ===========================================================================
+//  World entity
+// ===========================================================================
+
+@SolidClass = worldspawn : "World"
+[
+    message(string)   : "Map title"     : ""
+    skyname(string)   : "Sky texture"   : ""
+    // Sky rotation / draw data mirrors GFX_SkyData
+    sky_axis(string)      : "Sky rotation axis"       : "0 0 1"
+    sky_dpm(float)        : "Sky degrees per minute"  : "0"
+    sky_drawscale(float)  : "Sky draw scale"          : "1"
+]
+
+
+// ===========================================================================
+//  Brush entities
+// ===========================================================================
+
+@SolidClass base(Targetable, Angles) = func_wall : "Static brush model"
+[
+    // no extra keys – plain renderable world geometry compiled as a sub-model
+]
+
+@SolidClass base(Targetable, Angles) = func_detail : "Detail brush (no vis occlusion)"
+[
+    // Brushes marked DETAIL (bit 5) – compiled as model but won't cut vis portals.
+]
+
+@SolidClass base(Targetable, Angles) = func_door : "Sliding / rotating door"
+[
+    angle(float)     : "Open direction (yaw)" : "0"
+    speed(float)     : "Move speed"           : "100"
+    wait(float)      : "Auto-close delay"     : "3"
+    lip(float)       : "Lip"                  : "8"
+    dmg(integer)     : "Crush damage"         : "2"
+    health(integer)  : "Health (shootable)"   : "0"
+    spawnflags(flags)
+    [
+        1  : "Start open"    : 0
+        4  : "Don't link"    : 0
+        8  : "Toggle"        : 0
+        32 : "Reverse dir"   : 0
+    ]
+]
+
+@SolidClass base(Targetable, Angles) = func_plat : "Elevator / platform"
+[
+    height(float)   : "Travel height"  : "0"
+    speed(float)    : "Speed"          : "150"
+    accel(float)    : "Acceleration"   : "50"
+    lip(float)      : "Lip"            : "8"
+    dmg(integer)    : "Crush damage"
+    spawnflags(flags)
+    [
+        1  : "Low trigger"   : 0
+    ]
+]
+
+@SolidClass base(Targetable, Angles) = func_rotating : "Continuously spinning brush"
+[
+    speed(float)    : "Rotation speed (deg/s)"
+    spawnflags(flags)
+    [
+        1  : "Start on"           : 0
+        2  : "Reverse"            : 0
+        4  : "X axis"             : 0
+        8  : "Y axis"             : 0
+        16 : "Accel / decel"      : 0
+        32 : "Fan – hurt touch"   : 0
+    ]
+]
+
+@SolidClass base(Targetable) = func_clip : "Invisible clip brush (BSP_CONTENTS_CLIP2)"
+[
+    // Compiled with content flag CLIP (bit 6) – blocks movement, invisible.
+]
+
+@SolidClass base(Targetable) = func_hint : "Hint brush – BSP split helper (BSP_CONTENTS_HINT2)"
+[
+    // Forces a BSP split along this brush. Not rendered or collidable.
+]
+
+@SolidClass base(Targetable) = func_areaportal : "Area portal separator (BSP_CONTENTS_AREA2)"
+[
+    // Marks a leaf as an area-separator; corresponds to GFX_AreaPortal/GFX_Area.
+]
+
+@SolidClass base(Targetable, Angles) = func_water : "Water / liquid volume (BSP_CONTENTS_EMPTY2)"
+[
+    watertype(choices) : "Liquid type"
+    [
+        0 : "Water"
+        1 : "Lava"
+        2 : "Slime"
+    ]
+    waveheight(float) : "Wave amplitude" : "0"
+]
+
+@SolidClass base(Targetable, Angles) = func_window : "Window glass (BSP_CONTENTS_WINDOW2)"
+[
+    // Brush compiled with WINDOW contents – visible and collidable like solid,
+    // but categorised separately for rendering (e.g. alpha sorting).
+]
+
+@SolidClass base(Targetable, Angles) = func_illusionary : "Non-solid visible brush (BSP_CONTENTS_SHEET)"
+[
+    // Compiled as a SHEET; single-sided face, no collision.
+]
+
+
+// ===========================================================================
+//  Point entities – lighting
+// ===========================================================================
+
+@PointClass base(Targetable, Light_base) size(-8 -8 -8, 8 8 8) color(255 255 0) = light : "Omni light"
+[
+    origin(vector)  : "Origin"
+    style(integer)  : "Style"   : "0"
+    // Colours as floats 0-1 or integer 0-255 depending on compiler convention
+    _color(string) : "Light colour (R G B 0-255)"
+    wait(float)      : "Distance falloff multiplier" : "1"
+]
+
+@PointClass base(Targetable, Light_base) size(-8 -8 -8, 8 8 8) color(255 200 0) = light_spot : "Spotlight"
+[
+    origin(vector)   : "Origin"
+    angle(float)     : "Yaw"
+    pitch(float)     : "Pitch"
+    _cone(integer)   : "Inner cone angle"  : "10"
+    _cone2(integer)  : "Outer cone angle"  : "30"
+    _color(string)   : "Light colour (R G B 0-255)"
+]
+
+@PointClass base(Targetable, Light_base) size(-8 -8 -8, 8 8 8) color(220 220 255) = light_ambient : "Ambient / sky light"
+[
+    origin(vector)   : "Origin"
+    _color(string)   : "Colour (R G B 0-255)"
+    // GFX_SkyData influences how sky-lit faces are handled; keep sky params on worldspawn.
+]
+
+
+// ===========================================================================
+//  Point entities – gameplay
+// ===========================================================================
+
+@PointClass base(Targetable, Angles) size(-16 -16 -24, 16 16 32) color(0 255 0) = info_player_start : "Player start"
+[
+    origin(vector) : "Origin"
+]
+
+@PointClass base(Targetable, Angles) size(-16 -16 -24, 16 16 32) color(0 200 0) = info_player_deathmatch : "Deathmatch spawn"
+[
+    origin(vector) : "Origin"
+]
+
+@PointClass base(Targetable, Angles) size(-8 -8 -8, 8 8 8) color(200 100 0) = info_null : "Null info / target point"
+[
+    origin(vector) : "Origin"
+]
+
+@PointClass base(Targetable, Targeteer, Angles) size(-8 -8 -8, 8 8 8) color(200 100 0) = info_notnull : "Target point (kept in output)"
+[
+    origin(vector) : "Origin"
+]
+
+@PointClass base(Targetable, Targeteer, Angles) size(-16 -16 -8, 16 16 8) color(128 0 200) = trigger_relay : "Trigger relay"
+[
+    origin(vector)  : "Origin"
+    delay(float)    : "Trigger delay (s)"
+    killtarget(target_destination) : "Kill target" : ""
+    message(string) : "Message" : ""
+]
+
+@PointClass base(Targetable, Targeteer) size(-16 -16 -8, 16 16 8) color(128 0 200) = trigger_counter : "Trigger counter"
+[
+    origin(vector)  : "Origin"
+    count(integer)  : "Count needed" : "2"
+]
+
+@SolidClass base(Targetable, Targeteer) = trigger_once : "One-shot trigger volume"
+[
+    delay(float)   : "Trigger delay (s)"
+    message(string): "Message"
+    killtarget(target_destination) : "Kill target"
+    spawnflags(flags)
+    [
+        1 : "Monsters activate" : 0
+        2 : "No touch"          : 0
+    ]
+]
+
+@SolidClass base(Targetable, Targeteer) = trigger_multiple : "Repeating trigger volume"
+[
+    delay(float)   : "Trigger delay (s)"
+    wait(float)    : "Re-arm delay (s)"
+    message(string): "Message"
+    killtarget(target_destination) : "Kill target"
+    spawnflags(flags)
+    [
+        1 : "Monsters activate" : 0
+    ]
+]
+
+@SolidClass base(Targetable, Targeteer) = trigger_push : "Push / wind zone"
+[
+    speed(float)  : "Push speed"
+    angle(float)  : "Push yaw dir"
+    spawnflags(flags)
+    [
+        1 : "Push once" : 0
+    ]
+]
+
+@SolidClass base(Targetable, Targeteer) = trigger_hurt : "Damage zone"
+[
+    dmg(integer)   : "Damage per tick"
+    delay(float)   : "Damage interval"
+    spawnflags(flags)
+    [
+        1 : "No protection"  : 0
+        2 : "Silent"         : 0
+    ]
+]
+
+
+// ===========================================================================
+//  Point entities – items / pickups  (stubs – expand for your game)
+// ===========================================================================
+
+@PointClass base(Targetable, Angles) size(-16 -16 0, 16 16 32) color(0 100 255) = item_generic : "Generic item pickup"
+[
+    origin(vector)  : "Origin"
+    model(string)   : "Model path"
+    message(string) : "Pickup msg"
+    count(integer)  : "Amount"
+    spawnflags(flags)
+    [
+        1 : "Floating"      : 0
+        2 : "Triggered"     : 0
+    ]
+]
+
+
+// ===========================================================================
+//  Point entities – misc
+// ===========================================================================
+
+@PointClass base(Targetable, Targeteer, Angles) size(-4 -4 -4, 4 4 4) color(255 0 255) = path_corner : "Path node for trains / movers"
+[
+    origin(vector)  : "Origin"
+    speed(float)    : "Speed to next"   : "0"
+    wait(float)     : "Wait at node"    : "0"
+]
+
+@PointClass base(Targetable, Targeteer, Angles) size(-16 -16 -16, 16 16 16) color(200 200 0) = func_train : "Moving brush train"
+[
+    origin(vector)  : "Origin (start)"
+    speed(float)    : "Speed"
+    target(target_destination) : "First path_corner"
+    dmg(integer)    : "Crush damage"
+    spawnflags(flags)
+    [
+        1 : "Start on"          : 0
+        2 : "Toggle"            : 0
+        4 : "Block stops"       : 0
+    ]
+]
+
+@PointClass size(-8 -8 -8, 8 8 8) color(255 128 0) = env_sound : "Ambient sound emitter"
+[
+    origin(vector)   : "Origin"
+    soundfile(string): "Sound file"      : ""
+    volume(float)    : "Volume (0-1)"
+    radius(float)    : "Falloff radius"
+    attenuation(choices) : "Attenuation"
+    [
+        0 : "None (everywhere)"
+        1 : "Normal"
+        2 : "Idle"
+        3 : "Static"
+    ]
+    spawnflags(flags)
+    [
+        1 : "Start silent" : 0
+        2 : "Loop"         : 1
+    ]
+]
+
+@PointClass base(Targetable, Angles) size(-4 -4 -4, 4 4 4) color(0 255 200) = misc_model : "Static decoration model"
+[
+    origin(vector)  : "Origin"
+    model(string)   : "Model"
+    scale(float)    : "Scale"
+]

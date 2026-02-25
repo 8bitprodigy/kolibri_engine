@@ -28,8 +28,9 @@ typedef struct
 AxisRemapping;
 
 // Preset configurations
-static const AxisRemapping AXIS_REMAP_NONE   = {0, 1, 2, 0, 0, 0, 1};  // Quake/idTech (Z-up)
-static const AxisRemapping AXIS_REMAP_RAYLIB = {0, 2, 1, 0, 1, 0, 1.0f/64.0f};  // Raylib (Y-up)
+static const AxisRemapping AXIS_REMAP_NONE           = {0, 1, 2, 0, 0, 0, 1};           // Quake/idTech (Z-up), no change
+static const AxisRemapping AXIS_REMAP_RAYLIB         = {0, 2, 1, 0, 1, 0, 1.0f/64.0f}; // Raylib (Y-up), with 1/64 scale baked in
+static const AxisRemapping AXIS_REMAP_RAYLIB_NOSCALE = {0, 2, 1, 0, 1, 0, 1.0f};       // Raylib (Y-up), no scale — for BSP compile pass; apply MAP_SCALE at render time
 
 typedef struct 
 {

@@ -109,7 +109,8 @@
 									BSP_CONTENTS_EMPTY2 | \
 									BSP_CONTENTS_WINDOW2 | \
 									BSP_CONTENTS_SHEET | \
-									BSP_CONTENTS_WAVY2)
+									BSP_CONTENTS_WAVY2 | \
+									BSP_CONTENTS_DETAIL2)				// Detail brushes produce visible faces
 
 // These contents define where faces are NOT allowed to merge across
 #define BSP_MERGE_SEP_CONTENTS     (BSP_CONTENTS_WAVY2 | \

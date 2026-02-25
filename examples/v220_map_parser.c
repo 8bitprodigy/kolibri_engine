@@ -280,7 +280,7 @@ ParseEntity(Tokenizer *tok, MapEntity *entity)
                             &origin.z
                         ) == 3
                 ) {
-                    origin = RemapVector3(origin, true); /* true = apply scale */
+                    origin = RemapVector3(origin, false); /* true = apply scale */
                     snprintf(
                             entity->properties[entity->property_count].value,
                             sizeof(entity->properties[entity->property_count].value),
