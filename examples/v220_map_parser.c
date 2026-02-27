@@ -2,413 +2,576 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+
 #include <raylib.h>
+#include <raymath.h>
 
 #include "v220_map_parser.h"
 
-#include <raymath.h>
 
+/* =========================================================================
+   Internal types
+   ========================================================================= */
 
-static AxisRemapping g_remap;
-
-static inline Vector3
-RemapVector3(Vector3 v, bool scale)
+/*
+    Tokenizer
+        Walks a null-terminated char buffer one token at a time.
+        The AxisRemapping is stored here so no global state is needed,
+        making the parser re-entrant.
+*/
+typedef struct
 {
-    float components[3] = { v.x, v.y, v.z };
-    float flipped[3];
-    float result[3];
-    
-    // First apply flips to input components
-    flipped[0] = components[0] * (g_remap.flip_x ? -1.0f : 1.0f);
-    flipped[1] = components[1] * (g_remap.flip_y ? -1.0f : 1.0f);
-    flipped[2] = components[2] * (g_remap.flip_z ? -1.0f : 1.0f);
-    
-    // Then remap to output axes
-    result[0] = flipped[g_remap.x_to];
-    result[1] = flipped[g_remap.y_to];
-    result[2] = flipped[g_remap.z_to];
-    
-    return Vector3Scale(
-        (Vector3){ result[0], result[1], result[2] },
-        scale ? g_remap.scale : 1.0f
-    );
+    char         *current;
+    char          token[MAX_TOKEN_LENGTH];
+    AxisRemapping remap;
 }
-
-/* Tokenizer state */
-typedef struct 
-{
-    char *data;
-    char *current;
-    char token[MAX_TOKEN_LENGTH];
-} 
 Tokenizer;
 
-/* Initialize tokenizer */
-void 
-InitTokenizer(Tokenizer *tok, char *data) 
+
+/* =========================================================================
+   Dynamic-array helpers
+   ========================================================================= */
+
+/*
+    GrowArray
+        Ensures *array has room for at least (count + 1) elements of
+        elem_size bytes.  Doubles capacity on each grow, starting at 8.
+        Returns true on success, false on allocation failure.
+*/
+static bool
+GrowArray(void **array, int *capacity, int count, size_t elem_size)
 {
-    tok->data = data;
-    tok->current = data;
-    tok->token[0] = '\0';
+    if (count < *capacity)
+        return true;
+
+    int   new_cap = (*capacity == 0) ? 8 : (*capacity * 2);
+    void *grown   = realloc(*array, (size_t)new_cap * elem_size);
+
+    if (!grown)
+        return false;
+
+    *array    = grown;
+    *capacity = new_cap;
+    return true;
 }
 
 
-// Skip whitespace and comments
-void 
-SkipWhitespace(Tokenizer *tok) 
+/* =========================================================================
+   Axis remapping
+   ========================================================================= */
+
+static Vector3
+RemapVector3(const Tokenizer *tok, Vector3 v, bool apply_scale)
 {
-    while (*tok->current) {
-        if (*tok->current == ' ' || *tok->current == '\t' || 
-            *tok->current == '\r' || *tok->current == '\n') {
+    const AxisRemapping *r = &tok->remap;
+
+    float c[3] = { v.x, v.y, v.z };
+
+    /* Apply per-axis flips */
+    float f[3];
+    f[0] = c[0] * (r->flip_x ? -1.0f : 1.0f);
+    f[1] = c[1] * (r->flip_y ? -1.0f : 1.0f);
+    f[2] = c[2] * (r->flip_z ? -1.0f : 1.0f);
+
+    /* Remap to destination axes */
+    Vector3 out = { f[r->x_to], f[r->y_to], f[r->z_to] };
+
+    return Vector3Scale(out, apply_scale ? r->scale : 1.0f);
+}
+
+
+/* =========================================================================
+   Tokenizer
+   ========================================================================= */
+
+static void
+InitTokenizer(Tokenizer *tok, char *data, AxisRemapping remap)
+{
+    tok->current  = data;
+    tok->token[0] = '\0';
+    tok->remap    = remap;
+}
+
+static void
+SkipWhitespaceAndComments(Tokenizer *tok)
+{
+    while (*tok->current)
+    {
+        /* Whitespace */
+        if (*tok->current == ' '  || *tok->current == '\t' ||
+            *tok->current == '\r' || *tok->current == '\n')
+        {
             tok->current++;
         }
-        else if (*tok->current == '/' && *(tok->current + 1) == '/') {
-            // Skip line comment
-            while (*tok->current && *tok->current != '\n') {
+        /* Line comment ( // ... ) */
+        else if (tok->current[0] == '/' && tok->current[1] == '/')
+        {
+            while (*tok->current && *tok->current != '\n')
                 tok->current++;
-            }
         }
-        else {
+        else
+        {
             break;
         }
     }
 }
 
-// Get next token
-bool 
-GetToken(Tokenizer *tok) 
+/*
+    GetToken
+        Advances tok->current past the next token and stores it in
+        tok->token.  Returns true if a token was read, false at EOF.
+*/
+static bool
+GetToken(Tokenizer *tok)
 {
-    SkipWhitespace(tok);
-    
-    if (!*tok->current) return false;
-    
-    char *start = tok->current;
+    SkipWhitespaceAndComments(tok);
+
+    if (!*tok->current)
+        return false;
+
     int len = 0;
-    
-    // Handle quoted strings
-    if (*tok->current == '"') {
-        tok->current++; // Skip opening quote
-        start = tok->current;
-        
-        while (*tok->current && *tok->current != '"' && len < MAX_TOKEN_LENGTH - 1) {
+
+    if (*tok->current == '"')
+    {
+        /* Quoted string — strip the surrounding quotes */
+        tok->current++;
+        while (*tok->current && *tok->current != '"' &&
+               len < MAX_TOKEN_LENGTH - 1)
+        {
             tok->token[len++] = *tok->current++;
         }
-        
-        if (*tok->current == '"') tok->current++; // Skip closing quote
+        if (*tok->current == '"')
+            tok->current++;
     }
-    else {
-        // Handle regular tokens
-        while (*tok->current && *tok->current != ' ' && *tok->current != '\t' &&
-               *tok->current != '\r' && *tok->current != '\n' && 
-               len < MAX_TOKEN_LENGTH - 1) {
+    else
+    {
+        /* Unquoted token — ends at whitespace */
+        while (*tok->current &&
+               *tok->current != ' '  && *tok->current != '\t' &&
+               *tok->current != '\r' && *tok->current != '\n' &&
+               len < MAX_TOKEN_LENGTH - 1)
+        {
             tok->token[len++] = *tok->current++;
         }
     }
-    
+
     tok->token[len] = '\0';
     return len > 0;
 }
 
-// Calculate plane from 3 points
-void 
-CalculatePlane(Vector3 p1, Vector3 p2, Vector3 p3, MapPlane *plane) 
+/*
+    UngetToken
+        "Pushes back" the last token by rewinding tok->current.
+        Only valid immediately after a GetToken call on an unquoted token.
+*/
+static void
+UngetToken(Tokenizer *tok)
+{
+    tok->current -= strlen(tok->token);
+}
+
+
+/* =========================================================================
+   Plane math
+   ========================================================================= */
+
+static void
+CalculatePlane(Vector3 p1, Vector3 p2, Vector3 p3, MapPlane *plane)
 {
     Vector3 v1 = Vector3Subtract(p2, p1);
     Vector3 v2 = Vector3Subtract(p3, p1);
-    
-    plane->normal = Vector3Normalize(Vector3CrossProduct(v2, v1));
+
+    plane->normal   = Vector3Normalize(Vector3CrossProduct(v2, v1));
     plane->distance = Vector3DotProduct(plane->normal, p1);
 }
 
-// Parse a brush plane line
-bool 
-ParseBrushPlane(Tokenizer *tok, MapPlane *plane) 
+
+/* =========================================================================
+   Brush / plane parsing
+   ========================================================================= */
+
+static bool
+ParseBrushPlane(Tokenizer *tok, MapPlane *plane)
 {
     Vector3 p1, p2, p3;
-    
-    // Parse first point ( x y z )
-    if (!GetToken(tok) || strcmp(tok->token, "(") != 0) return false;
-    if (!GetToken(tok)) return false; p1.x = atof(tok->token);
-    if (!GetToken(tok)) return false; p1.y = atof(tok->token);
-    if (!GetToken(tok)) return false; p1.z = atof(tok->token);
-    if (!GetToken(tok) || strcmp(tok->token, ")") != 0) return false;
-    
-    // Parse second point ( x y z )
-    if (!GetToken(tok) || strcmp(tok->token, "(") != 0) return false;
-    if (!GetToken(tok)) return false; p2.x = atof(tok->token);
-    if (!GetToken(tok)) return false; p2.y = atof(tok->token);
-    if (!GetToken(tok)) return false; p2.z = atof(tok->token);
-    if (!GetToken(tok) || strcmp(tok->token, ")") != 0) return false;
-    
-    // Parse third point ( x y z )
-    if (!GetToken(tok) || strcmp(tok->token, "(") != 0) return false;
-    if (!GetToken(tok)) return false; p3.x = atof(tok->token);
-    if (!GetToken(tok)) return false; p3.y = atof(tok->token);
-    if (!GetToken(tok)) return false; p3.z = atof(tok->token);
-    if (!GetToken(tok) || strcmp(tok->token, ")") != 0) return false;
 
-    // CRITICAL FIX: Remap points FIRST
-    p1 = RemapVector3(p1, false);
-    p2 = RemapVector3(p2, false);
-    p3 = RemapVector3(p3, false);
-    
-    // THEN calculate plane from remapped points
-    // This ensures normal matches the actual geometry
+#define EXPECT(str)  do { if (!GetToken(tok) || strcmp(tok->token, (str)) != 0) return false; } while (0)
+#define NEXT_FLOAT(f) do { if (!GetToken(tok)) return false; (f) = (float)atof(tok->token); } while (0)
+
+    /* ( x y z ) */
+    EXPECT("(");
+    NEXT_FLOAT(p1.x); NEXT_FLOAT(p1.y); NEXT_FLOAT(p1.z);
+    EXPECT(")");
+
+    EXPECT("(");
+    NEXT_FLOAT(p2.x); NEXT_FLOAT(p2.y); NEXT_FLOAT(p2.z);
+    EXPECT(")");
+
+    EXPECT("(");
+    NEXT_FLOAT(p3.x); NEXT_FLOAT(p3.y); NEXT_FLOAT(p3.z);
+    EXPECT(")");
+
+    /* Remap points into engine space BEFORE deriving the plane equation
+       so that the stored normal matches the actual rendered geometry.    */
+    p1 = RemapVector3(tok, p1, false);
+    p2 = RemapVector3(tok, p2, false);
+    p3 = RemapVector3(tok, p3, false);
+
     CalculatePlane(p1, p2, p3, plane);
-    
-    // Parse texture name
+
+    /* Texture name */
     if (!GetToken(tok)) return false;
-    strncpy(plane->texture, tok->token, sizeof(plane->texture) - 1);
-    plane->texture[sizeof(plane->texture) - 1] = '\0';
-    
-    // Parse U axis [ ux uy uz offset ]
-    if (!GetToken(tok) || strcmp(tok->token, "[") != 0) return false;
-    if (!GetToken(tok)) return false; plane->u_axis.x = atof(tok->token);
-    if (!GetToken(tok)) return false; plane->u_axis.y = atof(tok->token);
-    if (!GetToken(tok)) return false; plane->u_axis.z = atof(tok->token);
-    if (!GetToken(tok)) return false; plane->u_offset = atof(tok->token);
-    if (!GetToken(tok) || strcmp(tok->token, "]") != 0) return false;
+    strncpy(plane->texture, tok->token, MAX_TEXTURE_NAME - 1);
+    plane->texture[MAX_TEXTURE_NAME - 1] = '\0';
 
-    plane->u_axis = RemapVector3(plane->u_axis, false);
-    
-    // Parse V axis [ vx vy vz offset ]
-    if (!GetToken(tok) || strcmp(tok->token, "[") != 0) return false;
-    if (!GetToken(tok)) return false; plane->v_axis.x = atof(tok->token);
-    if (!GetToken(tok)) return false; plane->v_axis.y = atof(tok->token);
-    if (!GetToken(tok)) return false; plane->v_axis.z = atof(tok->token);
-    if (!GetToken(tok)) return false; plane->v_offset = atof(tok->token);
-    if (!GetToken(tok) || strcmp(tok->token, "]") != 0) return false;
+    /* [ ux uy uz u_offset ] */
+    EXPECT("[");
+    NEXT_FLOAT(plane->u_axis.x);
+    NEXT_FLOAT(plane->u_axis.y);
+    NEXT_FLOAT(plane->u_axis.z);
+    NEXT_FLOAT(plane->u_offset);
+    EXPECT("]");
+    plane->u_axis = RemapVector3(tok, plane->u_axis, false);
 
-    plane->v_axis = RemapVector3(plane->v_axis, false);
-    
-    // Parse rotation, scale_x, scale_y
-    if (!GetToken(tok)) return false; plane->rotation = atof(tok->token);
-    if (!GetToken(tok)) return false; plane->u_scale = atof(tok->token);
-    if (!GetToken(tok)) return false; plane->v_scale = atof(tok->token);
-    
+    /* [ vx vy vz v_offset ] */
+    EXPECT("[");
+    NEXT_FLOAT(plane->v_axis.x);
+    NEXT_FLOAT(plane->v_axis.y);
+    NEXT_FLOAT(plane->v_axis.z);
+    NEXT_FLOAT(plane->v_offset);
+    EXPECT("]");
+    plane->v_axis = RemapVector3(tok, plane->v_axis, false);
+
+    /* rotation  u_scale  v_scale */
+    NEXT_FLOAT(plane->rotation);
+    NEXT_FLOAT(plane->u_scale);
+    NEXT_FLOAT(plane->v_scale);
+
+#undef EXPECT
+#undef NEXT_FLOAT
+
     return true;
 }
 
-// Parse a brush
-bool 
-ParseBrush(Tokenizer *tok, MapBrush *brush) 
+/*
+    ParseBrush
+        Allocates and fills a MapBrush.  The opening '{' has NOT yet been
+        consumed when this is called.
+        Returns a heap-allocated MapBrush on success, NULL on failure.
+        Caller is responsible for freeing via FreeMapBrush().
+*/
+static MapBrush *
+ParseBrush(Tokenizer *tok)
 {
-    brush->plane_count = 0;
-    
-    if (!GetToken(tok) || strcmp(tok->token, "{") != 0) return false;
-    
-    while (GetToken(tok)) {
-        if (strcmp(tok->token, "}") == 0) {
-            return brush->plane_count > 0;
+    if (!GetToken(tok) || strcmp(tok->token, "{") != 0)
+        return NULL;
+
+    MapBrush *brush = (MapBrush *)calloc(1, sizeof(MapBrush));
+    if (!brush) return NULL;
+
+    while (GetToken(tok))
+    {
+        if (strcmp(tok->token, "}") == 0)
+        {
+            if (brush->plane_count == 0)
+            {
+                /* Empty brush — treat as an error */
+                free(brush->planes);
+                free(brush);
+                return NULL;
+            }
+            return brush;
         }
-        
-        // Put back the token and parse plane
-        tok->current -= strlen(tok->token);
-        
-        if (brush->plane_count >= MAX_BRUSH_PLANES) {
-            printf("Warning: Brush has too many planes, skipping extras\n");
-            continue;
+
+        /* Not a closing brace — it's the first token of a plane definition */
+        UngetToken(tok);
+
+        if (!GrowArray((void **)&brush->planes,
+                       &brush->plane_capacity,
+                        brush->plane_count,
+                        sizeof(MapPlane)))
+        {
+            fprintf(stderr, "v220_map_parser: out of memory growing plane array\n");
+            free(brush->planes);
+            free(brush);
+            return NULL;
         }
-        
-        if (!ParseBrushPlane(tok, &brush->planes[brush->plane_count])) {
-            printf("Error parsing brush plane\n");
-            return false;
+
+        if (!ParseBrushPlane(tok, &brush->planes[brush->plane_count]))
+        {
+            fprintf(stderr, "v220_map_parser: error parsing brush plane %d\n",
+                    brush->plane_count);
+            free(brush->planes);
+            free(brush);
+            return NULL;
         }
-        
+
         brush->plane_count++;
     }
-    
-    return false; // No closing brace found
-}
 
-// Parse an entity
-bool 
-ParseEntity(Tokenizer *tok, MapEntity *entity) 
-{
-    entity->property_count = 0;
-    entity->brush_count = 0;
-    
-    if (!GetToken(tok) || strcmp(tok->token, "{") != 0) return false;
-    
-    while (GetToken(tok)) {
-        if (strcmp(tok->token, "}") == 0) {
-            return true;
-        }
-        else if (strcmp(tok->token, "{") == 0) {
-            // It's a brush - put back the token
-            tok->current -= strlen(tok->token);
-            
-            if (entity->brush_count >= MAX_BRUSH_PLANES) {
-                printf("Warning: Entity has too many brushes\n");
-                continue;
-            }
-            
-            if (!ParseBrush(tok, &entity->brushes[entity->brush_count])) {
-                printf("Error parsing entity brush\n");
-                return false;
-            }
-            entity->brush_count++;
-        }
-        else {
-            // It's a key-value pair
-            if (entity->property_count >= MAX_ENTITY_KEYS) {
-                printf("Warning: Entity has too many properties\n");
-                continue;
-            }
-            
-            // Current token is the key
-            strncpy(entity->properties[entity->property_count].key, tok->token, 
-                   sizeof(entity->properties[entity->property_count].key) - 1);
-            
-            // Get the value
-            if (!GetToken(tok)) return false;
-
-            /* SPECIAL CASE: Remap origin vectors */
-            if (
-                strcmp(
-                        entity->properties[entity->property_count].key, 
-                        "origin"
-                    ) == 0
-            ) {
-                Vector3 origin;
-                if (
-                    sscanf(
-                            tok->token, 
-                            "%f %f %f",
-                            &origin.x, 
-                            &origin.y, 
-                            &origin.z
-                        ) == 3
-                ) {
-                    origin = RemapVector3(origin, false); /* true = apply scale */
-                    snprintf(
-                            entity->properties[entity->property_count].value,
-                            sizeof(entity->properties[entity->property_count].value),
-                            "%f %f %f",
-                            origin.x,
-                            origin.y,
-                            origin.z
-                        );
-                }
-                else {
-                    // Couldn't parse, store as-is
-                    strncpy(entity->properties[entity->property_count].value, tok->token,
-                        sizeof(entity->properties[entity->property_count].value) - 1);
-                }
-            }
-            else {
-                strncpy(entity->properties[entity->property_count].value, tok->token,
-                    sizeof(entity->properties[entity->property_count].value) - 1);
-            }
-            
-            entity->property_count++;
-        }
-    }
-    
-    return false; // No closing brace found
-}
-
-// Main parser function
-MapData * 
-ParseValve220Map(const char *filename, AxisRemapping remap) 
-{
-    g_remap = remap;
-    
-    // Load file
-    char *file_data = LoadFileText(filename);
-    if (!file_data) {
-        printf("Error: Could not load map file %s\n", filename);
-        return NULL;
-    }
-    
-    MapData *map = (MapData*)malloc(sizeof(MapData));
-    if (!map) {
-        UnloadFileText(file_data);
-        return NULL;
-    }
-    
-    map->entity_count = 0;
-    map->world_brush_count = 0;
-    
-    Tokenizer tok;
-    InitTokenizer(&tok, file_data);
-    
-    // Parse entities
-    while (GetToken(&tok)) {
-        if (strcmp(tok.token, "{") == 0) {
-            // Put back the token
-            tok.current -= strlen(tok.token);
-            
-            if (map->entity_count >= MAX_ENTITIES) {
-                printf("Warning: Too many entities in map\n");
-                break;
-            }
-            
-            if (!ParseEntity(&tok, &map->entities[map->entity_count])) {
-                printf("Error parsing entity %d\n", map->entity_count);
-                break;
-            }
-            
-            // If it's worldspawn (first entity), move brushes to world_brushes
-            if (map->entity_count == 0) {
-                MapEntity *worldspawn = &map->entities[0];
-                for (int i = 0; i < worldspawn->brush_count && map->world_brush_count < MAX_BRUSHES; i++) {
-                    map->world_brushes[map->world_brush_count++] = worldspawn->brushes[i];
-                }
-                worldspawn->brush_count = 0; // Clear from entity
-            }
-            
-            map->entity_count++;
-        }
-    }
-    
-    UnloadFileText(file_data);
-    
-    printf("Loaded map: %d entities, %d world brushes\n", 
-           map->entity_count, map->world_brush_count);
-    
-    return map;
-}
-
-// Helper function to get entity property
-const char * 
-GetEntityProperty(MapEntity *entity, const char *key) 
-{
-    for (int i = 0; i < entity->property_count; i++) {
-        if (strcmp(entity->properties[i].key, key) == 0) {
-            return entity->properties[i].value;
-        }
-    }
+    /* EOF without closing brace */
+    fprintf(stderr, "v220_map_parser: unexpected EOF inside brush\n");
+    free(brush->planes);
+    free(brush);
     return NULL;
 }
 
-// Clean up
-void 
-FreeMapData(MapData *map) 
-{
-    if (map) {
-        free(map);
-    }
-}
+
+/* =========================================================================
+   Entity parsing
+   ========================================================================= */
 
 /*
-// Example usage
-int main(void) {
-    MapData *map = ParseValve220Map("test.map");
-    if (map) {
-        printf("Successfully parsed map!\n");
-        
-        // Print some info
-        for (int i = 0; i < map->entity_count; i++) {
-            const char *classname = GetEntityProperty(&map->entities[i], "classname");
-            if (classname) {
-                printf("Entity %d: %s\n", i, classname);
-            }
-        }
-        
-        FreeMapData(map);
-    }
-    
-    return 0;
-}
+    ParseEntity
+        The opening '{' has NOT yet been consumed.
+        Returns a heap-allocated MapEntity on success, NULL on failure.
 */
+static MapEntity *
+ParseEntity(Tokenizer *tok)
+{
+    if (!GetToken(tok) || strcmp(tok->token, "{") != 0)
+        return NULL;
+
+    MapEntity *entity = (MapEntity *)calloc(1, sizeof(MapEntity));
+    if (!entity) return NULL;
+
+    while (GetToken(tok))
+    {
+        if (strcmp(tok->token, "}") == 0)
+            return entity;
+
+        if (strcmp(tok->token, "{") == 0)
+        {
+            /* Brush block — push back the '{' and parse */
+            UngetToken(tok);
+
+            if (!GrowArray((void **)&entity->brushes,
+                           &entity->brush_capacity,
+                            entity->brush_count,
+                            sizeof(MapBrush)))
+            {
+                fprintf(stderr, "v220_map_parser: out of memory growing brush array\n");
+                goto fail;
+            }
+
+            MapBrush *b = ParseBrush(tok);
+            if (!b)
+            {
+                fprintf(stderr, "v220_map_parser: error parsing entity brush %d\n",
+                        entity->brush_count);
+                goto fail;
+            }
+
+            /* Copy the struct into the flat array, then release the
+               temporary allocation from ParseBrush.                  */
+            entity->brushes[entity->brush_count] = *b;
+            free(b);   /* planes pointer is now owned by the array entry */
+            entity->brush_count++;
+        }
+        else
+        {
+            /* Key-value pair — current token is the key */
+            if (!GrowArray((void **)&entity->properties,
+                           &entity->property_capacity,
+                            entity->property_count,
+                            sizeof(EntityKeyValue)))
+            {
+                fprintf(stderr, "v220_map_parser: out of memory growing property array\n");
+                goto fail;
+            }
+
+            EntityKeyValue *kv = &entity->properties[entity->property_count];
+
+            strncpy(kv->key, tok->token, sizeof(kv->key) - 1);
+            kv->key[sizeof(kv->key) - 1] = '\0';
+
+            if (!GetToken(tok))
+            {
+                fprintf(stderr, "v220_map_parser: EOF reading value for key '%s'\n",
+                        kv->key);
+                goto fail;
+            }
+
+            /* Special case: remap "origin" vectors into engine space */
+            if (strcmp(kv->key, "origin") == 0)
+            {
+                Vector3 origin;
+                if (sscanf(tok->token, "%f %f %f",
+                           &origin.x, &origin.y, &origin.z) == 3)
+                {
+                    origin = RemapVector3(tok, origin, false);
+                    snprintf(kv->value, sizeof(kv->value),
+                             "%f %f %f", origin.x, origin.y, origin.z);
+                }
+                else
+                {
+                    strncpy(kv->value, tok->token, sizeof(kv->value) - 1);
+                    kv->value[sizeof(kv->value) - 1] = '\0';
+                }
+            }
+            else
+            {
+                strncpy(kv->value, tok->token, sizeof(kv->value) - 1);
+                kv->value[sizeof(kv->value) - 1] = '\0';
+            }
+
+            entity->property_count++;
+        }
+    }
+
+    fprintf(stderr, "v220_map_parser: unexpected EOF inside entity\n");
+
+fail:
+    /* Free everything we accumulated before the error */
+    for (int i = 0; i < entity->brush_count; i++)
+        free(entity->brushes[i].planes);
+    free(entity->brushes);
+    free(entity->properties);
+    free(entity);
+    return NULL;
+}
+
+
+/* =========================================================================
+   Free helpers
+   ========================================================================= */
+
+static void
+FreeMapBrushArray(MapBrush *brushes, int count)
+{
+    if (!brushes) return;
+    for (int i = 0; i < count; i++)
+        free(brushes[i].planes);
+    free(brushes);
+}
+
+static void
+FreeMapEntityArray(MapEntity *entities, int count)
+{
+    if (!entities) return;
+    for (int i = 0; i < count; i++)
+    {
+        FreeMapBrushArray(entities[i].brushes, entities[i].brush_count);
+        free(entities[i].properties);
+    }
+    free(entities);
+}
+
+
+/* =========================================================================
+   Public API
+   ========================================================================= */
+
+MapData *
+ParseValve220Map(const char *filename, AxisRemapping remap)
+{
+    char *file_data = LoadFileText(filename);
+    if (!file_data)
+    {
+        fprintf(stderr, "v220_map_parser: could not load '%s'\n", filename);
+        return NULL;
+    }
+
+    MapData *map = (MapData *)calloc(1, sizeof(MapData));
+    if (!map)
+    {
+        UnloadFileText(file_data);
+        return NULL;
+    }
+
+    Tokenizer tok;
+    InitTokenizer(&tok, file_data, remap);
+
+    while (GetToken(&tok))
+    {
+        if (strcmp(tok.token, "{") != 0)
+            continue;   /* Skip any stray tokens before the first entity */
+
+        UngetToken(&tok);
+
+        if (!GrowArray((void **)&map->entities,
+                       &map->entity_capacity,
+                        map->entity_count,
+                        sizeof(MapEntity)))
+        {
+            fprintf(stderr, "v220_map_parser: out of memory growing entity array\n");
+            goto fail;
+        }
+
+        MapEntity *e = ParseEntity(&tok);
+        if (!e)
+        {
+            fprintf(stderr, "v220_map_parser: error parsing entity %d\n",
+                    map->entity_count);
+            goto fail;
+        }
+
+        map->entities[map->entity_count] = *e;
+        free(e);
+        map->entity_count++;
+
+        /*
+            Worldspawn (entity 0): promote its brushes to map->world_brushes
+            so BSP compilers that expect a flat brush list get what they need.
+            The brushes array inside entities[0] is left empty afterwards;
+            the planes memory is now owned by world_brushes entries.
+        */
+        if (map->entity_count == 1)
+        {
+            MapEntity *ws = &map->entities[0];
+
+            for (int i = 0; i < ws->brush_count; i++)
+            {
+                if (!GrowArray((void **)&map->world_brushes,
+                               &map->world_brush_capacity,
+                                map->world_brush_count,
+                                sizeof(MapBrush)))
+                {
+                    fprintf(stderr,
+                            "v220_map_parser: out of memory growing world_brushes\n");
+                    goto fail;
+                }
+                map->world_brushes[map->world_brush_count++] = ws->brushes[i];
+            }
+
+            /* The brush structs were moved — release the array but not the
+               planes pointers, which are now owned by world_brushes.      */
+            free(ws->brushes);
+            ws->brushes          = NULL;
+            ws->brush_count      = 0;
+            ws->brush_capacity   = 0;
+        }
+    }
+
+    UnloadFileText(file_data);
+
+    printf("v220_map_parser: loaded '%s' — %d entities, %d world brushes\n",
+           filename, map->entity_count, map->world_brush_count);
+
+    return map;
+
+fail:
+    UnloadFileText(file_data);
+    FreeMapData(map);
+    return NULL;
+}
+
+
+void
+FreeMapData(MapData *map)
+{
+    if (!map) return;
+    FreeMapEntityArray(map->entities,     map->entity_count);
+    FreeMapBrushArray (map->world_brushes, map->world_brush_count);
+    free(map);
+}
+
+
+const char *
+GetEntityProperty(MapEntity *entity, const char *key)
+{
+    for (int i = 0; i < entity->property_count; i++)
+        if (strcmp(entity->properties[i].key, key) == 0)
+            return entity->properties[i].value;
+    return NULL;
+}

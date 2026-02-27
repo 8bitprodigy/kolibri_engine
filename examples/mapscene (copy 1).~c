@@ -13,18 +13,12 @@
 #include "mapscene.h"
 #include "bsp.h"
 #include "brush2.h"
-#include "fill.h"
-#include "portals.h"
-#include "poly.h"
 
 
 #define PLANE_EPSILON  0.01f
 #define CLIP_BOX_HALF  16384.0f
 #define CLIP_BUF_SIZE  256
 #define MAX_FACE_VERTS 32
-
-/* Radius of the wireframe sphere drawn at the leak entity position */
-/* DrawSphereWires called with 0.5f, 3 rings, 8 segments */
 
 
 /*
@@ -55,7 +49,7 @@ static bool
 faces_are_coplanar_and_opposite(const CompiledFace *f1, const CompiledFace *f2)
 {
     float dot = Vector3DotProduct(f1->normal, f2->normal);
-    if (-0.99f < dot)
+    if (-0.99f < dot) 
         return false;
 
     float dist_sum = fabsf(f1->plane_dist + f2->plane_dist);
@@ -82,8 +76,9 @@ mark_hidden_faces(MapSceneData *sd)
     int hidden_faces = 0;
 
     /* Initialize all faces as visible */
-    for (int i = 0; i < sd->face_count; i++)
+    for (int i = 0; i < sd->face_count; i++) {
         sd->all_faces[i].is_visible = true;
+    }
 
     /* Check each pair of faces for coplanar-opposite condition */
     for (int i = 0; i < sd->face_count; i++) {
@@ -99,8 +94,8 @@ mark_hidden_faces(MapSceneData *sd)
         }
     }
 
-    DBG_OUT("[MapScene] Marked %d hidden faces (%.1f%%)",
-            hidden_faces,
+    DBG_OUT("[MapScene] Marked %d hidden faces (%.1f%%)", 
+            hidden_faces, 
             (100.0f * hidden_faces) / (sd->face_count ? sd->face_count : 1));
 }
 
@@ -112,15 +107,15 @@ mark_hidden_faces(MapSceneData *sd)
     plane; we need to recover the actual polygon vertices for every face.
 
     Algorithm
-    For each face in the brush:
+    For each face iin the brush:
         1. Start with a large polygon that lies on F's plane (clipped to the
-           bounding box so it is finite).
+        bounding box so it is finite).
         2. For every OTHER plane P in the same brush, clip the polygon to the
-           half-space defined by P (keep the side that points inward, i.e.
-           dot(P.normal, vertex) <= P.distance).
+        half-space defined by P (keep the side that points inward, i.e.
+        dot(P.normal, vertex) <= P.distance).
         3. Whatever polygon survives is the rendered face.
 
-    The clipping loop is standard Sutherland-Hodgman style loop over the vertex
+    The clipping loop is standard Sutherland-HOdgman style loop over the vertex
     list.
 */
 static Vector3 clip_buf_a[CLIP_BUF_SIZE];
@@ -152,7 +147,7 @@ clip_polygon_by_plane(
     for (int i = 0; i < in_count; i++) {
         Vector3
             cur  = in[i],
-            next = in[(i + 1) % in_count];
+            next = in[(i+1) % in_count];
 
         float
             d_cur  = Vector3DotProduct(normal, cur)  - distance,
@@ -166,21 +161,33 @@ clip_polygon_by_plane(
             if (out_count < CLIP_BUF_SIZE) out[out_count++] = cur;
 
             if (!next_inside) {
-                float   t            = d_cur / (d_cur - d_next);
+                float   t = d_cur / (d_cur - d_next);
                 Vector3 intersection = Vector3Add(
                         cur,
-                        Vector3Scale(Vector3Subtract(next, cur), t)
+                        Vector3Scale(
+                                Vector3Subtract(next, cur),
+                                t
+                            )
                     );
+                    
                 if (out_count < CLIP_BUF_SIZE) out[out_count++] = intersection;
             }
         }
-        else if (next_inside) {
+        else if (next_inside)
+        {
             float   t            = d_cur / (d_cur - d_next);
             Vector3 intersection = Vector3Add(
-                    cur,
-                    Vector3Scale(Vector3Subtract(next, cur), t)
+                    cur, 
+                    Vector3Scale(
+                            Vector3Subtract(
+                                    next, 
+                                    cur
+                                ), 
+                            t
+                        )   
                 );
-            if (out_count < CLIP_BUF_SIZE) out[out_count++] = intersection;
+            if (out_count < CLIP_BUF_SIZE)
+                out[out_count++] = intersection;
         }
     }
 
@@ -190,7 +197,7 @@ clip_polygon_by_plane(
 
 /*
     make_face_seed_polygon
-        Given a plane (normal, distance), produce a large convex polygon that
+        Given a plane (normal, distance), produce a large convex polygon that 
         lies exactly on that plane and is contained within the clip box.
 
         We pick two orthogonal tangent vectors on the plane and lay out a large
@@ -199,17 +206,42 @@ clip_polygon_by_plane(
 static int
 make_face_seed_polygon(Vector3 normal, float distance, Vector3 *out)
 {
-    Vector3
+    Vector3 
         up        = (fabsf(normal.y) < 0.9f) ? V3_UP : V3_FORWARD,
         tangent_u = Vector3Normalize(Vector3CrossProduct(normal, up)),
         tangent_v = Vector3CrossProduct(normal, tangent_u),
+
         center    = Vector3Scale(normal, distance);
 
     float s = CLIP_BOX_HALF;
-    out[0] = Vector3Add(center, Vector3Add(Vector3Scale(tangent_u,  s), Vector3Scale(tangent_v,  s)));
-    out[1] = Vector3Add(center, Vector3Add(Vector3Scale(tangent_u, -s), Vector3Scale(tangent_v,  s)));
-    out[2] = Vector3Add(center, Vector3Add(Vector3Scale(tangent_u, -s), Vector3Scale(tangent_v, -s)));
-    out[3] = Vector3Add(center, Vector3Add(Vector3Scale(tangent_u,  s), Vector3Scale(tangent_v, -s)));
+    out[0] = Vector3Add(
+            center, 
+            Vector3Add(
+                    Vector3Scale(tangent_u,  s), 
+                    Vector3Scale(tangent_v,  s)
+                )
+        );
+    out[1] = Vector3Add(
+            center, 
+            Vector3Add(
+                    Vector3Scale(tangent_u, -s), 
+                    Vector3Scale(tangent_v,  s)
+                )
+        );
+    out[2] = Vector3Add(
+            center, 
+            Vector3Add(
+                    Vector3Scale(tangent_u, -s), 
+                    Vector3Scale(tangent_v, -s)
+                )
+        );
+    out[3] = Vector3Add(
+            center, 
+            Vector3Add(
+                    Vector3Scale(tangent_u,  s), 
+                    Vector3Scale(tangent_v, -s)
+                )
+        );
 
     return 4;
 }
@@ -220,9 +252,9 @@ make_face_seed_polygon(Vector3 normal, float distance, Vector3 *out)
         Takes a single MapBrush and produces temporary face data (with embedded
         vertices). Returns the number of valid faces compiled. The caller is
         responsible for copying this data into the flat arrays.
-
-        temp_faces must have room for at least brush->plane_count entries.
-        Returns the number of valid faces written to temp_faces.
+        
+        temp_faces: output array (must have space for at least MAX_BRUSH_PLANES faces)
+        Returns: number of valid faces written to temp_faces
 */
 static int g_compile_brush_index = 0;  /* temporary: tracks which brush we're on */
 
@@ -268,19 +300,19 @@ compile_brush(const MapBrush *brush, TempCompiledFace *temp_faces)
 
 
 void DiagnoseBrushNormals(const CompiledBrush *brushes, int brush_count,
-                          const CompiledFace  *faces,
-                          const Vector3       *vertices)
+                         const CompiledFace *faces, const Vector3 *vertices)
 {
     DBG_OUT("[DIAG] === Testing Brush Normal Directions ===");
-
-    for (int b = 0; b < 3 && b < brush_count; b++) {
+    
+    for (int b = 0; b < 3 && b < brush_count; b++) {  // Test first 3 brushes
         const CompiledBrush *brush = &brushes[b];
-
+        
         DBG_OUT("[DIAG] Brush %d: %d faces", b, brush->face_count);
-
+        
+        // Calculate brush center (average of all vertices)
         Vector3 brush_center = {0, 0, 0};
         int total_verts = 0;
-
+        
         for (int f = 0; f < brush->face_count; f++) {
             const CompiledFace *face = &faces[brush->face_start + f];
             for (int v = 0; v < face->vertex_count; v++) {
@@ -291,37 +323,43 @@ void DiagnoseBrushNormals(const CompiledBrush *brushes, int brush_count,
                 total_verts++;
             }
         }
-
+        
         if (total_verts > 0) {
             brush_center.x /= total_verts;
             brush_center.y /= total_verts;
             brush_center.z /= total_verts;
         }
-
+        
         DBG_OUT("[DIAG]   Brush center: (%.1f, %.1f, %.1f)",
                 brush_center.x, brush_center.y, brush_center.z);
-
+        
+        // Test each face: center should be on BACK side if normals point outward
         int correct_normals = 0;
-        int wrong_normals   = 0;
-
+        int wrong_normals = 0;
+        
         for (int f = 0; f < brush->face_count; f++) {
             const CompiledFace *face = &faces[brush->face_start + f];
+            
+            // Distance from brush center to face plane
             float dist = Vector3DotProduct(brush_center, face->normal) - face->plane_dist;
-
+            
             if (dist < -0.01f) {
+                // Center is on BACK side - correct if normals point outward!
                 correct_normals++;
             } else if (dist > 0.01f) {
+                // Center is on FRONT side - WRONG, normal points inward!
                 wrong_normals++;
                 DBG_OUT("[DIAG]   Face %d: WRONG DIRECTION! dist=%.3f", f, dist);
                 DBG_OUT("[DIAG]     Normal: (%.3f, %.3f, %.3f)",
                         face->normal.x, face->normal.y, face->normal.z);
             }
         }
-
+        
         DBG_OUT("[DIAG]   Result: %d correct, %d wrong", correct_normals, wrong_normals);
-
-        if (wrong_normals > 0)
+        
+        if (wrong_normals > 0) {
             DBG_OUT("[DIAG]   *** NORMALS ARE INVERTED! ***");
+        }
     }
 }
 
@@ -344,11 +382,6 @@ void DiagnoseBrushNormals(const CompiledBrush *brushes, int brush_count,
 
         On success, BSPModels[0].RootNode[0] is the finished draw-hull tree and
         sd->model points at BSPModels[0].
-
-        If ProcessWorldModel detects a leak it sets the global leak state in
-        GBSPLib; we read that back via GetLeakInfo() (stubbed below until the
-        GBSPLib integration exposes it) and store it in sd->has_leak /
-        sd->leak_point / sd->leak_path.
 */
 static bool
 build_bsp_from_mapdata(MapSceneData *sd)
@@ -359,13 +392,24 @@ build_bsp_from_mapdata(MapSceneData *sd)
         return false;
     }
 
+    /* All brushes — structural and detail alike — go into a single list.
+       The BSP compiler's SelectSplitSide already handles the distinction:
+       even passes (0, 2) skip detail brushes as splitter candidates;
+       odd passes (1, 3) allow them only after structural splits are exhausted. */
     MAP_Brush *head = NULL;
     MAP_Brush *tail = NULL;
 
     for (int bi = 0; bi < map->world_brush_count; bi++) {
-        const MapBrush *src      = &map->world_brushes[bi];
-        int             num_sides = src->plane_count;
+        const MapBrush *src = &map->world_brushes[bi];
 
+        int num_sides = src->plane_count;
+/*
+        if (num_sides > NUM_BRUSH_DEFAULT_SIDES) {
+            DBG_OUT("[BSP] Brush %d: %d sides > %d, clamping",
+                    bi, num_sides, NUM_BRUSH_DEFAULT_SIDES);
+            num_sides = NUM_BRUSH_DEFAULT_SIDES;
+        }
+//*/
         MAP_Brush *mb = AllocMapBrush(num_sides);
         if (!mb) { ERR_OUT("[BSP] AllocMapBrush failed"); continue; }
 
@@ -379,12 +423,14 @@ build_bsp_from_mapdata(MapSceneData *sd)
             plane.Normal = src->planes[si].normal;
             plane.Dist   = src->planes[si].distance;
             plane.Type   = PlaneType(&plane.Normal);
-
+            
             int32_t pside = 0;
             int32_t pnum  = FindPlane(&plane, &pside);
-
-            if (pside != 0)
+            
+            // Debug: check if planes are getting flipped
+            if (pside != 0) {
                 DBG_OUT("[BSP] Brush %d side %d: plane FLIPPED (pside=%d)", bi, si, pside);
+            }
 
             mb->OriginalSides[si].PlaneNum  = pnum;
             mb->OriginalSides[si].PlaneSide = (uint8_t)pside;
@@ -393,12 +439,14 @@ build_bsp_from_mapdata(MapSceneData *sd)
             mb->OriginalSides[si].Poly      = NULL;
         }
 
+        /* Build side polygons and brush bounds */
         MakeMapBrushPolys(mb);
+        
+        // Check if brush has valid volume
+        Vector3 size = Vector3Subtract(mb->Maxs, mb->Mins);
+        float volume = size.x * size.y * size.z;
 
-        Vector3 size   = Vector3Subtract(mb->Maxs, mb->Mins);
-        float   volume = size.x * size.y * size.z;
-
-        if (volume < 0.01f) {
+        if (volume < 0.01f) {  // Essentially zero volume
             DBG_OUT("[BSP] Brush %d: degenerate (volume %.6f) - skipping", bi, volume);
             FreeMapBrush(mb);
             continue;
@@ -412,12 +460,12 @@ build_bsp_from_mapdata(MapSceneData *sd)
     /* Include brushes from brush entities.
        Contents are determined first by spawnflags, then by classname fallback. */
     for (int ei = 1; ei < map->entity_count; ei++) {
-        MapEntity  *ent       = &map->entities[ei];
+        MapEntity *ent = &map->entities[ei];
         const char *classname = GetEntityProperty(ent, "classname");
-        if (!classname)          continue;
+        if (!classname) continue;
         if (ent->brush_count == 0) continue;
 
-        int32_t    contents        = -1;
+        int32_t contents = -1;
         const char *spawnflags_str = GetEntityProperty(ent, "spawnflags");
         if (spawnflags_str) {
             int flags = atoi(spawnflags_str);
@@ -440,8 +488,8 @@ build_bsp_from_mapdata(MapSceneData *sd)
         }
 
         for (int bi = 0; bi < ent->brush_count; bi++) {
-            const MapBrush *src      = &ent->brushes[bi];
-            int             num_sides = src->plane_count;
+            const MapBrush *src = &ent->brushes[bi];
+            int num_sides = src->plane_count;
 
             MAP_Brush *mb = AllocMapBrush(num_sides);
             if (!mb) continue;
@@ -483,177 +531,86 @@ build_bsp_from_mapdata(MapSceneData *sd)
     DBG_OUT("[BSP] Converted %d brushes — running ProcessWorldModel",
             map->world_brush_count);
 
+    /* ProcessWorldModel drives the complete two-pass pipeline:
+         CSGBrushes → BuildBSP → CreatePortals → RemoveHiddenLeafs
+         → MarkVisibleSides → MakeFaces → MakeLeafFaces → MergeNodes
+       The finished tree lands in BSPModels[0].RootNode[0].              */
     GBSP_Model *model = &BSPModels[0];
     memset(model, 0, sizeof(*model));
     NumBSPModels = 1;
 
     Vector3 entity_origins[MAX_MAP_ENTITIES];
-    int32_t entity_flags [MAX_MAP_ENTITIES];
-    int num_entities = map->entity_count < MAX_MAP_ENTITIES
-                     ? map->entity_count
-                     : MAX_MAP_ENTITIES;
+    int32_t entity_flags[MAX_MAP_ENTITIES];
+    int num_entities = map->entity_count < MAX_MAP_ENTITIES ? map->entity_count : MAX_MAP_ENTITIES;
 
     for (int i = 0; i < num_entities; i++) {
+        const char *origin_str = GetEntityProperty(&map->entities[i], "origin");
+        
         if (i == 0) {
+            // World entity - no origin
             entity_origins[i] = (Vector3){0, 0, 0};
-            entity_flags[i]   = 0;
-        } else {
-            const char *origin_str = GetEntityProperty(&map->entities[i], "origin");
-            if (origin_str) {
-                float ox, oy, oz;
-                if (sscanf(origin_str, "%f %f %f", &ox, &oy, &oz) == 3) {
-                    entity_origins[i] = (Vector3){ ox, oy, oz };
-                    entity_flags[i]   = ENTITY_HAS_ORIGIN;
-                } else {
-                    entity_origins[i] = (Vector3){0, 0, 0};
-                    entity_flags[i]   = 0;
-                }
+            entity_flags[i] = 0;
+        } else if (origin_str) {
+            /* The parser (ParseValve220Map) already applied AXIS_REMAP_RAYLIB_NOSCALE
+               to the "origin" value and stored the result back into the property string.
+               Read it directly — no further remapping needed. */
+            float ox, oy, oz;
+            if (sscanf(origin_str, "%f %f %f", &ox, &oy, &oz) == 3) {
+                entity_origins[i] = (Vector3){ ox, oy, oz };
+                entity_flags[i] = ENTITY_HAS_ORIGIN;
             } else {
                 entity_origins[i] = (Vector3){0, 0, 0};
-                entity_flags[i]   = 0;
+                entity_flags[i] = 0;
             }
+        } else {
+            // No origin property
+            entity_origins[i] = (Vector3){0, 0, 0};
+            entity_flags[i] = 0;
         }
     }
 
+    // Pass entities to BSP system (origins are now in BSP/engine space)
     SetBSPEntities(num_entities, entity_origins, entity_flags);
 
-    bool bsp_ok = ProcessWorldModel(model, head);
-    FreeMapBrushList(head);
-
-    /*
-        Check for leak BEFORE acting on the return value — ProcessWorldModel
-        returns false when RemoveHiddenLeafs detects a leak, but HitEntity
-        and HitNode are still valid at that point and we need them to build
-        the visualisation path.
-    */
-    if (HitEntity && HitNode)
-    {
-        sd->has_leak    = true;
-        sd->leak_entity = Entities[EntityHit].Origin;
-        sd->model       = model;
-        sd->bsp_built   = true;
-
-        DBG_OUT("[BSP] LEAK at entity %d (%.1f, %.1f, %.1f)",
-                EntityHit,
-                sd->leak_entity.x,
-                sd->leak_entity.y,
-                sd->leak_entity.z);
-        ERR_OUT("[BSP] LEAK — map is not sealed");
-
-        /* Count path points first so we can allocate exactly. */
-        int path_count = 1;
-        {
-            GBSP_Node *node = HitNode;
-            while (node && node->Occupied > 1)
-            {
-                int32_t      next        = node->Occupied;
-                GBSP_Node   *next_node   = NULL;
-                GBSP_Portal *next_portal = NULL;
-                bool         stop        = false;
-
-                for (GBSP_Portal *p = node->Portals; p; p = p->Next[!(p->Nodes[0] == node)])
-                {
-                    int s = (p->Nodes[0] == node);
-                    if (p->Nodes[s] == OutsideNode) { stop = true; break; }
-                    if (p->Nodes[s]->Occupied && p->Nodes[s]->Occupied < next)
-                    {
-                        next_portal = p;
-                        next_node   = p->Nodes[s];
-                        next        = next_node->Occupied;
-                    }
-                }
-
-                if (stop || !next_portal || !next_node) break;
-                path_count += 2;
-                node = next_node;
-            }
-        }
-
-        sd->leak_path = (Vector3 *)malloc(path_count * sizeof(Vector3));
-
-        if (sd->leak_path)
-        {
-            int        idx  = 0;
-            GBSP_Node *node = HitNode;
-
-            sd->leak_path[idx++] = Entities[EntityHit].Origin;
-
-            while (node && node->Occupied > 1)
-            {
-                int32_t      next        = node->Occupied;
-                GBSP_Node   *next_node   = NULL;
-                GBSP_Portal *next_portal = NULL;
-                bool         stop        = false;
-
-                for (GBSP_Portal *p = node->Portals; p; p = p->Next[!(p->Nodes[0] == node)])
-                {
-                    int s = (p->Nodes[0] == node);
-                    if (p->Nodes[s] == OutsideNode) { stop = true; break; }
-                    if (p->Nodes[s]->Occupied && p->Nodes[s]->Occupied < next)
-                    {
-                        next_portal = p;
-                        next_node   = p->Nodes[s];
-                        next        = next_node->Occupied;
-                    }
-                }
-
-                if (stop || !next_portal || !next_node || idx + 1 >= path_count)
-                    break;
-
-                Vector3 mid;
-                PolyCenter(next_portal->Poly, &mid);
-                sd->leak_path[idx++] = mid;
-
-                LeafCenter(next_node, &mid);
-                sd->leak_path[idx++] = mid;
-
-                node = next_node;
-            }
-
-            sd->leak_path_count = idx;
-        }
-
-        return true;
-    }
-
-    if (!bsp_ok) {
+    if (!ProcessWorldModel(model, head)) {
         ERR_OUT("[BSP] ProcessWorldModel failed");
+        FreeMapBrushList(head);
         return false;
     }
+
+    FreeMapBrushList(head);
 
     sd->model     = model;
     sd->bsp_built = true;
 
     /* Count draw-hull faces for a quick sanity print */
     int nfaces = 0;
-    if (model->RootNode[0])
+    if (model->RootNode[0]) {
         for (GBSP_Face *f = model->RootNode[0]->Faces; f; f = f->Next)
             nfaces++;
-
+    }
     DBG_OUT("[BSP] Done — %d faces on draw-hull root", nfaces);
 
     return true;
 }
 
 
-/* Recursive function to draw all faces in the BSP tree (GREEN wireframe) */
-void
-DrawBSPNode(GBSP_Node *node)
-{
+// Recursive function to draw all faces in BSP tree
+void DrawBSPNode(GBSP_Node *node) {
     if (!node) return;
     if (node->PlaneNum == PLANENUM_LEAF) return;
-
+    
     for (GBSP_Face *face = node->Faces; face; face = face->Next) {
         if (!face->Poly || face->Poly->NumVerts < 3) continue;
-
+        
         for (int i = 0; i < face->Poly->NumVerts; i++) {
-            int     next = (i + 1) % face->Poly->NumVerts;
-            Vector3 a    = Vector3Scale(face->Poly->Verts[i],    MAP_SCALE);
-            Vector3 b    = Vector3Scale(face->Poly->Verts[next], MAP_SCALE);
+            int next = (i + 1) % face->Poly->NumVerts;
+            Vector3 a = Vector3Scale(face->Poly->Verts[i],    MAP_SCALE);
+            Vector3 b = Vector3Scale(face->Poly->Verts[next], MAP_SCALE);
             DrawLine3D(a, b, GREEN);
         }
     }
-
+    
     DrawBSPNode(node->Children[0]);
     DrawBSPNode(node->Children[1]);
 }
@@ -669,8 +626,8 @@ DrawBSPNode(GBSP_Node *node)
         "map_data" is the raw "data" pointer passed to Scene_new; we treat it as
         a null-terminated path string.
 
-        Allocates a MapSceneData, parses the .map, compiles all world brushes
-        into flat arrays (two-pass: count first, then allocate and copy), and
+        Allocates a MapSceneData, parses the .map, compiles all world brushes 
+        into flat arrays (two-pass: count first, then allocate and copy), and 
         stores the result into the Scene's data slot.
 */
 static void
@@ -679,13 +636,17 @@ mapscene_Setup(Scene *scene, void *map_data)
     (void)scene;
     MapSceneData *sd = (MapSceneData *)map_data;
 
-    /* Parse with axis-swap + flip but NO scale. Scale (1/64) is applied at
+    /* Parse the .map file */
+    /* Parse with axis-swap + flip but NO scale.  Scale (1/64) is applied at
        render time via MAP_SCALE so the BSP compiler works in un-scaled map
        units and the sealing hull remains geometrically consistent.          */
     sd->map = ParseValve220Map(sd->source_path, AXIS_REMAP_RAYLIB_NOSCALE);
-    if (!sd->map) {
-        DBG_OUT("[MapScene] Error: ParseValve220Map failed for \"%s\"",
-                sd->source_path);
+    if (!sd->map)
+    {
+        DBG_OUT(
+                "[MapScene] Error: ParseValve220Map failed for \"%s\"", 
+                sd->source_path
+            );
         free(sd);
         return;
     }
@@ -693,73 +654,55 @@ mapscene_Setup(Scene *scene, void *map_data)
     int world_count = sd->map->world_brush_count;
     if (world_count == 0) {
         DBG_OUT("[MapScene] No world brushes found");
-        sd->brush_count  = 0;
-        sd->brushes      = NULL;
-        sd->all_faces    = NULL;
+        sd->brush_count = 0;
+        sd->brushes = NULL;
+        sd->all_faces = NULL;
         sd->all_vertices = NULL;
-        sd->face_count   = 0;
+        sd->face_count = 0;
         sd->vertex_count = 0;
         return;
     }
 
     /*
-        PASS 1: Compile brushes into temporary buffers and count totals.
-
-        temp_brush_faces is a heap-allocated array of pointers — one per brush.
-        Each pointer points to a TempCompiledFace array sized to that brush's
-        plane count, which is the exact upper bound on the number of faces
-        compile_brush can produce.
+        PASS 1: Compile brushes into temporary buffers and count totals
     */
-    TempCompiledFace **temp_brush_faces = (TempCompiledFace **)calloc(
-            world_count, sizeof(TempCompiledFace *));
-    int *brush_face_counts = (int *)calloc(world_count, sizeof(int));
-
-    if (!temp_brush_faces || !brush_face_counts) {
-        ERR_OUT("[MapScene] Failed to allocate temp bookkeeping arrays");
-        free(temp_brush_faces);
-        free(brush_face_counts);
-        return;
-    }
-
+    TempCompiledFace *temp_brush_faces[world_count];  /* Array of pointers to temp face arrays */
+    int               brush_face_counts[world_count];
+    
     int total_faces = 0;
     int total_verts = 0;
 
     for (int i = 0; i < world_count; i++) {
-        const MapBrush *brush      = &sd->map->world_brushes[i];
-        int             plane_count = brush->plane_count;
-
-        temp_brush_faces[i] = (TempCompiledFace *)malloc(
-                plane_count * sizeof(TempCompiledFace));
-
+        temp_brush_faces[i] = (TempCompiledFace*)malloc(MAX_BRUSH_PLANES * sizeof(TempCompiledFace));
         if (!temp_brush_faces[i]) {
-            DBG_OUT("[MapScene] Failed to allocate temp face buffer for brush %d", i);
             ERR_OUT("[MapScene] Failed to allocate temp face buffer for brush");
             brush_face_counts[i] = 0;
             continue;
         }
 
-        int face_count       = compile_brush(brush, temp_brush_faces[i]);
+        int face_count = compile_brush(&sd->map->world_brushes[i], temp_brush_faces[i]);
         brush_face_counts[i] = face_count;
-        total_faces         += face_count;
+        total_faces += face_count;
 
-        for (int f = 0; f < face_count; f++)
+        /* Count vertices */
+        for (int f = 0; f < face_count; f++) {
             total_verts += temp_brush_faces[i][f].vert_count;
+        }
     }
 
-    DBG_OUT("[MapScene] Compiled %d brushes: %d faces, %d vertices",
+    DBG_OUT("[MapScene] Compiled %d brushes: %d faces, %d vertices", 
             world_count, total_faces, total_verts);
 
     if (total_faces == 0) {
         DBG_OUT("[MapScene] Warning: No valid faces compiled");
-        for (int i = 0; i < world_count; i++)
+        for (int i = 0; i < world_count; i++) {
             free(temp_brush_faces[i]);
-        free(temp_brush_faces);
-        free(brush_face_counts);
-        sd->brush_count  = 0;
-        sd->brushes      = NULL;
-        sd->all_faces    = NULL;
+        }
+        sd->brush_count = 0;
+        sd->brushes = NULL;
+        sd->all_faces = NULL;
         sd->all_vertices = NULL;
-        sd->face_count   = 0;
+        sd->face_count = 0;
         sd->vertex_count = 0;
         return;
     }
@@ -767,30 +710,29 @@ mapscene_Setup(Scene *scene, void *map_data)
     /*
         PASS 2: Allocate flat arrays and copy data
     */
-    sd->all_vertices = (Vector3      *)malloc(total_verts  * sizeof(Vector3));
-    sd->all_faces    = (CompiledFace *)malloc(total_faces  * sizeof(CompiledFace));
-    sd->brushes      = (CompiledBrush*)malloc(world_count  * sizeof(CompiledBrush));
+    sd->all_vertices = (Vector3*)malloc(total_verts * sizeof(Vector3));
+    sd->all_faces    = (CompiledFace*)malloc(total_faces * sizeof(CompiledFace));
+    sd->brushes      = (CompiledBrush*)malloc(world_count * sizeof(CompiledBrush));
 
     if (!sd->all_vertices || !sd->all_faces || !sd->brushes) {
         ERR_OUT("[MapScene] Failed to allocate flat arrays");
         free(sd->all_vertices);
         free(sd->all_faces);
         free(sd->brushes);
-        for (int i = 0; i < world_count; i++)
+        for (int i = 0; i < world_count; i++) {
             free(temp_brush_faces[i]);
-        free(temp_brush_faces);
-        free(brush_face_counts);
-        sd->brush_count  = 0;
-        sd->brushes      = NULL;
-        sd->all_faces    = NULL;
+        }
+        sd->brush_count = 0;
+        sd->brushes = NULL;
+        sd->all_faces = NULL;
         sd->all_vertices = NULL;
-        sd->face_count   = 0;
+        sd->face_count = 0;
         sd->vertex_count = 0;
         return;
     }
 
-    sd->brush_count  = world_count;
-    sd->face_count   = total_faces;
+    sd->brush_count = world_count;
+    sd->face_count = total_faces;
     sd->vertex_count = total_verts;
 
     int face_idx = 0;
@@ -809,20 +751,19 @@ mapscene_Setup(Scene *scene, void *map_data)
             face->normal       = temp_face->normal;
             face->plane_dist   = temp_face->plane_dist;
             face->is_visible   = true;
-            face->brush_idx    = b;
+            face->brush_idx    = b; /* Track which brush each face belongs to */
 
-            memcpy(&sd->all_vertices[vert_idx], temp_face->verts,
+            /* Copy vertices */
+            memcpy(&sd->all_vertices[vert_idx], temp_face->verts, 
                    temp_face->vert_count * sizeof(Vector3));
 
             vert_idx += temp_face->vert_count;
             face_idx++;
         }
 
+        /* Free temporary face buffer for this brush */
         free(temp_brush_faces[b]);
     }
-
-    free(temp_brush_faces);
-    free(brush_face_counts);
 
     /*
         PASS 3: Build BSP tree via GBSPLib
@@ -830,7 +771,8 @@ mapscene_Setup(Scene *scene, void *map_data)
     DBG_OUT("[MapScene] Building BSP tree...");
     if (!build_bsp_from_mapdata(sd))
         ERR_OUT("[MapScene] BSP build failed");
-}
+} /* mapscene_Setup */
+
 
 
 static void
@@ -850,7 +792,7 @@ mapscene_Exit(Scene *scene)
     mapscene_RenderMap
         Renders wireframe of the MapData. Called once per frame.
         Iterates every compiled brush, accesses its faces through indices,
-        and draws each visible face as a wireframe polygon using raylib's
+        and draws each visible face as a wireframe polygon using raylib's 
         3D line primitives.
 */
 static void
@@ -858,97 +800,54 @@ mapscene_RenderMap(Scene *scene, Head *head)
 {
     Renderer     *renderer = Engine_getRenderer(Scene_getEngine(scene));
     MapSceneData *sd       = (MapSceneData*)Scene_getData(scene);
-    Camera       *camera   = Head_getCamera(head);
-    (void)camera;
-
+    Camera   *camera   = Head_getCamera(head);
+    (void)camera; // A secret tool for later
+    
+    /* World geometry wireframe */
     if (sd && sd->brushes && sd->all_faces && sd->all_vertices) {
+        Color wire_color = MAGENTA;
+
         for (int b = 0; b < sd->brush_count; b++) {
             CompiledBrush *brush = &sd->brushes[b];
 
             for (int f = 0; f < brush->face_count; f++) {
                 CompiledFace *face = &sd->all_faces[brush->face_start + f];
-
+                
                 if (face->vertex_count < 3) continue;
-                if (!face->is_visible)      continue;
-
+                if (!face->is_visible) continue;
+                
+                /* Get pointer to this face's vertices in the flat array */
                 Vector3 *face_verts = &sd->all_vertices[face->vertex_start];
-
+                
+                /* Draw wireframe edges — apply MAP_SCALE since vertices are
+                   now in un-scaled map units (scale deferred from parse time) */
                 for (int v = 0; v < face->vertex_count; v++) {
-                    int     next = (v + 1) % face->vertex_count;
-                    Vector3 a    = Vector3Scale(face_verts[v],    MAP_SCALE);
-                    Vector3 b    = Vector3Scale(face_verts[next], MAP_SCALE);
-                    DrawLine3D(a, b, MAGENTA);
+                    int next = (v + 1) % face->vertex_count;
+                    Vector3 a = Vector3Scale(face_verts[v],    MAP_SCALE);
+                    Vector3 b = Vector3Scale(face_verts[next], MAP_SCALE);
+                    DrawLine3D(a, b, wire_color);
                 }
             }
         }
     }
 
+    /*
+        Entity submission
+    */
     Entity **entities = Scene_getEntities(scene);
-    for (size_t i = 0; i < DynamicArray_length(entities); i++)
+    for (size_t i = 0; i < DynamicArray_length(entities); i++) {
         Renderer_submitEntity(renderer, entities[i]);
-}
-
-
-/*
-    mapscene_RenderLeakVisualization
-        Draws the leak diagnostic overlay when sd->has_leak is true:
-
-          - All brush geometry in MAGENTA wireframe (so you can see the
-            geometry even though the BSP is broken).
-          - The leak path as RED line segments connecting successive waypoints.
-          - A wireframe sphere at the leaking entity's origin.
-
-        This is called from mapscene_RenderBSP when has_leak is set, in place
-        of the normal BSP wireframe.
-
-        TODO: once GetLeakInfo() is wired up in build_bsp_from_mapdata and the
-        leak_path / leak_entity fields are populated, this will work as-is.
-*/
-static void
-mapscene_RenderLeakVisualization(MapSceneData *sd)
-{
-    /* Magenta brush wireframe -------------------------------------------- */
-    if (sd->brushes && sd->all_faces && sd->all_vertices) {
-        for (int b = 0; b < sd->brush_count; b++) {
-            CompiledBrush *brush = &sd->brushes[b];
-            for (int f = 0; f < brush->face_count; f++) {
-                CompiledFace *face = &sd->all_faces[brush->face_start + f];
-                if (face->vertex_count < 3 || !face->is_visible) continue;
-
-                Vector3 *verts = &sd->all_vertices[face->vertex_start];
-                for (int v = 0; v < face->vertex_count; v++) {
-                    int     next = (v + 1) % face->vertex_count;
-                    Vector3 a    = Vector3Scale(verts[v],    MAP_SCALE);
-                    Vector3 b    = Vector3Scale(verts[next], MAP_SCALE);
-                    DrawLine3D(a, b, MAGENTA);
-                }
-            }
-        }
     }
-
-    /* Leak path (RED lines) ---------------------------------------------- */
-    if (sd->leak_path && sd->leak_path_count >= 2) {
-        for (int i = 0; i < sd->leak_path_count - 1; i++) {
-            Vector3 a = Vector3Scale(sd->leak_path[i],     MAP_SCALE);
-            Vector3 b = Vector3Scale(sd->leak_path[i + 1], MAP_SCALE);
-            DrawLine3D(a, b, RED);
-        }
-    }
-
-    /* Sphere at the leaking entity's origin (RED) ------------------------ */
-    Vector3 sphere_pos = Vector3Scale(sd->leak_entity, MAP_SCALE);
-    DrawSphereWires(sphere_pos, 0.5f, 3, 8, RED);
 }
-
 
 /*
     mapscene_RenderBSP
         SceneRenderCallback - called once per frame.
 
-        If a leak was detected: draws the leak visualization overlay.
-        Otherwise draws the finished GBSPLib BSP faces in GREEN wireframe,
-        with the compiled-brush MAGENTA wireframe as a fallback when the BSP
-        tree is not yet available.
+        Draws the finished GBSPLib BSP faces from the draw-hull root node in
+        GREEN wireframe.  Falls back to the compiled-brush magenta wireframe so
+        geometry is always visible even if the BSP build hasn't finished or has
+        produced no faces yet.
 */
 static void
 mapscene_RenderBSP(Scene *scene, Head *head)
@@ -958,22 +857,48 @@ mapscene_RenderBSP(Scene *scene, Head *head)
     Camera       *camera   = Head_getCamera(head);
     (void)camera;
 
-    if (!sd) goto submit_entities;
-
-    /* Leak overlay takes priority over everything else */
-    if (sd->has_leak) {
-        mapscene_RenderLeakVisualization(sd);
-        goto submit_entities;
+    /* BSP face wireframe (GREEN)
+    if (sd && sd->bsp_built && sd->model && sd->model->RootNode[0]) {
+        GBSP_Node *root = sd->model->RootNode[0];
+        for (GBSP_Face *f = root->Faces; f; f = f->Next) {
+            if (!f->Poly || f->Poly->NumVerts < 3) continue;
+            for (int v = 0; v < f->Poly->NumVerts; v++) {
+                int next = (v + 1) % f->Poly->NumVerts;
+                DrawLine3D(f->Poly->Verts[v], f->Poly->Verts[next], GREEN);
+            }
+        }
     }
-
-    /* BSP face wireframe (GREEN) */
-    if (sd->bsp_built && sd->model && sd->model->RootNode[0]) {
-        DrawBSPNode(sd->model->RootNode[0]);
-        goto submit_entities;
+ */
+    if (sd && sd->bsp_built && sd->model && sd->model->RootNode[0]) {
+        DrawBSPNode(sd->model->RootNode[0]);  // ← Replace your existing loop
     }
-
-    /* Fallback: compiled-brush MAGENTA wireframe (BSP not built yet) */
-    if (sd->brushes && sd->all_faces && sd->all_vertices) {
+    /* Debug: Draw spheres at degenerate brush positions
+    if (sd && sd->map) {
+        MapData *map = sd->map;
+        for (int b = 0; b < map->world_brush_count; b++) {
+            MapBrush *brush = &map->world_brushes[b];
+            
+            // Calculate brush center from planes
+            Vector3 center = {0, 0, 0};
+            int point_count = 0;
+            
+            for (int p = 0; p < brush->plane_count && p < 8; p++) {
+                // Get any point on the plane
+                MapPlane *plane = &brush->planes[p];
+                Vector3 point = Vector3Scale(plane->normal, plane->distance);
+                center = Vector3Add(center, point);
+                point_count++;
+            }
+            
+            if (point_count > 0) {
+                center = Vector3Scale(center, 1.0f / point_count);
+                DrawSphereWires(center, 0.1f, 1, 4, RED);
+            }
+        }
+    }
+   */  
+    /* Brush wireframe fallback (MAGENTA) */
+    if (sd && sd->brushes && sd->all_faces && sd->all_vertices) {
         for (int b = 0; b < sd->brush_count; b++) {
             CompiledBrush *brush = &sd->brushes[b];
             for (int f = 0; f < brush->face_count; f++) {
@@ -981,21 +906,17 @@ mapscene_RenderBSP(Scene *scene, Head *head)
                 if (face->vertex_count < 3 || !face->is_visible) continue;
                 Vector3 *verts = &sd->all_vertices[face->vertex_start];
                 for (int v = 0; v < face->vertex_count; v++) {
-                    int     next = (v + 1) % face->vertex_count;
-                    Vector3 a    = Vector3Scale(verts[v],    MAP_SCALE);
-                    Vector3 b    = Vector3Scale(verts[next], MAP_SCALE);
-                    DrawLine3D(a, b, MAGENTA);
+                    int next = (v + 1) % face->vertex_count;
+                    //DrawLine3D(verts[v], verts[next], MAGENTA);
                 }
             }
         }
     }
 
-submit_entities:
-    {
-        Entity **entities = Scene_getEntities(scene);
-        for (size_t i = 0; i < DynamicArray_length(entities); i++)
-            Renderer_submitEntity(renderer, entities[i]);
-    }
+    /* Entity submission */
+    Entity **entities = Scene_getEntities(scene);
+    for (size_t i = 0; i < DynamicArray_length(entities); i++)
+        Renderer_submitEntity(renderer, entities[i]);
 }
 
 
@@ -1011,16 +932,27 @@ mapscene_Free(Scene *scene)
         sd->bsp_built = false;
     }
 
-    free(sd->all_vertices); sd->all_vertices = NULL; sd->vertex_count = 0;
-    free(sd->all_faces);    sd->all_faces    = NULL; sd->face_count   = 0;
-    free(sd->brushes);      sd->brushes      = NULL; sd->brush_count  = 0;
+    /* Free flat arrays */
+    if (sd->all_vertices) {
+        free(sd->all_vertices);
+        sd->all_vertices = NULL;
+        sd->vertex_count = 0;
+    }
 
-    /* Leak path — allocated by GBSPLib (or NULL if never set) */
-    free(sd->leak_path);
-    sd->leak_path       = NULL;
-    sd->leak_path_count = 0;
-    sd->has_leak        = false;
+    if (sd->all_faces) {
+        free(sd->all_faces);
+        sd->all_faces = NULL;
+        sd->face_count = 0;
+    }
 
+    /* Free brush metadata */
+    if (sd->brushes) {
+        free(sd->brushes);
+        sd->brushes = NULL;
+        sd->brush_count = 0;
+    }
+
+    /* Free parsed map data */
     if (sd->map) {
         FreeMapData(sd->map);
         sd->map = NULL;
@@ -1033,19 +965,19 @@ mapscene_Free(Scene *scene)
 */
 
 SceneVTable MapScene_vtable = {
-    .Setup          = mapscene_Setup,
-    .Enter          = NULL,
-    .Update         = NULL,
-    .EntityEnter    = NULL,
-    .EntityExit     = NULL,
-    .CheckCollision = NULL,
-    .MoveEntity     = NULL,
-    .Raycast        = NULL,
-    .PreRender      = NULL,
-    .Render         = mapscene_RenderBSP,
-    .Exit           = NULL,
-    .Free           = mapscene_Free,
-};
+        .Setup          = mapscene_Setup,
+        .Enter          = NULL,
+        .Update         = NULL,
+        .EntityEnter    = NULL,
+        .EntityExit     = NULL,
+        .CheckCollision = NULL,
+        .MoveEntity     = NULL,
+        .Raycast        = NULL,
+        .PreRender      = NULL,
+        .Render         = mapscene_RenderBSP,
+        .Exit           = NULL,
+        .Free           = mapscene_Free,
+    };
 
 
 /*

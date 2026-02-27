@@ -25,19 +25,6 @@
 
 #include "bsp.h"
 
-int32_t RemoveHiddenLeafs(GBSP_Node *RootNode, GBSP_Node *ONode);
-
-/* Compute the centroid of a leaf from its portals */
-void LeafCenter(GBSP_Node *Node, Vector3 *PortalMid);
-
-/*
-    Leak state — set by RemoveHiddenLeafs when the map is not sealed.
-    HitEntity  : true if a leak was found
-    EntityHit  : index into Entities[] for the leaking entity
-    HitNode    : leaf node where the flood fill entered empty space
-*/
-extern bool       HitEntity;
-extern int32_t    EntityHit;
-extern GBSP_Node *HitNode;
+int32_t	RemoveHiddenLeafs(GBSP_Node *RootNode, GBSP_Node *ONode);
 
 #endif
