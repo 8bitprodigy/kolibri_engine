@@ -1,0 +1,430 @@
+/****************************************************************************************/
+/*  visflood.c                                                                          */
+/*                                                                                      */
+/*  Ported from Genesis3D VisFlood.cpp to C99/raylib                                   */
+/*  Genesis3D infrastructure (GHook, geRam, geBoolean) replaced with standard C.       */
+/****************************************************************************************/
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include <raylib.h>
+#include <raymath.h>
+
+#include "bsp.h"
+#include "poly.h"
+#include "vis.h"
+
+
+/* =========================================================================
+   Module-local globals (mirror the originals in VisFlood.cpp)
+   ========================================================================= */
+
+static int32_t CanSee;
+static int32_t SrcLeaf;
+static int32_t MightSee;
+
+#define ON_EPSILON 0.01f
+
+
+/* =========================================================================
+   PlaneDistanceFastP
+       Signed distance from Point to Plane.  The original had per-axis fast
+       paths for PLANE_X/Y/Z but fell through to the dot product anyway, so
+       we just use the dot product directly.
+   ========================================================================= */
+
+static inline float
+PlaneDistanceFastP(const Vector3 *Point, const GBSP_Plane *Plane)
+{
+    return Vector3DotProduct(Plane->Normal, *Point) - Plane->Dist;
+}
+
+
+/* =========================================================================
+   PortalCanSeePortal
+       Quick check: can Portal1 possibly see Portal2?
+       Does NOT account for intervening geometry — that is the slow pass's job.
+   ========================================================================= */
+
+bool
+PortalCanSeePortal(VIS_Portal *Portal1, VIS_Portal *Portal2)
+{
+    GBSP_Poly  *Poly;
+    int32_t     i;
+    float       Dist;
+
+    /* All of Portal1's verts must have at least one behind Portal2's plane */
+    Poly = Portal1->Poly;
+    for (i = 0; i < Poly->NumVerts; i++)
+    {
+        Dist = PlaneDistanceFastP(&Poly->Verts[i], &Portal2->Plane);
+        if (Dist < -ON_EPSILON)
+            break;
+    }
+    if (i == Poly->NumVerts)
+        return false;   /* Portal1 is entirely in front of Portal2 */
+
+    /* All of Portal2's verts must have at least one in front of Portal1's plane */
+    Poly = Portal2->Poly;
+    for (i = 0; i < Poly->NumVerts; i++)
+    {
+        Dist = PlaneDistanceFastP(&Poly->Verts[i], &Portal1->Plane);
+        if (Dist > ON_EPSILON)
+            break;
+    }
+    if (i == Poly->NumVerts)
+        return false;   /* Portal2 is entirely behind Portal1 */
+
+    return true;
+}
+
+
+/* =========================================================================
+   FloodPortalsFast_r
+   ========================================================================= */
+
+void
+FloodPortalsFast_r(VIS_Portal *SrcPortal, VIS_Portal *DestPortal)
+{
+    VIS_Leaf   *Leaf;
+    VIS_Portal *Portal;
+    int32_t     LeafNum;
+    int32_t     PNum;
+
+    PNum = (int32_t)(DestPortal - VisPortalArray);
+
+    if (PortalSeen[PNum])
+        return;
+    PortalSeen[PNum] = 1;
+
+    /* Mark DestPortal as visible from SrcPortal */
+    LeafNum      = DestPortal->Leaf;
+    int32_t Bit  = 1 << (PNum & 7);
+
+    if (!(SrcPortal->VisBits[PNum >> 3] & Bit))
+    {
+        SrcPortal->VisBits[PNum >> 3] |= Bit;
+        SrcPortal->MightSee++;
+        VisLeafs[SrcLeaf].MightSee++;
+        MightSee++;
+    }
+
+    /* Recursively flood into all portals reachable through DestPortal's leaf */
+    Leaf = &VisLeafs[LeafNum];
+    for (Portal = Leaf->Portals; Portal; Portal = Portal->Next)
+    {
+        if (PortalCanSeePortal(SrcPortal, Portal))
+            FloodPortalsFast_r(SrcPortal, Portal);
+    }
+}
+
+
+/* =========================================================================
+   FloodLeafPortalsFast
+   ========================================================================= */
+
+void
+FloodLeafPortalsFast(int32_t LeafNum)
+{
+    VIS_Leaf   *Leaf;
+    VIS_Portal *Portal;
+
+    Leaf = &VisLeafs[LeafNum];
+
+    if (!Leaf->Portals)
+        return;
+
+    SrcLeaf = LeafNum;
+
+    for (Portal = Leaf->Portals; Portal; Portal = Portal->Next)
+    {
+        Portal->VisBits = (uint8_t *)calloc(NumVisPortalBytes, sizeof(uint8_t));
+        if (!Portal->VisBits)
+        {
+            fprintf(stderr, "ERROR: FloodLeafPortalsFast: out of memory.\n");
+            return;
+        }
+
+        memset(PortalSeen, 0, NumVisPortals);
+        MightSee = 0;
+
+        FloodPortalsFast_r(Portal, Portal);
+    }
+}
+
+
+/* =========================================================================
+   ClipToSeperators
+       Clips Target against the separating planes formed by edges of Source
+       and vertices of Pass.  Used by the slow (full) vis pass to tighten
+       visibility through a chain of portals.
+   ========================================================================= */
+
+static bool
+ClipToSeperators(GBSP_Poly *Source, GBSP_Poly *Pass, GBSP_Poly *Target,
+                 bool FlipClip, GBSP_Poly **Dest)
+{
+    int32_t    i, j, k, l;
+    GBSP_Plane Plane;
+    Vector3    v1, v2;
+    float      d, Length;
+    int32_t    Counts[3];
+    bool       FlipTest;
+
+    for (i = 0; i < Source->NumVerts; i++)
+    {
+        l  = (i + 1) % Source->NumVerts;
+        v1 = Vector3Subtract(Source->Verts[l], Source->Verts[i]);
+
+        for (j = 0; j < Pass->NumVerts; j++)
+        {
+            v2 = Vector3Subtract(Pass->Verts[j], Source->Verts[i]);
+
+            Plane.Normal = Vector3CrossProduct(v1, v2);
+            Length       = Vector3LengthSqr(Plane.Normal);
+
+            if (Length < ON_EPSILON * ON_EPSILON)
+                continue;
+
+            Plane.Normal = Vector3Normalize(Plane.Normal);
+            Plane.Dist   = Vector3DotProduct(Pass->Verts[j], Plane.Normal);
+
+            /* Determine which side of the plane the rest of Source is on */
+            FlipTest = false;
+            for (k = 0; k < Source->NumVerts; k++)
+            {
+                if (k == i || k == l)
+                    continue;
+
+                d = Vector3DotProduct(Source->Verts[k], Plane.Normal) - Plane.Dist;
+                if (d < -ON_EPSILON)
+                {
+                    FlipTest = false;
+                    break;
+                }
+                else if (d > ON_EPSILON)
+                {
+                    FlipTest = true;
+                    break;
+                }
+            }
+            if (k == Source->NumVerts)
+                continue;   /* all source verts on plane — degenerate, skip */
+
+            if (FlipTest)
+            {
+                Plane.Normal = Vector3Negate(Plane.Normal);
+                Plane.Dist   = -Plane.Dist;
+            }
+
+            /* Verify that all of Pass (except vertex j) is on the positive side */
+            Counts[0] = Counts[1] = Counts[2] = 0;
+            for (k = 0; k < Pass->NumVerts; k++)
+            {
+                if (k == j) continue;
+                d = Vector3DotProduct(Pass->Verts[k], Plane.Normal) - Plane.Dist;
+                if      (d < -ON_EPSILON) break;
+                else if (d >  ON_EPSILON) Counts[0]++;
+                else                      Counts[2]++;
+            }
+            if (k != Pass->NumVerts) continue;
+            if (!Counts[0])          continue;
+
+            /* Clip Target against this separating plane */
+            if (!ClipPoly(Target, &Plane, FlipClip, &Target))
+            {
+                fprintf(stderr, "ERROR: ClipToSeperators: ClipPoly failed.\n");
+                return false;
+            }
+
+            if (!Target)
+            {
+                *Dest = NULL;
+                return true;
+            }
+        }
+    }
+
+    *Dest = Target;
+    return true;
+}
+
+
+/* =========================================================================
+   FloodPortalsSlow_r
+   ========================================================================= */
+
+static bool
+FloodPortalsSlow_r(VIS_Portal *SrcPortal, VIS_Portal *DestPortal,
+                   VIS_PStack *PrevStack)
+{
+    VIS_Leaf   *Leaf;
+    VIS_Portal *Portal;
+    int32_t     LeafNum, j, PNum;
+    uint32_t   *Test, *Might, *Vis, More;
+    VIS_PStack  Stack;
+
+    PNum = (int32_t)(DestPortal - VisPortalArray);
+
+    /* Mark DestPortal as definitely visible from SrcPortal */
+    int32_t Bit = 1 << (PNum & 7);
+    if (!(SrcPortal->FinalVisBits[PNum >> 3] & Bit))
+    {
+        SrcPortal->FinalVisBits[PNum >> 3] |= Bit;
+        SrcPortal->CanSee++;
+        VisLeafs[SrcLeaf].CanSee++;
+        CanSee++;
+    }
+
+    LeafNum = DestPortal->Leaf;
+    Leaf    = &VisLeafs[LeafNum];
+
+    Might = (uint32_t *)Stack.VisBits;
+    Vis   = (uint32_t *)SrcPortal->FinalVisBits;
+
+    for (Portal = Leaf->Portals; Portal; Portal = Portal->Next)
+    {
+        PNum = (int32_t)(Portal - VisPortalArray);
+        Bit  = 1 << (PNum & 7);
+
+        /* Fast-vis says we can't reach this portal */
+        if (!(SrcPortal->VisBits[PNum >> 3] & Bit))
+            continue;
+
+        /* Previous stack frame can't reach this portal */
+        if (!(PrevStack->VisBits[PNum >> 3] & Bit))
+            continue;
+
+        /* Check if this portal can contribute any new visibility */
+        Test = Portal->Done
+             ? (uint32_t *)Portal->FinalVisBits
+             : (uint32_t *)Portal->VisBits;
+
+        More = 0;
+        for (j = 0; j < NumVisPortalLongs; j++)
+        {
+            Might[j] = ((uint32_t *)PrevStack->VisBits)[j] & Test[j];
+            More    |= (Might[j] & ~Vis[j]);
+        }
+
+        if (!More && (SrcPortal->FinalVisBits[PNum >> 3] & Bit))
+            continue;   /* nothing new */
+
+        /* Copy and clip the pass polygon against SrcPortal's plane */
+        if (!CopyPoly(Portal->Poly, &Stack.Pass))
+            return false;
+
+        if (!ClipPoly(Stack.Pass, &SrcPortal->Plane, false, &Stack.Pass))
+            return false;
+        if (!Stack.Pass)
+            continue;
+
+        /* Copy and clip the source polygon against this portal's plane */
+        if (!CopyPoly(PrevStack->Source, &Stack.Source))
+            return false;
+
+        if (!ClipPoly(Stack.Source, &Portal->Plane, true, &Stack.Source))
+            return false;
+        if (!Stack.Source)
+        {
+            FreePoly(Stack.Pass);
+            continue;
+        }
+
+        /* If no previous pass polygon, recurse immediately */
+        if (!PrevStack->Pass)
+        {
+            if (!FloodPortalsSlow_r(SrcPortal, Portal, &Stack))
+                return false;
+            FreePoly(Stack.Source);
+            FreePoly(Stack.Pass);
+            continue;
+        }
+
+        /* Clip pass through separators */
+        if (!ClipToSeperators(Stack.Source, PrevStack->Pass, Stack.Pass,
+                               false, &Stack.Pass))
+            return false;
+        if (!Stack.Pass)
+        {
+            FreePoly(Stack.Source);
+            continue;
+        }
+
+        if (!ClipToSeperators(PrevStack->Pass, Stack.Source, Stack.Pass,
+                               true, &Stack.Pass))
+            return false;
+        if (!Stack.Pass)
+        {
+            FreePoly(Stack.Source);
+            continue;
+        }
+
+        if (!FloodPortalsSlow_r(SrcPortal, Portal, &Stack))
+            return false;
+
+        FreePoly(Stack.Source);
+        FreePoly(Stack.Pass);
+    }
+
+    return true;
+}
+
+
+/* =========================================================================
+   FloodPortalsSlow
+   ========================================================================= */
+
+bool
+FloodPortalsSlow(void)
+{
+    VIS_Portal *Portal;
+    VIS_PStack  PStack;
+    int32_t     k, i, PNum;
+
+    for (k = 0; k < NumVisPortals; k++)
+        VisPortalArray[k].Done = false;
+
+    for (k = 0; k < NumVisPortals; k++)
+    {
+        Portal = VisSortedPortals[k];
+
+        Portal->FinalVisBits = (uint8_t *)calloc(NumVisPortalBytes, sizeof(uint8_t));
+        if (!Portal->FinalVisBits)
+        {
+            fprintf(stderr, "ERROR: FloodPortalsSlow: out of memory.\n");
+            return false;
+        }
+
+        memset(PortalSeen, 0, NumVisPortals);
+        CanSee = 0;
+
+        for (i = 0; i < NumVisPortalBytes; i++)
+            PStack.VisBits[i] = Portal->VisBits[i];
+
+        if (!CopyPoly(Portal->Poly, &PStack.Source))
+            return false;
+        PStack.Pass = NULL;
+
+        /* SrcLeaf is the leaf whose portals we are processing */
+        SrcLeaf = Portal->Leaf;
+
+        if (!FloodPortalsSlow_r(Portal, Portal, &PStack))
+            return false;
+
+        FreePoly(PStack.Source);
+
+        Portal->Done = true;
+
+        PNum = (int32_t)(Portal - VisPortalArray);
+        if (VisVerbose)
+            printf("Portal: %4i - Fast Vis: %4i, Full Vis: %4i\n",
+                   k + 1, Portal->MightSee, Portal->CanSee);
+    }
+
+    return true;
+}

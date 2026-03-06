@@ -1,0 +1,122 @@
+/****************************************************************************************/
+/*  vis.h                                                                               */
+/*                                                                                      */
+/*  Ported from Genesis3D Vis.h / VisFlood.cpp to C99/raylib                           */
+/*  File I/O and Genesis3D infrastructure removed; operates entirely in-memory on       */
+/*  the BSP tree produced by ProcessWorldModel.                                         */
+/****************************************************************************************/
+#ifndef VIS_H
+#define VIS_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <raylib.h>
+
+#include "bsp.h"
+#include "poly.h"
+
+
+/*
+    VIS_Portal
+        One directed portal between two leaves, as seen by the vis system.
+        Each undirected BSP portal produces two VIS_Portals (one per direction).
+*/
+typedef struct VIS_Portal
+{
+    struct VIS_Portal *Next;        /* Next portal in this leaf's list      */
+
+    GBSP_Poly  *Poly;               /* Convex polygon shape of the portal   */
+    GBSP_Plane  Plane;              /* Plane of the portal                  */
+    Vector3     Center;             /* Centroid of Poly                     */
+    float       Radius;             /* Max distance from Center to any vert */
+
+    uint8_t    *VisBits;            /* Portals this portal might see        */
+    uint8_t    *FinalVisBits;       /* Portals this portal can really see   */
+    int32_t     Leaf;               /* Index of the leaf this portal looks into */
+    int32_t     MightSee;           /* Count of portals in VisBits          */
+    int32_t     CanSee;             /* Count of portals in FinalVisBits     */
+    bool        Done;               /* Full vis pass completed for portal   */
+}
+VIS_Portal;
+
+/*
+    VIS_Leaf
+        Per-leaf visibility bookkeeping.
+*/
+typedef struct
+{
+    VIS_Portal *Portals;            /* Linked list of portals for this leaf */
+    int32_t     MightSee;
+    int32_t     CanSee;
+}
+VIS_Leaf;
+
+/*
+    VIS_PStack
+        Per-recursion state for FloodPortalsSlow_r.
+        VisBits is sized to MAX_TEMP_PORTALS / 8.
+*/
+#define MAX_TEMP_PORTALS 25000
+
+typedef struct
+{
+    uint8_t    VisBits[MAX_TEMP_PORTALS / 8];
+    GBSP_Poly *Source;
+    GBSP_Poly *Pass;
+}
+VIS_PStack;
+
+
+/* -----------------------------------------------------------------------
+   Globals (defined in vis.c, extern'd here for visflood.c)
+   ----------------------------------------------------------------------- */
+extern int32_t     NumVisPortals;
+extern int32_t     NumVisPortalBytes;
+extern int32_t     NumVisPortalLongs;
+extern VIS_Portal *VisPortalArray;
+extern VIS_Portal **VisSortedPortals;
+extern uint8_t    *PortalSeen;
+
+extern int32_t     NumVisLeafs;
+extern int32_t     NumVisLeafBytes;
+extern int32_t     NumVisLeafLongs;
+extern uint8_t    *LeafVisBits;
+extern VIS_Leaf   *VisLeafs;
+
+extern int32_t     TotalVisibleLeafs;
+
+extern bool        VisVerbose;
+extern bool        NoSort;
+extern bool        FullVis;
+
+
+/* -----------------------------------------------------------------------
+   Public API
+   ----------------------------------------------------------------------- */
+
+/*
+    RunVis
+        Entry point. Builds VIS_Portal/VIS_Leaf arrays from the in-memory
+        BSP tree rooted at RootNode, runs the fast and (optionally) full vis
+        passes, then collects the results into LeafVisBits.
+
+        On success returns true and LeafVisBits is valid.
+        The caller can query visibility with:
+
+            uint8_t *row = &LeafVisBits[leafA * NumVisLeafBytes];
+            bool visible = (row[leafB >> 3] & (1 << (leafB & 7))) != 0;
+
+        Call FreeAllVisData() when done.
+*/
+bool RunVis(GBSP_Node *RootNode, bool full_vis, bool verbose);
+
+/*  Release all vis allocations. */
+void FreeAllVisData(void);
+
+/* visflood.c functions called from vis.c */
+void FloodLeafPortalsFast (int32_t LeafNum);
+bool FloodPortalsSlow     (void);
+bool PortalCanSeePortal   (VIS_Portal *Portal1, VIS_Portal *Portal2);
+
+
+#endif /* VIS_H */

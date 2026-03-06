@@ -16,7 +16,6 @@
 #include "portals.h"
 #include "fill.h"
 #include "brush2.h"
-#include "vis.h"
 
 #define USE_VOLUMES
 
@@ -1404,10 +1403,6 @@ bool ProcessWorldModel(GBSP_Model *Model, MAP_Brush *MapBrushes)
 
 	// Make the leaf LeafFaces (record what faces touch what leafs...)
 	MakeLeafFaces(Node);
-
-	// Run VIS while portals are still alive
-	if (!RunVis(Node, Model, false, false))
-		fprintf(stderr, "WARNING: RunVis failed — no visibility culling.\n");
 
 	// Free portals...
 	if (!FreePortals(Node))

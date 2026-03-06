@@ -486,11 +486,6 @@ struct GBSP_Model
     
     int         IsAreaPortal;
     int32_t     Areas[2];
-
-    /* VIS output — populated by RunVis, freed by FreeModelVisData */
-    uint8_t    *LeafVisBits;     /* flat array: NumVisLeafs * NumVisLeafBytes */
-    int32_t     NumVisLeafs;
-    int32_t     NumVisLeafBytes;
 };
 
 //====================================================================================

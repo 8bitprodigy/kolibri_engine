@@ -10,6 +10,7 @@
 
 #include "kolibri.h"
 #include "renderer.h"
+#include "vis.h"
 #include "leaf.h"
 #include "v220_map_parser.h"
 #include "mapscene.h"
@@ -626,6 +627,9 @@ build_bsp_from_mapdata(MapSceneData *sd)
     sd->model     = model;
     sd->bsp_built = true;
 
+    if (!RunVis(sd->model->RootNode[0], true, true))
+        ERR_OUT("[BSP] VIS pass failed");
+
     /* Count draw-hull faces for a quick sanity print */
     int nfaces = 0;
     if (model->RootNode[0])
@@ -665,7 +669,8 @@ DrawBSPNode_r(GBSP_Node *node, Frustum *frustum, const uint8_t *camera_leaf_vis)
         if (node->Contents & BSP_CONTENTS_SOLID2) return;
 
         /* Vis check: skip if the camera leaf can't see this leaf */
-        if (camera_leaf_vis && node->PortalLeafNum >= 0)
+        if (camera_leaf_vis && node->PortalLeafNum >= 0
+                             && node->PortalLeafNum < NumVisLeafs)
         {
             int32_t n = node->PortalLeafNum;
             if (!(camera_leaf_vis[n >> 3] & (1 << (n & 7))))
@@ -1021,28 +1026,18 @@ mapscene_RenderBSP(Scene *scene, Head *head)
             vis row so DrawBSPNode_r can skip leaves the camera can't see.
             Falls back to frustum-only culling if VIS hasn't been run.
         */
-        /* Cache vis row — only recompute when camera moves to a new leaf */
-        static GBSP_Node     *s_last_cam_leaf = NULL;
-        static const uint8_t *s_cam_leaf_vis  = NULL;
-
         const uint8_t *camera_leaf_vis = NULL;
-        if (sd->model->LeafVisBits && sd->model->NumVisLeafBytes > 0)
+        if (LeafVisBits && NumVisLeafBytes > 0)
         {
-            Vector3    cam_map  = Vector3Scale(camera->position, 1.0f / MAP_SCALE);
+            /* Camera position is in render units; BSP is in map units */
+            Vector3 cam_map = Vector3Scale(camera->position, 1.0f / MAP_SCALE);
             GBSP_Node *cam_leaf = FindLeaf(sd->model->RootNode[0], &cam_map);
-
-            if (cam_leaf != s_last_cam_leaf)
+            if (cam_leaf && cam_leaf->PortalLeafNum >= 0
+                         && cam_leaf->PortalLeafNum < NumVisLeafs)
             {
-                s_last_cam_leaf = cam_leaf;
-                s_cam_leaf_vis  = NULL;
-                if (cam_leaf && cam_leaf->PortalLeafNum >= 0
-                             && cam_leaf->PortalLeafNum < sd->model->NumVisLeafs)
-                {
-                    s_cam_leaf_vis = &sd->model->LeafVisBits[
-                        cam_leaf->PortalLeafNum * sd->model->NumVisLeafBytes];
-                }
+                camera_leaf_vis = &LeafVisBits[cam_leaf->PortalLeafNum
+                                               * NumVisLeafBytes];
             }
-            camera_leaf_vis = s_cam_leaf_vis;
         }
 
         DrawBSPNode_r(sd->model->RootNode[0], frustum, camera_leaf_vis);

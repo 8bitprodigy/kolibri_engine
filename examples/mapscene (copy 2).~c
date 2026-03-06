@@ -10,6 +10,7 @@
 
 #include "kolibri.h"
 #include "renderer.h"
+#include "vis.h"
 #include "leaf.h"
 #include "v220_map_parser.h"
 #include "mapscene.h"
@@ -615,6 +616,10 @@ build_bsp_from_mapdata(MapSceneData *sd)
             sd->leak_path_count = idx;
         }
 
+        bool vis_ok = RunVis(sd->model->RootNode[0], true, true);
+
+        if (!vis_ok) ERR_OUT("[BSP] VIS pass failed.");
+
         return true;
     }
 
@@ -641,17 +646,20 @@ build_bsp_from_mapdata(MapSceneData *sd)
 /* -------------------------------------------------------------------------
    BSP rendering with frustum culling and VIS
    -------------------------------------------------------------------------
-   Faces in GBSPLib are stored on *leaves* via LeafFaces (populated by
-   MakeLeafFaces during ProcessWorldModel). Drawing from leaf->LeafFaces
-   means the vis check at the leaf directly gates its own faces — invisible
-   leaves are skipped before any drawing happens.
+   DrawBSPNode_r walks the BSP tree drawing GREEN wireframe faces.
 
-   Traversal:
-     - At interior nodes: bbox frustum cull. If outside, skip entire subtree.
-     - At leaves: vis check first, then draw LeafFaces if visible.
+   At each interior node:
+     - Bbox is tested against the frustum (isAABBInFrustum). If entirely
+       outside, the whole subtree is skipped.
+     - Faces on the node are drawn if we reach it.
 
-   camera_leaf_vis: row in LeafVisBits for the camera's current leaf, or NULL
-                    to fall back to frustum-only culling.
+   At each leaf:
+     - If VIS data is available, the leaf's PortalLeafNum is tested against
+       the camera leaf's vis row. Invisible leaves cause an early return,
+       which prevents drawing the faces on their parent node for that branch.
+
+   camera_leaf_vis: pointer to the camera leaf's row in LeafVisBits, or NULL
+                    if VIS hasn't been run yet (falls back to frustum-only).
    ------------------------------------------------------------------------- */
 
 static void
@@ -661,34 +669,20 @@ DrawBSPNode_r(GBSP_Node *node, Frustum *frustum, const uint8_t *camera_leaf_vis)
 
     if (node->PlaneNum == PLANENUM_LEAF)
     {
-        /* Skip solid leaves — they have no faces */
-        if (node->Contents & BSP_CONTENTS_SOLID2) return;
-
-        /* Vis check: skip if the camera leaf can't see this leaf */
+        /* Vis check: skip this leaf if the camera can't see it */
         if (camera_leaf_vis && node->PortalLeafNum >= 0)
         {
             int32_t n = node->PortalLeafNum;
-            if (!(camera_leaf_vis[n >> 3] & (1 << (n & 7))))
-                return;
-        }
-
-        /* Draw all faces belonging to this leaf */
-        for (int i = 0; i < node->NumLeafFaces; i++)
-        {
-            GBSP_Face *face = node->LeafFaces[i];
-            if (!face || !face->Poly || face->Poly->NumVerts < 3) continue;
-            for (int v = 0; v < face->Poly->NumVerts; v++)
+            if (n < NumVisLeafs)
             {
-                int     next = (v + 1) % face->Poly->NumVerts;
-                Vector3 a    = Vector3Scale(face->Poly->Verts[v],    MAP_SCALE);
-                Vector3 b    = Vector3Scale(face->Poly->Verts[next], MAP_SCALE);
-                DrawLine3D(a, b, GREEN);
+                if (!(camera_leaf_vis[n >> 3] & (1 << (n & 7))))
+                    return;
             }
         }
-        return;
+        return; /* leaves carry no faces in this BSP */
     }
 
-    /* Interior node: frustum cull against bbox */
+    /* Frustum cull against this node's bbox (map units → render units) */
     Vector3 mins    = Vector3Scale(node->Mins, MAP_SCALE);
     Vector3 maxs    = Vector3Scale(node->Maxs, MAP_SCALE);
     Vector3 center  = Vector3Scale(Vector3Add(mins, maxs), 0.5f);
@@ -698,6 +692,19 @@ DrawBSPNode_r(GBSP_Node *node, Frustum *frustum, const uint8_t *camera_leaf_vis)
     if (!isAABBInFrustum(center, extents, frustum, dist_sq,
                          DEFAULT_MAX_RENDER_DISTANCE))
         return;
+
+    /* Draw faces on this interior node */
+    for (GBSP_Face *face = node->Faces; face; face = face->Next)
+    {
+        if (!face->Poly || face->Poly->NumVerts < 3) continue;
+        for (int i = 0; i < face->Poly->NumVerts; i++)
+        {
+            int     next = (i + 1) % face->Poly->NumVerts;
+            Vector3 a    = Vector3Scale(face->Poly->Verts[i],    MAP_SCALE);
+            Vector3 b    = Vector3Scale(face->Poly->Verts[next], MAP_SCALE);
+            DrawLine3D(a, b, GREEN);
+        }
+    }
 
     DrawBSPNode_r(node->Children[0], frustum, camera_leaf_vis);
     DrawBSPNode_r(node->Children[1], frustum, camera_leaf_vis);
@@ -1021,28 +1028,18 @@ mapscene_RenderBSP(Scene *scene, Head *head)
             vis row so DrawBSPNode_r can skip leaves the camera can't see.
             Falls back to frustum-only culling if VIS hasn't been run.
         */
-        /* Cache vis row — only recompute when camera moves to a new leaf */
-        static GBSP_Node     *s_last_cam_leaf = NULL;
-        static const uint8_t *s_cam_leaf_vis  = NULL;
-
         const uint8_t *camera_leaf_vis = NULL;
-        if (sd->model->LeafVisBits && sd->model->NumVisLeafBytes > 0)
+        if (LeafVisBits && NumVisLeafBytes > 0)
         {
-            Vector3    cam_map  = Vector3Scale(camera->position, 1.0f / MAP_SCALE);
+            /* Camera position is in render units; BSP is in map units */
+            Vector3 cam_map = Vector3Scale(camera->position, 1.0f / MAP_SCALE);
             GBSP_Node *cam_leaf = FindLeaf(sd->model->RootNode[0], &cam_map);
-
-            if (cam_leaf != s_last_cam_leaf)
+            if (cam_leaf && cam_leaf->PortalLeafNum >= 0
+                         && cam_leaf->PortalLeafNum < NumVisLeafs)
             {
-                s_last_cam_leaf = cam_leaf;
-                s_cam_leaf_vis  = NULL;
-                if (cam_leaf && cam_leaf->PortalLeafNum >= 0
-                             && cam_leaf->PortalLeafNum < sd->model->NumVisLeafs)
-                {
-                    s_cam_leaf_vis = &sd->model->LeafVisBits[
-                        cam_leaf->PortalLeafNum * sd->model->NumVisLeafBytes];
-                }
+                camera_leaf_vis = &LeafVisBits[cam_leaf->PortalLeafNum
+                                               * NumVisLeafBytes];
             }
-            camera_leaf_vis = s_cam_leaf_vis;
         }
 
         DrawBSPNode_r(sd->model->RootNode[0], frustum, camera_leaf_vis);

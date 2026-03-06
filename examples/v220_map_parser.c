@@ -13,12 +13,6 @@
    Internal types
    ========================================================================= */
 
-/*
-    Tokenizer
-        Walks a null-terminated char buffer one token at a time.
-        The AxisRemapping is stored here so no global state is needed,
-        making the parser re-entrant.
-*/
 typedef struct
 {
     char         *current;
@@ -32,12 +26,6 @@ Tokenizer;
    Dynamic-array helpers
    ========================================================================= */
 
-/*
-    GrowArray
-        Ensures *array has room for at least (count + 1) elements of
-        elem_size bytes.  Doubles capacity on each grow, starting at 8.
-        Returns true on success, false on allocation failure.
-*/
 static bool
 GrowArray(void **array, int *capacity, int count, size_t elem_size)
 {
@@ -67,13 +55,11 @@ RemapVector3(const Tokenizer *tok, Vector3 v, bool apply_scale)
 
     float c[3] = { v.x, v.y, v.z };
 
-    /* Apply per-axis flips */
     float f[3];
     f[0] = c[0] * (r->flip_x ? -1.0f : 1.0f);
     f[1] = c[1] * (r->flip_y ? -1.0f : 1.0f);
     f[2] = c[2] * (r->flip_z ? -1.0f : 1.0f);
 
-    /* Remap to destination axes */
     Vector3 out = { f[r->x_to], f[r->y_to], f[r->z_to] };
 
     return Vector3Scale(out, apply_scale ? r->scale : 1.0f);
@@ -97,13 +83,11 @@ SkipWhitespaceAndComments(Tokenizer *tok)
 {
     while (*tok->current)
     {
-        /* Whitespace */
         if (*tok->current == ' '  || *tok->current == '\t' ||
             *tok->current == '\r' || *tok->current == '\n')
         {
             tok->current++;
         }
-        /* Line comment ( // ... ) */
         else if (tok->current[0] == '/' && tok->current[1] == '/')
         {
             while (*tok->current && *tok->current != '\n')
@@ -116,11 +100,6 @@ SkipWhitespaceAndComments(Tokenizer *tok)
     }
 }
 
-/*
-    GetToken
-        Advances tok->current past the next token and stores it in
-        tok->token.  Returns true if a token was read, false at EOF.
-*/
 static bool
 GetToken(Tokenizer *tok)
 {
@@ -133,7 +112,6 @@ GetToken(Tokenizer *tok)
 
     if (*tok->current == '"')
     {
-        /* Quoted string — strip the surrounding quotes */
         tok->current++;
         while (*tok->current && *tok->current != '"' &&
                len < MAX_TOKEN_LENGTH - 1)
@@ -145,7 +123,6 @@ GetToken(Tokenizer *tok)
     }
     else
     {
-        /* Unquoted token — ends at whitespace */
         while (*tok->current &&
                *tok->current != ' '  && *tok->current != '\t' &&
                *tok->current != '\r' && *tok->current != '\n' &&
@@ -159,11 +136,6 @@ GetToken(Tokenizer *tok)
     return len > 0;
 }
 
-/*
-    UngetToken
-        "Pushes back" the last token by rewinding tok->current.
-        Only valid immediately after a GetToken call on an unquoted token.
-*/
 static void
 UngetToken(Tokenizer *tok)
 {
@@ -195,54 +167,31 @@ ParseBrushPlane(Tokenizer *tok, MapPlane *plane)
 {
     Vector3 p1, p2, p3;
 
-#define EXPECT(str)  do { if (!GetToken(tok) || strcmp(tok->token, (str)) != 0) return false; } while (0)
+#define EXPECT(str)   do { if (!GetToken(tok) || strcmp(tok->token, (str)) != 0) return false; } while (0)
 #define NEXT_FLOAT(f) do { if (!GetToken(tok)) return false; (f) = (float)atof(tok->token); } while (0)
 
-    /* ( x y z ) */
-    EXPECT("(");
-    NEXT_FLOAT(p1.x); NEXT_FLOAT(p1.y); NEXT_FLOAT(p1.z);
-    EXPECT(")");
+    EXPECT("("); NEXT_FLOAT(p1.x); NEXT_FLOAT(p1.y); NEXT_FLOAT(p1.z); EXPECT(")");
+    EXPECT("("); NEXT_FLOAT(p2.x); NEXT_FLOAT(p2.y); NEXT_FLOAT(p2.z); EXPECT(")");
+    EXPECT("("); NEXT_FLOAT(p3.x); NEXT_FLOAT(p3.y); NEXT_FLOAT(p3.z); EXPECT(")");
 
-    EXPECT("(");
-    NEXT_FLOAT(p2.x); NEXT_FLOAT(p2.y); NEXT_FLOAT(p2.z);
-    EXPECT(")");
-
-    EXPECT("(");
-    NEXT_FLOAT(p3.x); NEXT_FLOAT(p3.y); NEXT_FLOAT(p3.z);
-    EXPECT(")");
-
-    /* Remap points into engine space BEFORE deriving the plane equation
-       so that the stored normal matches the actual rendered geometry.    */
     p1 = RemapVector3(tok, p1, false);
     p2 = RemapVector3(tok, p2, false);
     p3 = RemapVector3(tok, p3, false);
 
     CalculatePlane(p1, p2, p3, plane);
 
-    /* Texture name */
     if (!GetToken(tok)) return false;
     strncpy(plane->texture, tok->token, MAX_TEXTURE_NAME - 1);
     plane->texture[MAX_TEXTURE_NAME - 1] = '\0';
 
-    /* [ ux uy uz u_offset ] */
-    EXPECT("[");
-    NEXT_FLOAT(plane->u_axis.x);
-    NEXT_FLOAT(plane->u_axis.y);
-    NEXT_FLOAT(plane->u_axis.z);
-    NEXT_FLOAT(plane->u_offset);
-    EXPECT("]");
+    EXPECT("["); NEXT_FLOAT(plane->u_axis.x); NEXT_FLOAT(plane->u_axis.y);
+                 NEXT_FLOAT(plane->u_axis.z); NEXT_FLOAT(plane->u_offset); EXPECT("]");
     plane->u_axis = RemapVector3(tok, plane->u_axis, false);
 
-    /* [ vx vy vz v_offset ] */
-    EXPECT("[");
-    NEXT_FLOAT(plane->v_axis.x);
-    NEXT_FLOAT(plane->v_axis.y);
-    NEXT_FLOAT(plane->v_axis.z);
-    NEXT_FLOAT(plane->v_offset);
-    EXPECT("]");
+    EXPECT("["); NEXT_FLOAT(plane->v_axis.x); NEXT_FLOAT(plane->v_axis.y);
+                 NEXT_FLOAT(plane->v_axis.z); NEXT_FLOAT(plane->v_offset); EXPECT("]");
     plane->v_axis = RemapVector3(tok, plane->v_axis, false);
 
-    /* rotation  u_scale  v_scale */
     NEXT_FLOAT(plane->rotation);
     NEXT_FLOAT(plane->u_scale);
     NEXT_FLOAT(plane->v_scale);
@@ -253,13 +202,6 @@ ParseBrushPlane(Tokenizer *tok, MapPlane *plane)
     return true;
 }
 
-/*
-    ParseBrush
-        Allocates and fills a MapBrush.  The opening '{' has NOT yet been
-        consumed when this is called.
-        Returns a heap-allocated MapBrush on success, NULL on failure.
-        Caller is responsible for freeing via FreeMapBrush().
-*/
 static MapBrush *
 ParseBrush(Tokenizer *tok)
 {
@@ -273,46 +215,30 @@ ParseBrush(Tokenizer *tok)
     {
         if (strcmp(tok->token, "}") == 0)
         {
-            if (brush->plane_count == 0)
-            {
-                /* Empty brush — treat as an error */
-                free(brush->planes);
-                free(brush);
-                return NULL;
-            }
+            if (brush->plane_count == 0) { free(brush->planes); free(brush); return NULL; }
             return brush;
         }
 
-        /* Not a closing brace — it's the first token of a plane definition */
         UngetToken(tok);
 
-        if (!GrowArray((void **)&brush->planes,
-                       &brush->plane_capacity,
-                        brush->plane_count,
-                        sizeof(MapPlane)))
+        if (!GrowArray((void **)&brush->planes, &brush->plane_capacity,
+                        brush->plane_count, sizeof(MapPlane)))
         {
             fprintf(stderr, "v220_map_parser: out of memory growing plane array\n");
-            free(brush->planes);
-            free(brush);
-            return NULL;
+            free(brush->planes); free(brush); return NULL;
         }
 
         if (!ParseBrushPlane(tok, &brush->planes[brush->plane_count]))
         {
-            fprintf(stderr, "v220_map_parser: error parsing brush plane %d\n",
-                    brush->plane_count);
-            free(brush->planes);
-            free(brush);
-            return NULL;
+            fprintf(stderr, "v220_map_parser: error parsing brush plane %d\n", brush->plane_count);
+            free(brush->planes); free(brush); return NULL;
         }
 
         brush->plane_count++;
     }
 
-    /* EOF without closing brace */
     fprintf(stderr, "v220_map_parser: unexpected EOF inside brush\n");
-    free(brush->planes);
-    free(brush);
+    free(brush->planes); free(brush);
     return NULL;
 }
 
@@ -321,11 +247,6 @@ ParseBrush(Tokenizer *tok)
    Entity parsing
    ========================================================================= */
 
-/*
-    ParseEntity
-        The opening '{' has NOT yet been consumed.
-        Returns a heap-allocated MapEntity on success, NULL on failure.
-*/
 static MapEntity *
 ParseEntity(Tokenizer *tok)
 {
@@ -342,39 +263,26 @@ ParseEntity(Tokenizer *tok)
 
         if (strcmp(tok->token, "{") == 0)
         {
-            /* Brush block — push back the '{' and parse */
             UngetToken(tok);
 
-            if (!GrowArray((void **)&entity->brushes,
-                           &entity->brush_capacity,
-                            entity->brush_count,
-                            sizeof(MapBrush)))
+            if (!GrowArray((void **)&entity->brushes, &entity->brush_capacity,
+                            entity->brush_count, sizeof(MapBrush)))
             {
                 fprintf(stderr, "v220_map_parser: out of memory growing brush array\n");
                 goto fail;
             }
 
             MapBrush *b = ParseBrush(tok);
-            if (!b)
-            {
-                fprintf(stderr, "v220_map_parser: error parsing entity brush %d\n",
-                        entity->brush_count);
-                goto fail;
-            }
+            if (!b) { fprintf(stderr, "v220_map_parser: error parsing entity brush %d\n", entity->brush_count); goto fail; }
 
-            /* Copy the struct into the flat array, then release the
-               temporary allocation from ParseBrush.                  */
             entity->brushes[entity->brush_count] = *b;
-            free(b);   /* planes pointer is now owned by the array entry */
+            free(b);
             entity->brush_count++;
         }
         else
         {
-            /* Key-value pair — current token is the key */
-            if (!GrowArray((void **)&entity->properties,
-                           &entity->property_capacity,
-                            entity->property_count,
-                            sizeof(EntityKeyValue)))
+            if (!GrowArray((void **)&entity->properties, &entity->property_capacity,
+                            entity->property_count, sizeof(EntityKeyValue)))
             {
                 fprintf(stderr, "v220_map_parser: out of memory growing property array\n");
                 goto fail;
@@ -385,23 +293,15 @@ ParseEntity(Tokenizer *tok)
             strncpy(kv->key, tok->token, sizeof(kv->key) - 1);
             kv->key[sizeof(kv->key) - 1] = '\0';
 
-            if (!GetToken(tok))
-            {
-                fprintf(stderr, "v220_map_parser: EOF reading value for key '%s'\n",
-                        kv->key);
-                goto fail;
-            }
+            if (!GetToken(tok)) { fprintf(stderr, "v220_map_parser: EOF reading value for key '%s'\n", kv->key); goto fail; }
 
-            /* Special case: remap "origin" vectors into engine space */
             if (strcmp(kv->key, "origin") == 0)
             {
                 Vector3 origin;
-                if (sscanf(tok->token, "%f %f %f",
-                           &origin.x, &origin.y, &origin.z) == 3)
+                if (sscanf(tok->token, "%f %f %f", &origin.x, &origin.y, &origin.z) == 3)
                 {
                     origin = RemapVector3(tok, origin, false);
-                    snprintf(kv->value, sizeof(kv->value),
-                             "%f %f %f", origin.x, origin.y, origin.z);
+                    snprintf(kv->value, sizeof(kv->value), "%f %f %f", origin.x, origin.y, origin.z);
                 }
                 else
                 {
@@ -422,7 +322,6 @@ ParseEntity(Tokenizer *tok)
     fprintf(stderr, "v220_map_parser: unexpected EOF inside entity\n");
 
 fail:
-    /* Free everything we accumulated before the error */
     for (int i = 0; i < entity->brush_count; i++)
         free(entity->brushes[i].planes);
     free(entity->brushes);
@@ -473,11 +372,7 @@ ParseValve220Map(const char *filename, AxisRemapping remap)
     }
 
     MapData *map = (MapData *)calloc(1, sizeof(MapData));
-    if (!map)
-    {
-        UnloadFileText(file_data);
-        return NULL;
-    }
+    if (!map) { UnloadFileText(file_data); return NULL; }
 
     Tokenizer tok;
     InitTokenizer(&tok, file_data, remap);
@@ -485,61 +380,43 @@ ParseValve220Map(const char *filename, AxisRemapping remap)
     while (GetToken(&tok))
     {
         if (strcmp(tok.token, "{") != 0)
-            continue;   /* Skip any stray tokens before the first entity */
+            continue;
 
         UngetToken(&tok);
 
-        if (!GrowArray((void **)&map->entities,
-                       &map->entity_capacity,
-                        map->entity_count,
-                        sizeof(MapEntity)))
+        if (!GrowArray((void **)&map->entities, &map->entity_capacity,
+                        map->entity_count, sizeof(MapEntity)))
         {
             fprintf(stderr, "v220_map_parser: out of memory growing entity array\n");
             goto fail;
         }
 
         MapEntity *e = ParseEntity(&tok);
-        if (!e)
-        {
-            fprintf(stderr, "v220_map_parser: error parsing entity %d\n",
-                    map->entity_count);
-            goto fail;
-        }
+        if (!e) { fprintf(stderr, "v220_map_parser: error parsing entity %d\n", map->entity_count); goto fail; }
 
         map->entities[map->entity_count] = *e;
         free(e);
         map->entity_count++;
 
-        /*
-            Worldspawn (entity 0): promote its brushes to map->world_brushes
-            so BSP compilers that expect a flat brush list get what they need.
-            The brushes array inside entities[0] is left empty afterwards;
-            the planes memory is now owned by world_brushes entries.
-        */
         if (map->entity_count == 1)
         {
             MapEntity *ws = &map->entities[0];
 
             for (int i = 0; i < ws->brush_count; i++)
             {
-                if (!GrowArray((void **)&map->world_brushes,
-                               &map->world_brush_capacity,
-                                map->world_brush_count,
-                                sizeof(MapBrush)))
+                if (!GrowArray((void **)&map->world_brushes, &map->world_brush_capacity,
+                                map->world_brush_count, sizeof(MapBrush)))
                 {
-                    fprintf(stderr,
-                            "v220_map_parser: out of memory growing world_brushes\n");
+                    fprintf(stderr, "v220_map_parser: out of memory growing world_brushes\n");
                     goto fail;
                 }
                 map->world_brushes[map->world_brush_count++] = ws->brushes[i];
             }
 
-            /* The brush structs were moved — release the array but not the
-               planes pointers, which are now owned by world_brushes.      */
             free(ws->brushes);
-            ws->brushes          = NULL;
-            ws->brush_count      = 0;
-            ws->brush_capacity   = 0;
+            ws->brushes        = NULL;
+            ws->brush_count    = 0;
+            ws->brush_capacity = 0;
         }
     }
 
@@ -561,7 +438,7 @@ void
 FreeMapData(MapData *map)
 {
     if (!map) return;
-    FreeMapEntityArray(map->entities,     map->entity_count);
+    FreeMapEntityArray(map->entities,      map->entity_count);
     FreeMapBrushArray (map->world_brushes, map->world_brush_count);
     free(map);
 }

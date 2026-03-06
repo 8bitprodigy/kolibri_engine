@@ -83,7 +83,7 @@ void   DiagnoseBrushNormals(const CompiledBrush *brushes, int brush_count,
                              const CompiledFace  *faces,
                              const Vector3       *vertices);
 
-void   DrawBSPNode(GBSP_Node *node);
+
 
 Scene *MapScene_new(const char *map_path, Engine *engine);
 

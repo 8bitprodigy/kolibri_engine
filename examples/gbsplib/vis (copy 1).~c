@@ -1,0 +1,544 @@
+/****************************************************************************************/
+/*  vis.c                                                                               */
+/*                                                                                      */
+/*  Ported from Genesis3D Vis.cpp to C99/raylib                                        */
+/*  File I/O removed; portals are built directly from the in-memory BSP tree.          */
+/****************************************************************************************/
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <stdbool.h>
+
+#include <raylib.h>
+#include <raymath.h>
+
+#include "bsp.h"
+#include "poly.h"
+#include "portals.h"
+#include "vis.h"
+
+
+/* =========================================================================
+   Globals
+   ========================================================================= */
+
+int32_t     NumVisPortals      = 0;
+int32_t     NumVisPortalBytes  = 0;
+int32_t     NumVisPortalLongs  = 0;
+VIS_Portal *VisPortalArray         = NULL;
+VIS_Portal **VisSortedPortals  = NULL;
+uint8_t    *PortalSeen         = NULL;
+uint8_t    *PortalBits         = NULL;
+
+int32_t     NumVisLeafs        = 0;
+int32_t     NumVisLeafBytes    = 0;
+int32_t     NumVisLeafLongs    = 0;
+uint8_t    *LeafVisBits        = NULL;
+VIS_Leaf   *VisLeafs           = NULL;
+
+int32_t     TotalVisibleLeafs  = 0;
+
+bool        VisVerbose         = false;
+bool        NoSort             = false;
+bool        FullVis            = true;
+
+/* used by CollectLeafVisBits */
+static int32_t LeafSee = 0;
+
+
+/* =========================================================================
+   Free helpers
+   ========================================================================= */
+
+void
+FreeAllVisData(void)
+{
+    int32_t i;
+
+    if (VisPortalArray)
+    {
+        for (i = 0; i < NumVisPortals; i++)
+        {
+            if (VisPortalArray[i].Poly)        FreePoly(VisPortalArray[i].Poly);
+            if (VisPortalArray[i].FinalVisBits) free(VisPortalArray[i].FinalVisBits);
+            if (VisPortalArray[i].VisBits)      free(VisPortalArray[i].VisBits);
+        }
+        free(VisPortalArray);
+        VisPortalArray = NULL;
+    }
+
+    if (VisSortedPortals) { free(VisSortedPortals); VisSortedPortals = NULL; }
+    if (PortalSeen)       { free(PortalSeen);        PortalSeen       = NULL; }
+    if (PortalBits)       { free(PortalBits);        PortalBits       = NULL; }
+    if (LeafVisBits)      { free(LeafVisBits);       LeafVisBits      = NULL; }
+    if (VisLeafs)         { free(VisLeafs);          VisLeafs         = NULL; }
+
+    NumVisPortals     = 0;
+    NumVisPortalBytes = 0;
+    NumVisPortalLongs = 0;
+    NumVisLeafs       = 0;
+    NumVisLeafBytes   = 0;
+    NumVisLeafLongs   = 0;
+    TotalVisibleLeafs = 0;
+}
+
+
+/* =========================================================================
+   Portal sorting
+   ========================================================================= */
+
+static int
+PComp(const void *a, const void *b)
+{
+    const VIS_Portal *pa = *(const VIS_Portal **)a;
+    const VIS_Portal *pb = *(const VIS_Portal **)b;
+    if (pa->MightSee == pb->MightSee) return  0;
+    if (pa->MightSee <  pb->MightSee) return -1;
+    return 1;
+}
+
+static void
+SortPortals(void)
+{
+    int32_t i;
+    for (i = 0; i < NumVisPortals; i++)
+        VisSortedPortals[i] = &VisPortalArray[i];
+
+    if (!NoSort)
+        qsort(VisSortedPortals, NumVisPortals, sizeof(VisSortedPortals[0]), PComp);
+}
+
+
+/* =========================================================================
+   CalcPortalInfo
+   ========================================================================= */
+
+static bool
+CalcPortalInfo(VIS_Portal *Portal)
+{
+    GBSP_Poly *Poly  = Portal->Poly;
+    float      BestDist = 0.0f;
+    int32_t    i;
+
+    PolyCenter(Poly, &Portal->Center);
+
+    for (i = 0; i < Poly->NumVerts; i++)
+    {
+        Vector3 Vect = Vector3Subtract(Poly->Verts[i], Portal->Center);
+        float   Dist = Vector3Length(Vect);
+        if (Dist > BestDist)
+            BestDist = Dist;
+    }
+
+    Portal->Radius = BestDist;
+    return true;
+}
+
+
+/* =========================================================================
+   CollectLeafVisBits
+   ========================================================================= */
+
+static bool
+CollectLeafVisBits(int32_t LeafNum)
+{
+    VIS_Portal *Portal, *SPortal;
+    VIS_Leaf   *Leaf;
+    uint8_t    *LeafBits, *VisBits;
+    int32_t     k, Bit, SLeaf;
+
+    Leaf     = &VisLeafs[LeafNum];
+    LeafBits = &LeafVisBits[LeafNum * NumVisLeafBytes];
+
+    memset(PortalBits, 0, NumVisPortalBytes);
+
+    /* OR together the vis bits of all portals belonging to this leaf */
+    for (Portal = Leaf->Portals; Portal; Portal = Portal->Next)
+    {
+        if      (Portal->FinalVisBits) VisBits = Portal->FinalVisBits;
+        else if (Portal->VisBits)      VisBits = Portal->VisBits;
+        else
+        {
+            fprintf(stderr, "ERROR: CollectLeafVisBits: no VisInfo for portal.\n");
+            return false;
+        }
+
+        for (k = 0; k < NumVisPortalBytes; k++)
+            PortalBits[k] |= VisBits[k];
+
+        if (Portal->VisBits)      { free(Portal->VisBits);      Portal->VisBits      = NULL; }
+        if (Portal->FinalVisBits) { free(Portal->FinalVisBits); Portal->FinalVisBits = NULL; }
+    }
+
+    /* Convert portal vis bits → leaf vis bits */
+    for (k = 0; k < NumVisPortals; k++)
+    {
+        if (PortalBits[k >> 3] & (1 << (k & 7)))
+        {
+            SPortal = &VisPortalArray[k];
+            SLeaf   = SPortal->Leaf;
+            LeafBits[SLeaf >> 3] |= 1 << (SLeaf & 7);
+        }
+    }
+
+    Bit = 1 << (LeafNum & 7);
+
+    if (LeafBits[LeafNum >> 3] & Bit)
+        printf("*WARNING* CollectLeafVisBits: Leaf %i can see himself!\n", LeafNum);
+
+    /* A leaf always sees itself */
+    LeafBits[LeafNum >> 3] |= Bit;
+
+    LeafSee = 0;
+    for (k = 0; k < NumVisLeafs; k++)
+    {
+        if (LeafBits[k >> 3] & (1 << (k & 7)))
+            LeafSee++;
+    }
+
+    if (LeafSee == 0)
+    {
+        fprintf(stderr, "ERROR: CollectLeafVisBits: Leaf %d can't see anything.\n", LeafNum);
+        return false;
+    }
+
+    return true;
+}
+
+
+/* =========================================================================
+   VisAllLeafs
+   ========================================================================= */
+
+static bool
+VisAllLeafs(void)
+{
+    int32_t i;
+
+    PortalSeen = (uint8_t *)calloc(NumVisPortals, sizeof(uint8_t));
+    if (!PortalSeen)
+    {
+        fprintf(stderr, "ERROR: VisAllLeafs: out of memory for PortalSeen.\n");
+        return false;
+    }
+
+    /* Fast pass — flood each leaf's portals to compute MightSee */
+    for (i = 0; i < NumVisLeafs; i++)
+        FloodLeafPortalsFast(i);
+
+    /* Sort portals by MightSee for the slow (full) pass */
+    SortPortals();
+
+    /* Full pass — refine MightSee into CanSee */
+    if (FullVis)
+    {
+        if (!FloodPortalsSlow())
+            return false;
+    }
+
+    free(PortalSeen);
+    PortalSeen = NULL;
+
+    /* Allocate and zero the final leaf vis table */
+    LeafVisBits = (uint8_t *)calloc(NumVisLeafs * NumVisLeafBytes, sizeof(uint8_t));
+    if (!LeafVisBits)
+    {
+        fprintf(stderr, "ERROR: VisAllLeafs: out of memory for LeafVisBits.\n");
+        return false;
+    }
+
+    PortalBits = (uint8_t *)calloc(NumVisPortalBytes, sizeof(uint8_t));
+    if (!PortalBits)
+    {
+        fprintf(stderr, "ERROR: VisAllLeafs: out of memory for PortalBits.\n");
+        return false;
+    }
+
+    TotalVisibleLeafs = 0;
+
+    for (i = 0; i < NumVisLeafs; i++)
+    {
+        LeafSee = 0;
+        if (!CollectLeafVisBits(i))
+            return false;
+        TotalVisibleLeafs += LeafSee;
+    }
+
+    free(PortalBits);
+    PortalBits = NULL;
+
+    printf("Total visible areas            : %5i\n", TotalVisibleLeafs);
+    printf("Average visible from each area : %5i\n",
+           NumVisLeafs > 0 ? TotalVisibleLeafs / NumVisLeafs : 0);
+
+    return true;
+}
+
+
+/* =========================================================================
+   BuildVisPortalsFromBSP
+       Replaces LoadPortalFile.  Walks the in-memory BSP tree, numbers all
+       non-solid leaf nodes, then builds two directed VIS_Portals for every
+       GBSP_Portal that connects two non-solid leaves (one portal per side).
+
+       The original portal file stored (NumVerts, Verts[], LeafFrom, LeafTo)
+       for each directed portal; we derive the same information from the tree.
+   ========================================================================= */
+
+/* Pass 1: count and number non-solid leaves */
+static void
+NumberLeafs_r(GBSP_Node *Node, int32_t *count)
+{
+    if (Node->PlaneNum == PLANENUM_LEAF)
+    {
+        if (!(Node->Contents & BSP_CONTENTS_SOLID2))
+        {
+            Node->PortalLeafNum = (*count)++;
+        }
+        else
+        {
+            Node->PortalLeafNum = -1;
+        }
+        return;
+    }
+    NumberLeafs_r(Node->Children[0], count);
+    NumberLeafs_r(Node->Children[1], count);
+}
+
+/* Pass 2: count directed portals between non-solid leaves */
+static void
+CountPortals_r(GBSP_Node *Node, int32_t *count)
+{
+    if (Node->PlaneNum == PLANENUM_LEAF)
+    {
+        /* Portals live on leaf nodes */
+        if (Node->Contents & BSP_CONTENTS_SOLID2) return;
+        if (Node->PortalLeafNum < 0) return;
+
+        GBSP_Portal *p;
+        int32_t      side;
+        for (p = Node->Portals; p; p = p->Next[side])
+        {
+            side = (p->Nodes[1] == Node);
+
+            /* Only count each undirected portal once (side 0 is canonical) */
+            if (side != 0) continue;
+
+            GBSP_Node *n0 = p->Nodes[0];
+            GBSP_Node *n1 = p->Nodes[1];
+
+            if (n0->PlaneNum != PLANENUM_LEAF || n1->PlaneNum != PLANENUM_LEAF)
+                continue;
+            if (n0->PortalLeafNum < 0 || n1->PortalLeafNum < 0)
+                continue;
+
+            *count += 2;
+        }
+        return;
+    }
+
+    CountPortals_r(Node->Children[0], count);
+    CountPortals_r(Node->Children[1], count);
+}
+
+/* Pass 3: fill VIS_Portal and VIS_Leaf arrays */
+static void
+FillPortals_r(GBSP_Node *Node, int32_t *idx)
+{
+    if (Node->PlaneNum == PLANENUM_LEAF)
+    {
+        if (Node->Contents & BSP_CONTENTS_SOLID2) return;
+        if (Node->PortalLeafNum < 0) return;
+
+        GBSP_Portal *p;
+        int32_t      side;
+        for (p = Node->Portals; p; p = p->Next[side])
+        {
+            side = (p->Nodes[1] == Node);
+
+            if (side != 0) continue;
+
+            GBSP_Node *n0 = p->Nodes[0];
+            GBSP_Node *n1 = p->Nodes[1];
+
+            if (n0->PlaneNum != PLANENUM_LEAF || n1->PlaneNum != PLANENUM_LEAF)
+                continue;
+
+            int32_t leaf0 = n0->PortalLeafNum;
+            int32_t leaf1 = n1->PortalLeafNum;
+
+            if (leaf0 < 0 || leaf1 < 0) continue;
+
+            if (*idx + 1 >= NumVisPortals)
+            {
+                fprintf(stderr, "ERROR: FillPortals_r: portal index overflow\n");
+                return;
+            }
+
+            /* Portal A: looks from leaf0 → leaf1 (poly faces leaf1, use as-is) */
+            {
+                VIS_Portal *vp = &VisPortalArray[*idx];
+                GBSP_Poly  *cp = NULL;
+
+                if (!CopyPoly(p->Poly, &cp) || !cp)
+                {
+                    fprintf(stderr, "ERROR: FillPortals_r: CopyPoly failed for portal A\n");
+                    return;
+                }
+
+                vp->Poly = cp;
+                vp->Leaf = leaf1;
+                PlaneFromVerts(cp->Verts, &vp->Plane);
+                vp->Next = VisLeafs[leaf0].Portals;
+                VisLeafs[leaf0].Portals = vp;
+                CalcPortalInfo(vp);
+                (*idx)++;
+            }
+
+            /* Portal B: looks from leaf1 → leaf0 (poly reversed to face leaf0) */
+            {
+                VIS_Portal *vp  = &VisPortalArray[*idx];
+                GBSP_Poly  *cp  = NULL;
+                GBSP_Poly  *rev = NULL;
+
+                if (!CopyPoly(p->Poly, &cp) || !cp)
+                {
+                    fprintf(stderr, "ERROR: FillPortals_r: CopyPoly failed for portal B\n");
+                    return;
+                }
+
+                if (!ReversePoly(cp, &rev) || !rev)
+                {
+                    fprintf(stderr, "ERROR: FillPortals_r: ReversePoly failed for portal B\n");
+                    FreePoly(cp);
+                    return;
+                }
+                FreePoly(cp);
+
+                vp->Poly = rev;
+                vp->Leaf = leaf0;
+                PlaneFromVerts(rev->Verts, &vp->Plane);
+                vp->Next = VisLeafs[leaf1].Portals;
+                VisLeafs[leaf1].Portals = vp;
+                CalcPortalInfo(vp);
+                (*idx)++;
+            }
+        }
+        return;
+    }
+
+    FillPortals_r(Node->Children[0], idx);
+    FillPortals_r(Node->Children[1], idx);
+}
+
+static bool
+BuildVisPortalsFromBSP(GBSP_Node *RootNode)
+{
+    int32_t leaf_count   = 0;
+    int32_t portal_count = 0;
+    int32_t idx          = 0;
+
+    /* Pass 1: number the leaves */
+    NumberLeafs_r(RootNode, &leaf_count);
+    NumVisLeafs = leaf_count;
+
+    if (NumVisLeafs == 0)
+    {
+        fprintf(stderr, "ERROR: BuildVisPortalsFromBSP: no non-solid leaves found.\n");
+        return false;
+    }
+
+    /* Pass 2: count directed portals */
+    CountPortals_r(RootNode, &portal_count);
+    NumVisPortals = portal_count;
+
+    if (NumVisPortals == 0)
+    {
+        fprintf(stderr, "ERROR: BuildVisPortalsFromBSP: no vis portals found.\n");
+        return false;
+    }
+
+    if (NumVisPortals >= MAX_TEMP_PORTALS)
+    {
+        fprintf(stderr, "ERROR: BuildVisPortalsFromBSP: too many portals (%d >= %d).\n",
+                NumVisPortals, MAX_TEMP_PORTALS);
+        return false;
+    }
+
+    printf("BuildVisPortalsFromBSP: %d leaves, %d directed portals\n",
+           NumVisLeafs, NumVisPortals);
+
+    /* Allocate arrays */
+    VisPortalArray = (VIS_Portal *)calloc(NumVisPortals, sizeof(VIS_Portal));
+    if (!VisPortalArray)
+    {
+        fprintf(stderr, "ERROR: BuildVisPortalsFromBSP: out of memory for VisPortalArray.\n");
+        return false;
+    }
+
+    VisSortedPortals = (VIS_Portal **)calloc(NumVisPortals, sizeof(VIS_Portal *));
+    if (!VisSortedPortals)
+    {
+        fprintf(stderr, "ERROR: BuildVisPortalsFromBSP: out of memory for VisSortedPortals.\n");
+        return false;
+    }
+
+    VisLeafs = (VIS_Leaf *)calloc(NumVisLeafs, sizeof(VIS_Leaf));
+    if (!VisLeafs)
+    {
+        fprintf(stderr, "ERROR: BuildVisPortalsFromBSP: out of memory for VisLeafs.\n");
+        return false;
+    }
+
+    /* Pass 3: fill portals and leaf portal lists */
+    FillPortals_r(RootNode, &idx);
+
+    if (idx != NumVisPortals)
+    {
+        fprintf(stderr,
+                "WARNING: BuildVisPortalsFromBSP: expected %d portals, filled %d.\n",
+                NumVisPortals, idx);
+        NumVisPortals = idx;
+    }
+
+    /* Compute byte/long counts — round up to 64-bit boundary (matches original) */
+    NumVisLeafBytes   = ((NumVisLeafs   + 63) & ~63) >> 3;
+    NumVisPortalBytes = ((NumVisPortals + 63) & ~63) >> 3;
+
+    NumVisPortalLongs = NumVisPortalBytes / (int32_t)sizeof(uint32_t);
+    NumVisLeafLongs   = NumVisLeafBytes   / (int32_t)sizeof(uint32_t);
+
+    return true;
+}
+
+
+/* =========================================================================
+   RunVis  — public entry point
+   ========================================================================= */
+
+bool
+RunVis(GBSP_Node *RootNode, bool full_vis, bool verbose)
+{
+    FullVis    = full_vis;
+    VisVerbose = verbose;
+
+    FreeAllVisData();
+
+    printf(" --- RunVis --- \n");
+
+    if (!BuildVisPortalsFromBSP(RootNode))
+        goto fail;
+
+    printf("NumPortals : %5i\n", NumVisPortals);
+    printf("NumLeafs   : %5i\n", NumVisLeafs);
+
+    if (!VisAllLeafs())
+        goto fail;
+
+    return true;
+
+fail:
+    FreeAllVisData();
+    return false;
+}
