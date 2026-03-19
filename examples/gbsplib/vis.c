@@ -61,6 +61,7 @@ FreeWorkingData(void)
             if (VisPortalArray[i].Poly)         FreePoly(VisPortalArray[i].Poly);
             if (VisPortalArray[i].FinalVisBits)  free(VisPortalArray[i].FinalVisBits);
             if (VisPortalArray[i].VisBits)       free(VisPortalArray[i].VisBits);
+            if (VisPortalArray[i].LeafVisBits)   free(VisPortalArray[i].LeafVisBits);
         }
         free(VisPortalArray);  VisPortalArray  = NULL;
     }
@@ -240,6 +241,33 @@ VisAllLeafs(uint8_t *LeafVisBits)
     }
 
     printf("  FastVis complete.\n"); fflush(stdout);
+
+    /* Build per-portal leaf reachability table for use by slow pass */
+    {
+        int32_t p, k;
+        for (p = 0; p < NumVisPortals; p++)
+        {
+            VIS_Portal *P = &VisPortalArray[p];
+            if (!P->VisBits) continue;
+
+            P->LeafVisBits = (uint8_t *)calloc(NumVisLeafBytes, 1);
+            if (!P->LeafVisBits)
+            {
+                fprintf(stderr, "ERROR: BuildPortalLeafVisBits: OOM\n");
+                return false;
+            }
+
+            /* Convert portal bits -> leaf bits */
+            for (k = 0; k < NumVisPortals; k++)
+            {
+                if (P->VisBits[k >> 3] & (1 << (k & 7)))
+                {
+                    int32_t sl = VisPortalArray[k].Leaf;
+                    P->LeafVisBits[sl >> 3] |= (1 << (sl & 7));
+                }
+            }
+        }
+    }
 
     SortPortals();
 
@@ -516,11 +544,90 @@ RunVis(GBSP_Node *RootNode, GBSP_Model *Model, bool full_vis, bool verbose)
     if (!VisAllLeafs(Model->LeafVisBits))
         goto fail;
 
-    FreeWorkingData();
+    /* Keep working data alive if fast-vis only — RerunSlowVis needs it.
+       Free immediately if full vis was already run. */
+    if (FullVis)
+        FreeWorkingData();
+
     return true;
 
 fail:
     FreeWorkingData();
     FreeModelVisData(Model);
     return false;
+}
+
+
+/* =========================================================================
+   RerunSlowVis
+       Upgrades a fast-vis result to full vis without rebuilding portals.
+       Call this from the console after the map has been compiled.
+       Returns false if fast-vis working data is no longer available.
+   ========================================================================= */
+
+bool
+RerunSlowVis(GBSP_Model *Model)
+{
+    if (!VisPortalArray || !VisLeafs || NumVisPortals == 0)
+    {
+        fprintf(stderr, "RerunSlowVis: no portal data available — recompile the map first.\n");
+        return false;
+    }
+
+    printf(" --- RerunSlowVis (full vis) --- \n");
+
+    /* Reset fast-vis VisBits so slow pass can start fresh */
+    PortalSeen = (uint8_t *)calloc(NumVisPortals, sizeof(uint8_t));
+    if (!PortalSeen) { fprintf(stderr, "ERROR: RerunSlowVis: OOM PortalSeen\n"); return false; }
+
+    FullVis = true;
+
+    /* Re-sort portals by MightSee */
+    SortPortals();
+
+    if (!FloodPortalsSlow())
+    {
+        free(PortalSeen); PortalSeen = NULL;
+        return false;
+    }
+
+    free(PortalSeen); PortalSeen = NULL;
+
+    PortalBits = (uint8_t *)calloc(NumVisPortalBytes, sizeof(uint8_t));
+    if (!PortalBits) { fprintf(stderr, "ERROR: RerunSlowVis: OOM PortalBits\n"); return false; }
+
+    /* Rebuild LeafVisBits from full vis results */
+    FreeModelVisData(Model);
+    Model->LeafVisBits = (uint8_t *)calloc(NumVisLeafs * NumVisLeafBytes, sizeof(uint8_t));
+    if (!Model->LeafVisBits)
+    {
+        free(PortalBits); PortalBits = NULL;
+        fprintf(stderr, "ERROR: RerunSlowVis: OOM LeafVisBits\n");
+        return false;
+    }
+    Model->NumVisLeafs     = NumVisLeafs;
+    Model->NumVisLeafBytes = NumVisLeafBytes;
+
+    TotalVisibleLeafs = 0;
+    int32_t i;
+    for (i = 0; i < NumVisLeafs; i++)
+    {
+        LeafSee = 0;
+        if (!CollectLeafVisBits(i, Model->LeafVisBits))
+        {
+            free(PortalBits); PortalBits = NULL;
+            FreeModelVisData(Model);
+            return false;
+        }
+        TotalVisibleLeafs += LeafSee;
+    }
+
+    free(PortalBits); PortalBits = NULL;
+
+    printf("Total visible areas            : %5i\n", TotalVisibleLeafs);
+    printf("Average visible from each area : %5i\n",
+           NumVisLeafs > 0 ? TotalVisibleLeafs / NumVisLeafs : 0);
+
+    FreeWorkingData();
+    return true;
 }

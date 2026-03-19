@@ -64,7 +64,7 @@ Entity_new(const Entity *template, Engine *engine, size_t user_data_size)
 	node->scene         = NULL;
 	node->creation_time = Engine_getTime(engine);
 	
-	Engine__insertEntity(engine, node);
+//	Engine__insertEntity(engine, node);
 	
 	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Setup) vtable->Setup(entity);
@@ -314,7 +314,7 @@ EntityNode__free(EntityNode *self)
 	EntityVTable *vtable = entity->vtable;
 	if (vtable && vtable->Free) vtable->Free(entity);
 	
-	Engine__removeEntity(self->engine, self);
+//	Engine__removeEntity(self->engine, self);
 
 	free(self);
 }

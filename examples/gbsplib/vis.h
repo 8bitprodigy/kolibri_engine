@@ -25,6 +25,7 @@ typedef struct VIS_Portal
     float       Radius;
     uint8_t    *VisBits;
     uint8_t    *FinalVisBits;
+    uint8_t    *LeafVisBits;    /* per-portal leaf reachability (fast-vis, leaf space) */
     int32_t     Leaf;       /* leaf this portal looks INTO  */
     int32_t     SrcLeaf;    /* leaf this portal belongs TO  */
     int32_t     MightSee;
@@ -78,6 +79,9 @@ extern bool        FullVis;
         Model->NumVisLeafBytes.
 */
 bool RunVis(GBSP_Node *RootNode, GBSP_Model *Model, bool full_vis, bool verbose);
+
+/* Upgrade a fast-vis result to full vis — call from console after map compile. */
+bool RerunSlowVis(GBSP_Model *Model);
 
 /* Release Model->LeafVisBits and zero the vis counts. */
 void FreeModelVisData(GBSP_Model *Model);

@@ -1,0 +1,74 @@
+project {Kolibri Engine} {
+    version 0.1.0
+    description {Minimalist game engine based on raylib.}
+    license 0BSD
+}
+
+target libkolibri {
+    set type      static_lib
+    set platforms linux
+
+    src     src/*.c
+
+    platform linux {
+    }
+}
+
+target libkolibri_dc {
+    set type      static_lib
+    set platforms dreamcast
+
+
+    platform linux {
+    }
+
+    platform dreamcast {
+
+        config release {
+            set cflags -O0
+            set defines DEBUG
+        }
+
+        config debug {
+            set cflags -O0
+            set defines DEBUG
+        }
+    }
+}
+
+toolchain linux {
+    set cc gcc
+    set cxx g++
+    set ar ar
+    set cflags {-Wall -Wextra}
+    set cxxflags {-Wall -Wextra}
+    set defines PLATFORM_LINUX
+    set opt_levels     {-O0 -O1 -O2 -O3 -Os -Oz}
+    set default_olevel -O3
+    set debug_flags [dict create \
+        -g {GDB symbols} \
+        -fsanitize=address AddressSanitizer \
+        -pg {gprof profiling} \
+    ]
+    set outdir build/linux-gcc
+}
+
+toolchain dreamcast {
+    set cc kos-cc
+    set cxx kos-c++
+    set ar kos-ar
+    set cflags {-ml -m4-single-only -Wall}
+    set cxxflags {-ml -m4-single-only -Wall}
+    set ldflags {-lkallisti -lc -lgcc}
+    set defines {PLATFORM_DREAMCAST _arch_dreamcast}
+    set sysroot /opt/toolchains/dc/sh-elf
+    set opt_levels     {-O0 -O1 -O2 -Os}
+    set default_olevel -O3
+    set debug_flags [dict create \
+        -g {GDB stub symbols} \
+        FRAME_POINTERS {KOS frame pointers} \
+        DC_SERIAL_DEBUG {Serial port debug output} \
+    ]
+    set outdir build/dreamcast
+}
+

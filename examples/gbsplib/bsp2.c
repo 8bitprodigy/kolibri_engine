@@ -1406,7 +1406,7 @@ bool ProcessWorldModel(GBSP_Model *Model, MAP_Brush *MapBrushes)
 	MakeLeafFaces(Node);
 
 	// Run VIS while portals are still alive
-	if (!RunVis(Node, Model, false, false))
+	if (!RunVis(Node, Model, true, false))
 		fprintf(stderr, "WARNING: RunVis failed — no visibility culling.\n");
 
 	// Free portals...

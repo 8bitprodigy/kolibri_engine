@@ -300,195 +300,149 @@ ClipToSeperators(GBSP_Poly *Source, GBSP_Poly *Pass, GBSP_Poly *Target,
 
 
 /* =========================================================================
-   SlowFrame — one level of the iterative RecursiveLeafFlow stack
-   Mirrors Quake's pstack_t but stored in a flat array for iteration.
+   SlowFrame  —  one level of the iterative slow-vis stack
    ========================================================================= */
 
 typedef struct
 {
-    int32_t     LeafNum;        /* leaf we just entered                        */
-    VIS_Portal *NextPortal;     /* next portal in this leaf to try             */
-    GBSP_Poly  *Source;         /* clipped source winding for this level       */
-    GBSP_Poly  *Pass;           /* clipped pass winding for this level         */
-    GBSP_Plane  PortalPlane;    /* plane of the portal we came through         */
-    uint8_t    *MightSee;       /* leaf-space mightsee — slot in MightSeePool  */
+    VIS_Portal *DestPortal;
+    VIS_Portal *NextPortal;
+    GBSP_Poly  *Source;
+    GBSP_Poly  *Pass;
+    uint32_t   *LeafMight;  /* leaf-space mightsee — points into LeafMightPool */
 } SlowFrame;
 
-#define SLOW_MAX_DEPTH  512
-
+#define SLOW_MAX_DEPTH  256
 
 /* =========================================================================
-   PortalFlow  (Quake-style, iterative)
-       Computes full vis for a single source portal.
-       Mirrors Quake's PortalFlow -> RecursiveLeafFlow.
+   FloodPortalsSlow_r  (iterative, leaf-space mightsee)
    ========================================================================= */
 
 static bool
-PortalFlow(VIS_Portal *SrcPortal)
+FloodPortalsSlow_r(VIS_Portal *SrcPortal, VIS_Portal *StartDest,
+                   VIS_PStack *RootStack)
 {
-    /* Allocate pools — one MightSee buffer + one frame per depth level */
-    uint8_t   *MightSeePool = (uint8_t *)malloc(SLOW_MAX_DEPTH * NumVisLeafBytes);
-    SlowFrame *Frames       = (SlowFrame *)malloc(SLOW_MAX_DEPTH * sizeof(SlowFrame));
-    if (!MightSeePool || !Frames)
+    /* One leaf-mightsee buffer per depth level — NumVisLeafBytes each (48 vs 372) */
+    uint32_t  *LeafMightPool = (uint32_t *)malloc(SLOW_MAX_DEPTH * NumVisLeafBytes);
+    SlowFrame *Frames        = (SlowFrame *)malloc(SLOW_MAX_DEPTH * sizeof(SlowFrame));
+    uint8_t   *LeafVis       = (uint8_t  *)calloc(NumVisLeafBytes, 1);
+    if (!LeafMightPool || !Frames || !LeafVis)
     {
-        free(MightSeePool); free(Frames);
-        fprintf(stderr, "ERROR: PortalFlow: OOM\n");
+        free(LeafMightPool); free(Frames); free(LeafVis);
+        fprintf(stderr, "ERROR: FloodPortalsSlow_r: OOM\n");
         return false;
     }
 
-    /* LeafVis: the running leaf visibility result for SrcPortal (= FinalVisBits in leaf space) */
-    uint8_t *LeafVis = (uint8_t *)calloc(NumVisLeafBytes, 1);
-    if (!LeafVis) { free(MightSeePool); free(Frames); return false; }
-
-    uint32_t *Vis = (uint32_t *)LeafVis;
-
-    /* Seed: enter the leaf SrcPortal looks INTO */
-    int32_t startLeaf = SrcPortal->Leaf;
-
-    /* Mark start leaf visible */
-    LeafVis[startLeaf >> 3] |= (1 << (startLeaf & 7));
-
-    /* Root frame — mightsee seeded from SrcPortal->LeafVisBits (fast-vis result) */
+    /* Root frame: seed leaf mightsee from StartDest's precomputed LeafVisBits */
     int32_t top = 0;
-    uint8_t *RootMight = MightSeePool + 0 * NumVisLeafBytes;
-    memcpy(RootMight, SrcPortal->LeafVisBits, NumVisLeafBytes);
+    uint32_t *RootMight = (uint32_t *)((uint8_t *)LeafMightPool + 0 * NumVisLeafBytes);
+    memcpy(RootMight, StartDest->LeafVisBits, NumVisLeafBytes);
 
-    Frames[top].LeafNum     = startLeaf;
-    Frames[top].NextPortal  = VisLeafs[startLeaf].Portals;
-    Frames[top].Source      = NULL;   /* set after push — root has no source yet */
-    Frames[top].Pass        = NULL;
-    Frames[top].PortalPlane = SrcPortal->Plane;
-    Frames[top].MightSee    = RootMight;
-
-    /* Copy SrcPortal winding as root source */
-    if (!CopyPoly(SrcPortal->Poly, &Frames[top].Source))
-    { free(MightSeePool); free(Frames); free(LeafVis); return false; }
-
+    Frames[top].DestPortal = StartDest;
+    Frames[top].Source     = RootStack->Source;
+    Frames[top].Pass       = RootStack->Pass;
+    Frames[top].LeafMight  = RootMight;
+    Frames[top].NextPortal = VisLeafs[StartDest->Leaf].Portals;
     top++;
+
+    /* Mark StartDest visible */
+    {
+        int32_t sl   = StartDest->Leaf;
+        int32_t pnum = (int32_t)(StartDest - VisPortalArray);
+        LeafVis[sl >> 3] |= (1 << (sl & 7));
+        SrcPortal->FinalVisBits[pnum >> 3] |= (1 << (pnum & 7));
+        SrcPortal->CanSee++;
+        VisLeafs[SrcLeaf].CanSee++;
+        CanSee++;
+    }
 
     while (top > 0)
     {
-        SlowFrame  *F = &Frames[top - 1];
-        VIS_Portal *p = F->NextPortal;
+        SlowFrame  *F      = &Frames[top - 1];
+        VIS_Portal *Portal = F->NextPortal;
 
-        if (!p)
+        if (!Portal)
         {
-            /* Done with this leaf — pop */
             if (top > 1) { FreePoly(F->Source); FreePoly(F->Pass); }
-            else           FreePoly(F->Source);   /* root source */
             top--;
             continue;
         }
 
-        /* Advance iterator */
-        F->NextPortal = p->Next;
+        F->NextPortal = Portal->Next;
 
-        int32_t destLeaf = p->Leaf;
-
-        /* Quake's leaf-skip check: cheapest possible rejection */
-        if (!(F->MightSee[destLeaf >> 3] & (1 << (destLeaf & 7))))
+        /* Leaf-space early out — single bit test, cheapest possible check */
+        int32_t destLeaf = Portal->Leaf;
+        if (!(((uint8_t *)F->LeafMight)[destLeaf >> 3] & (1 << (destLeaf & 7))))
             continue;
 
-        /* Choose test bits: use tight visbits if portal is done, else mightsee */
-        uint8_t *TestBits = (p->Done && p->LeafVisBits) ? p->LeafVisBits
-                                                         : (p->LeafVisBits ? p->LeafVisBits : NULL);
-        if (!TestBits) continue;
+        /* Portal-space check: fast-vis says src can't reach this portal */
+        int32_t PNum = (int32_t)(Portal - VisPortalArray);
+        if (!(SrcPortal->VisBits[PNum >> 3] & (1 << (PNum & 7))))
+            continue;
 
-        /* Depth guard */
+        if (!Portal->LeafVisBits) continue;
+
+        /* Depth check before using pool slot */
         if (top >= SLOW_MAX_DEPTH)
         {
-            fprintf(stderr, "ERROR: PortalFlow: depth overflow\n");
-            free(MightSeePool); free(Frames); free(LeafVis);
+            fprintf(stderr, "ERROR: FloodPortalsSlow_r: depth overflow\n");
+            free(LeafMightPool); free(Frames); free(LeafVis);
             return false;
         }
 
-        /* Leaf-space More check — NumVisLeafLongs longs (12 for 379 leaves) */
-        uint8_t  *NewMight = MightSeePool + top * NumVisLeafBytes;
-        uint32_t *NM       = (uint32_t *)NewMight;
-        uint32_t *PM       = (uint32_t *)F->MightSee;
-        uint32_t *TB       = (uint32_t *)TestBits;
+        /* Leaf-space More check — 12 longs instead of 93 */
+        uint32_t *NewMight = (uint32_t *)((uint8_t *)LeafMightPool + top * NumVisLeafBytes);
         uint32_t  More     = 0;
         for (int32_t j = 0; j < NumVisLeafLongs; j++)
         {
-            NM[j] = PM[j] & TB[j];
-            More  |= (NM[j] & ~Vis[j]);
+            NewMight[j] = F->LeafMight[j] & ((uint32_t *)Portal->LeafVisBits)[j];
+            More       |= (NewMight[j] & ~((uint32_t *)LeafVis)[j]);
         }
 
         if (!More && (LeafVis[destLeaf >> 3] & (1 << (destLeaf & 7))))
             continue;
 
-        /* Coplanar portal check (Quake does this too) */
+        /* Radius pre-checks before any geometry */
+        float PassDist = Vector3DotProduct(Portal->Center, SrcPortal->Plane.Normal)
+                       - SrcPortal->Plane.Dist;
+        if (PassDist < -Portal->Radius) continue;
+
+        GBSP_Poly *NewPass = NULL;
+        if (!CopyPoly(Portal->Poly, &NewPass))
+        { free(LeafMightPool); free(Frames); free(LeafVis); return false; }
+        if (PassDist < Portal->Radius)
         {
-            /* backplane of portal we're going through */
-            float nx = -p->Plane.Normal.x, ny = -p->Plane.Normal.y,
-                  nz = -p->Plane.Normal.z, nd = -p->Plane.Dist;
-            float px = F->PortalPlane.Normal.x, py = F->PortalPlane.Normal.y,
-                  pz = F->PortalPlane.Normal.z;
-            if (fabsf(px - nx) < 1e-5f && fabsf(py - ny) < 1e-5f &&
-                fabsf(pz - nz) < 1e-5f && fabsf(F->PortalPlane.Dist - nd) < 1e-5f)
-                continue;   /* coplanar — can't go out this face */
+            if (!ClipPoly(NewPass, &SrcPortal->Plane, false, &NewPass))
+            { free(LeafMightPool); free(Frames); free(LeafVis); return false; }
+            if (!NewPass) continue;
         }
 
-        /* Clip target (portal winding) against SrcPortal plane */
-        GBSP_Poly *target = NULL;
-        if (!CopyPoly(p->Poly, &target))
-        { free(MightSeePool); free(Frames); free(LeafVis); return false; }
+        float SrcDist = Vector3DotProduct(SrcPortal->Center, Portal->Plane.Normal)
+                      - Portal->Plane.Dist;
+        if (SrcDist > Portal->Radius) { FreePoly(NewPass); continue; }
 
-        if (!ClipPoly(target, &SrcPortal->Plane, false, &target))
-        { free(MightSeePool); free(Frames); free(LeafVis); return false; }
-        if (!target) continue;
-
-        /* If no pass winding yet, flow through immediately */
-        if (!F->Pass)
+        GBSP_Poly *NewSource = NULL;
+        if (!CopyPoly(F->Source, &NewSource))
+        { FreePoly(NewPass); free(LeafMightPool); free(Frames); free(LeafVis); return false; }
+        if (SrcDist > -Portal->Radius)
         {
-            /* Mark leaf visible */
-            if (!(LeafVis[destLeaf >> 3] & (1 << (destLeaf & 7))))
-            {
-                LeafVis[destLeaf >> 3] |= (1 << (destLeaf & 7));
-                SrcPortal->CanSee++;
-                VisLeafs[SrcLeaf].CanSee++;
-                CanSee++;
-            }
-
-            GBSP_Poly *srcCopy = NULL;
-            if (!CopyPoly(F->Source, &srcCopy))
-            { FreePoly(target); free(MightSeePool); free(Frames); free(LeafVis); return false; }
-
-            Frames[top].LeafNum     = destLeaf;
-            Frames[top].NextPortal  = VisLeafs[destLeaf].Portals;
-            Frames[top].Source      = srcCopy;
-            Frames[top].Pass        = target;
-            Frames[top].PortalPlane = p->Plane;
-            Frames[top].MightSee    = NewMight;
-            top++;
-            continue;
+            if (!ClipPoly(NewSource, &Portal->Plane, true, &NewSource))
+            { FreePoly(NewPass); free(LeafMightPool); free(Frames); free(LeafVis); return false; }
+            if (!NewSource) { FreePoly(NewPass); continue; }
         }
 
-        /* Clip target against prevstack portalplane */
-        if (!ClipPoly(target, &F->PortalPlane, false, &target))
-        { free(MightSeePool); free(Frames); free(LeafVis); return false; }
-        if (!target) continue;
+        if (F->Pass)
+        {
+            if (!ClipToSeperators(NewSource, F->Pass, NewPass, false, &NewPass))
+            { FreePoly(NewSource); free(LeafMightPool); free(Frames); free(LeafVis); return false; }
+            if (!NewPass) { FreePoly(NewSource); continue; }
 
-        /* Clip source against backplane of p */
-        GBSP_Poly *source = NULL;
-        if (!CopyPoly(F->Source, &source))
-        { FreePoly(target); free(MightSeePool); free(Frames); free(LeafVis); return false; }
+            if (!ClipToSeperators(F->Pass, NewSource, NewPass, true, &NewPass))
+            { FreePoly(NewSource); free(LeafMightPool); free(Frames); free(LeafVis); return false; }
+            if (!NewPass) { FreePoly(NewSource); continue; }
+        }
 
-        GBSP_Plane backplane = { { -p->Plane.Normal.x, -p->Plane.Normal.y, -p->Plane.Normal.z }, -p->Plane.Dist };
-        if (!ClipPoly(source, &backplane, false, &source))
-        { FreePoly(target); free(MightSeePool); free(Frames); free(LeafVis); return false; }
-        if (!source) { FreePoly(target); continue; }
-
-        /* Separator clipping */
-        if (!ClipToSeperators(source, F->Pass, target, false, &target))
-        { FreePoly(source); free(MightSeePool); free(Frames); free(LeafVis); return false; }
-        if (!target) { FreePoly(source); continue; }
-
-        if (!ClipToSeperators(F->Pass, source, target, true, &target))
-        { FreePoly(source); free(MightSeePool); free(Frames); free(LeafVis); return false; }
-        if (!target) { FreePoly(source); continue; }
-
-        /* Mark leaf visible */
+        /* Mark leaf and portal visible */
         if (!(LeafVis[destLeaf >> 3] & (1 << (destLeaf & 7))))
         {
             LeafVis[destLeaf >> 3] |= (1 << (destLeaf & 7));
@@ -496,29 +450,22 @@ PortalFlow(VIS_Portal *SrcPortal)
             VisLeafs[SrcLeaf].CanSee++;
             CanSee++;
         }
+        SrcPortal->FinalVisBits[PNum >> 3] |= (1 << (PNum & 7));
 
-        Frames[top].LeafNum     = destLeaf;
-        Frames[top].NextPortal  = VisLeafs[destLeaf].Portals;
-        Frames[top].Source      = source;
-        Frames[top].Pass        = target;
-        Frames[top].PortalPlane = p->Plane;
-        Frames[top].MightSee    = NewMight;
+        Frames[top].DestPortal = Portal;
+        Frames[top].Source     = NewSource;
+        Frames[top].Pass       = NewPass;
+        Frames[top].LeafMight  = NewMight;
+        Frames[top].NextPortal = VisLeafs[Portal->Leaf].Portals;
         top++;
     }
 
-    /* Convert LeafVis back to portal FinalVisBits */
-    for (int32_t k = 0; k < NumVisPortals; k++)
-    {
-        int32_t pl = VisPortalArray[k].Leaf;
-        if (LeafVis[pl >> 3] & (1 << (pl & 7)))
-            SrcPortal->FinalVisBits[k >> 3] |= (1 << (k & 7));
-    }
-
-    free(MightSeePool);
+    free(LeafMightPool);
     free(Frames);
     free(LeafVis);
     return true;
 }
+
 
 
 /* =========================================================================
@@ -528,34 +475,47 @@ PortalFlow(VIS_Portal *SrcPortal)
 bool
 FloodPortalsSlow(void)
 {
-    int32_t k;
+    VIS_Portal *Portal;
+    VIS_PStack  PStack;
+    int32_t     k, i, PNum;
 
     for (k = 0; k < NumVisPortals; k++)
         VisPortalArray[k].Done = false;
 
     for (k = 0; k < NumVisPortals; k++)
     {
-        VIS_Portal *Portal = VisSortedPortals[k];
+        Portal = VisSortedPortals[k];
 
-        if (!Portal->LeafVisBits) continue;
-
-        Portal->FinalVisBits = (uint8_t *)calloc(NumVisPortalBytes, 1);
+        Portal->FinalVisBits = (uint8_t *)calloc(NumVisPortalBytes, sizeof(uint8_t));
         if (!Portal->FinalVisBits)
         {
-            fprintf(stderr, "ERROR: FloodPortalsSlow: OOM\n");
+            fprintf(stderr, "ERROR: FloodPortalsSlow: out of memory.\n");
             return false;
         }
 
-        CanSee  = 0;
-        SrcLeaf = Portal->SrcLeaf;
+        memset(PortalSeen, 0, NumVisPortals);
+        CanSee = 0;
+
+        for (i = 0; i < NumVisPortalBytes; i++)
+            PStack.VisBits[i] = Portal->VisBits[i];
 
         if (k % 200 == 0) { printf("  SlowVis portal %d / %d...\n", k, NumVisPortals); fflush(stdout); }
 
-        if (!PortalFlow(Portal))
+        if (!CopyPoly(Portal->Poly, &PStack.Source))
             return false;
+        PStack.Pass = NULL;
+
+        /* SrcLeaf is the leaf this portal belongs to (not the leaf it looks into) */
+        SrcLeaf = Portal->SrcLeaf;
+
+        if (!FloodPortalsSlow_r(Portal, Portal, &PStack))
+            return false;
+
+        FreePoly(PStack.Source);
 
         Portal->Done = true;
 
+        PNum = (int32_t)(Portal - VisPortalArray);
         if (VisVerbose)
             printf("Portal: %4i - Fast Vis: %4i, Full Vis: %4i\n",
                    k + 1, Portal->MightSee, Portal->CanSee);
