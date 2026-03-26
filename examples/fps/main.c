@@ -127,7 +127,7 @@ runEngine(void *data, void *value)
 			enemy_pos,
 			engine
 		);
-	Entity_addToScene(grunt, scene);
+//	Entity_addToScene(grunt, scene);
  /*
 	Entity *ents[21][21][21];
 	int z = 0; 

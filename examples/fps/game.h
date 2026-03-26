@@ -10,7 +10,9 @@
 #include "../assman.h"
 #include "../explosion.h"
 #include "../infinite_plane_scene.h"
+#include "../lightning_beam.h"
 #include "../projectile.h"
+#include "../railtrail.h"
 #include "../sprite.h"
 #include "../thinker.h"
 #include "../utils.h"
@@ -124,6 +126,24 @@ typedef enum
 }
 EnemyAnims;
 
+typedef enum
+{
+	ATTRIB_THINKER = 0,
+	ATTRIB_HEALTH  = 1,
+	ATTRIB_ARMOR   = 2,
+	ATTRIB_AMMO    = 3,
+	ATTRIB_TARGET,
+	ATTRIB_PREV_POSITION,
+	ATTRIB_PREV_OFFSET,
+	ATTRIB_PREV_VELOCITY,
+	ATTRIB_MAX_ATTRIBS
+}
+Attributes;
+
+typedef unsigned short AttributesLUT[ATTRIB_MAX_ATTRIBS];
+
+void *Attribute_get(Entity *entity, Attributes attribute);
+
 typedef struct
 {
 	Model           model;
@@ -137,6 +157,7 @@ AnimatedModel;
 	game.c
 */
 extern ExplosionInfo   *explosion_Info;
+extern RailTrailInfo   *railtrail_Info;
 extern Renderable      *projectile_renderables;
 extern Model           
 					   *projectile_models,
@@ -152,6 +173,11 @@ void Game_mediaInit(      void);
 	main.c
 */
 extern char *path_prefix;
+extern int
+	tick_rate,
+	frame_rate,
+	screen_width,
+	screen_height;
 
 /*
 	enemy.c

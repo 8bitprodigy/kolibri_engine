@@ -46,7 +46,7 @@ OBJS_DEBUG   = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/debug/%.o)
 
 # Compiler flags
 CFLAGS_COMMON = -I$(INCDIR) -I./examples -Wall -Wextra -Wpedantic
-CFLAGS_RELEASE = $(CFLAGS_COMMON) -O3 -DNDEBUG
+CFLAGS_RELEASE = $(CFLAGS_COMMON) -O3 -DRELEASE
 CFLAGS_DEBUG = $(CFLAGS_COMMON) -g3 -O0 -DDEBUG
 
 .PHONY: all clean install uninstall release debug info

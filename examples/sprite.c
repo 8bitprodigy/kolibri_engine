@@ -277,35 +277,7 @@ RenderBillboard(
 		);
 		break;
 	case SPRITE_ALIGN_LOCAL_AXIS: 
-	    /* 1. Get the constraint axis in WORLD space */
-		Vector3 axis = Vector3Normalize(
-			Vector3RotateByQuaternion(
-				(Vector3){ 0, 0, 1 },   // LOCAL muzzle axis — change if needed
-				entity->orientation
-			)
-		);
-
-		/* 2. Vector from sprite to camera */
-		Vector3 to_cam = Vector3Normalize(
-			Vector3Subtract(camera->position, position)
-		);
-
-		/* 3. Remove axis component (THIS is the critical step) */
-		Vector3 facing = Vector3Subtract(
-			to_cam,
-			Vector3Scale(axis, Vector3DotProduct(to_cam, axis))
-		);
-
-		/* Degenerate case: camera is exactly on axis */
-		if (Vector3LengthSqr(facing) < 0.00001f)
-			facing = Vector3Perpendicular(axis);
-
-		facing = Vector3Normalize(facing);
-
-		/* 4. Build orthonormal basis (Raylib expects THIS order) */
-		right = Vector3Normalize(Vector3CrossProduct(facing, axis));
-		up    = Vector3CrossProduct(axis, right);
-
+		up = data->up;
 		break;
 	case SPRITE_ALIGN_CAMERA:
 		up = cam_up;

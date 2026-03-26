@@ -41,6 +41,7 @@ typedef void (*SpriteCallback)(SpriteInfo *info, SpriteData *data);
 typedef struct
 SpriteData
 {
+	Vector3 up;
 	size_t 
 		start_frame,
 		current_frame;

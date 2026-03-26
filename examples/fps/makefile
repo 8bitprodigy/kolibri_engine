@@ -38,6 +38,8 @@ ENGINE_SRC    = $(wildcard $(SRCDIR)/*.c)
 EXAMPLES_SRC  = $(EXAMPLESDIR)/heightmap.c $(EXAMPLESDIR)/infinite_plane_scene.c
 EXAMPLES_SRC += $(EXAMPLESDIR)/explosion.c $(EXAMPLESDIR)/projectile.c
 EXAMPLES_SRC += $(EXAMPLESDIR)/sprite.c $(EXAMPLESDIR)/utils.c
+EXAMPLES_SRC += $(EXAMPLESDIR)/railtrail.c $(EXAMPLESDIR)/ribbon.c
+EXAMPLES_SRC += $(EXAMPLESDIR)/lightning_beam.c
 GAME_SRC      = $(wildcard $(GAMESRCDIR)/*.c)
 
 ENGINE_OBJS   = $(ENGINE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/engine/%.o)

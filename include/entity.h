@@ -110,7 +110,7 @@ Entity
         };
     };
 
-    unsigned char *local_data[];
+    unsigned char local_data[];
 } 
 Entity;
 

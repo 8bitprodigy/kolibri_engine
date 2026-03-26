@@ -7,12 +7,16 @@
 #include "../loading_screen.h"
 
 
-Texture        explosion_Sprite;
-ExplosionInfo *explosion_Info;
-Texture        impact_Sprite;
-ExplosionInfo *impact_Info;
-Texture        blood_Sprite;
-ExplosionInfo *blood_Info;
+Texture            explosion_Sprite;
+ExplosionInfo     *explosion_Info;
+Texture            railtrail_Sprite;
+RailTrailInfo     *railtrail_Info;
+Texture            lightning_Sprite;
+LightningBeamInfo *lightning_Info;
+Texture            impact_Sprite;
+ExplosionInfo     *impact_Info;
+Texture            blood_Sprite;
+ExplosionInfo     *blood_Info;
 
 Renderable
 	sprite_Renderable = {
@@ -45,6 +49,24 @@ Renderable     *enemy_Renderables;
 EnemyInfo      *enemy_Infos;
 
 
+static Vector3
+getMuzzlePosition(Vector3 direction, Vector3 position)
+{
+	Vector3 
+		cam_right = Vector3Normalize(
+				Vector3CrossProduct(direction, V3_UP)
+			),
+		cam_up = Vector3Normalize(
+				Vector3CrossProduct(cam_right, direction)
+			);
+	return Vector3Add(
+			position,
+			Vector3Add(
+					Vector3Scale(cam_right, 0.3f),
+					Vector3Scale(cam_up,   -0.3f)
+				)
+		);
+}
 
 /*
 	Projectile callbacks
@@ -232,6 +254,7 @@ fireHitscan(
 		if (result.entity)
 			DBG_OUT("Hitscan fired at entity @%p", (void*)result.entity);
 		else {
+			DBG_OUT("Scene hit.");
 			Explosion_new(
 					impact_Info, 
 					result.position,
@@ -252,9 +275,10 @@ fireProjectile(
 	Vector3     direction
 )
 {
+	Vector3 muzzle = getMuzzlePosition(direction, position);
 	Projectile_new(
 			info->projectile, 
-			position, 
+			muzzle, 
 			direction, 
 			source, 
 			NULL, 
@@ -272,8 +296,9 @@ fireMinigun(
 	Vector3     direction
 )
 {
-	double time = Engine_getTime(Entity_getEngine(source));
-	float  *spread = &data->data.f;
+	double   time   = Engine_getTime(Entity_getEngine(source));
+	float   *spread = &data->data.f;
+	Vector3  muzzle = getMuzzlePosition(direction, position);
 	
 	const float 
 		MIN_SPREAD    = 0.25f,
@@ -313,7 +338,7 @@ fireMinigun(
 		);
 	Projectile_new(
 			info->projectile, 
-			position, 
+			muzzle, 
 			pellet_direction, 
 			source, 
 			NULL,
@@ -334,6 +359,7 @@ fireShotgun(
 	const int  num_bounces = 1;
 	int        max         = 8;
 	double     time        = Engine_getTime(Entity_getEngine(source));
+	Vector3    muzzle      = getMuzzlePosition(direction, position);
 
 	/*
 		Mechanic: 
@@ -372,7 +398,7 @@ fireShotgun(
 
 		Projectile_new(
 				info->projectile,
-				position,
+				muzzle,
 				pellet_direction,
 				source,
 				NULL,
@@ -380,6 +406,40 @@ fireShotgun(
 				&num_bounces
 			);
 	}
+}
+
+void
+fireRailgun(
+	WeaponInfo *info,
+	WeaponData *data,
+	Entity     *source,
+	Vector3     position,
+	Vector3     direction
+)
+{
+	Engine      *engine    = Entity_getEngine(source);
+	Scene       *scene     = Entity_getScene(source);
+	const float  MAX_RANGE = 512.0f;
+	Vector3      muzzle    = getMuzzlePosition(direction, position);
+
+	CollisionResult result = Scene_raycast(
+			scene,
+			position,
+			Vector3Add(
+					position,
+					Vector3Scale(
+							direction,
+							MAX_RANGE
+						)
+				),
+			source
+		);
+
+	Vector3 endpoint = (result.hit)
+		? result.position
+		: Vector3Add(position, Vector3Scale(direction, MAX_RANGE));
+	
+	RailTrail_new(railtrail_Info, muzzle, endpoint, engine, scene);
 }
 
 void
@@ -391,7 +451,29 @@ fireLightning(
 	Vector3     direction
 )
 {
-	
+	Engine      *engine    = Entity_getEngine(source);
+	Scene       *scene     = Entity_getScene( source);
+	const float  MAX_RANGE = 512.0f;
+	Vector3      muzzle    = getMuzzlePosition(direction, position);
+
+	CollisionResult result = Scene_raycast(
+			scene,
+			position,
+			Vector3Add(
+					position,
+					Vector3Scale(
+							direction,
+							MAX_RANGE
+						)
+				),
+			source
+		);
+
+	Vector3 endpoint = result.hit
+            ? result.position
+            : Vector3Add(position, Vector3Scale(direction, MAX_RANGE));
+
+    LightningBeam_new(lightning_Info, muzzle, endpoint, engine, scene);
 }
 
 
@@ -419,6 +501,28 @@ Explosion_mediaInit(void)
 			4, 4, 16
 		);
 
+	
+	railtrail_Sprite = LoadTexture( "resources/sprites/sniper_trail.png");
+	SetTextureFilter(railtrail_Sprite, TEXTURE_FILTER_BILINEAR);
+
+	railtrail_Info = RailTrailInfo_new(
+			1.0f, 
+			5.0f, 
+			0.125f, 
+			WHITE,
+			railtrail_Sprite, 
+			1
+		);
+
+	lightning_Sprite = LoadTexture("resources/sprites/lightning_bolt.png");
+	SetTextureFilter(lightning_Sprite, TEXTURE_FILTER_BILINEAR);
+	lightning_Info = LightningBeamInfo_new(
+			0.5f,
+			WHITE,
+			lightning_Sprite,
+			4
+		);
+	
 	LoadingScreen_draw(2.5, "resources/sprites/impact.png");
 	
 	impact_Sprite = LoadTexture("resources/sprites/impact.png");
@@ -778,13 +882,13 @@ Weapon_init(void)
 	weapon_Infos[WEAPON_RAILGUN] = (WeaponInfo){
 		.projectile        = NULL,
 		.refractory_period = 1.5f,
-		.Fire              = fireHitscan,
+		.Fire              = fireRailgun,
 		.action_type       = ACTION_MANUAL,
 	};
 	weapon_Infos[WEAPON_LIGHTNING_GUN] = (WeaponInfo){
 		.projectile        = NULL,
-		.refractory_period = 0.0f,
-		.Fire              = NULL,
+		.refractory_period = 1.0f/(float)tick_rate,
+		.Fire              = fireLightning,
 		.action_type       = ACTION_AUTOMATIC,
 	};
 	/*

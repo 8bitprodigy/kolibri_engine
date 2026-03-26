@@ -393,6 +393,7 @@ PLAYER_INPUT: {
 						GAMEPAD_AXIS_RIGHT_TRIGGER
 					) > 0.5f
 			);
+		
 		Weapon_fire(
 				&weapon_Infos[data->current_weapon],
 				&data->weapon_data[data->current_weapon],
