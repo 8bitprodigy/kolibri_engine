@@ -433,7 +433,6 @@ void
 Engine__insertEntity(Engine *self, EntityNode *node)
 {
     if (MAX_NUM_ENTITIES <= self->entity_count) return;
-	Entity *entity = NODE_TO_ENTITY(node);
 	if (!self->entities) {
 		self->entities = node;
 	}

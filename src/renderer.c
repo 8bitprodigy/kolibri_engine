@@ -210,7 +210,7 @@ Renderer__queryFrustum(
     );
 
     /* Optimized culling loop */
-    for (int i = 0; i < DynamicArray_length(candidates) && *visible_count < VIS_QUERY_SIZE; i++) {
+    for (size_t i = 0; i < DynamicArray_length(candidates) && *visible_count < VIS_QUERY_SIZE; i++) {
         RenderableWrapper *wrapper = candidates[i];
         
         if (wrapper->is_entity && !wrapper->entity->visible) continue;

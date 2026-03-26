@@ -3,7 +3,7 @@ LIBNAME = kolibri
 VERSION = 0.1.0
 
 # Compiler
-CC = gcc-14
+CC = gcc
 AR = ar
 ARFLAGS = rcs
 
@@ -45,7 +45,7 @@ OBJS_RELEASE = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/release/%.o)
 OBJS_DEBUG   = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/debug/%.o)
 
 # Compiler flags
-CFLAGS_COMMON = -I$(INCDIR) -I./examples -Wall -Wextra -Wpedantic
+CFLAGS_COMMON = -I$(INCDIR) -I./examples -Wall -Wextra -Wpedantic -Werror
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O3 -DNDEBUG
 CFLAGS_DEBUG = $(CFLAGS_COMMON) -g3 -O0 -DDEBUG
 

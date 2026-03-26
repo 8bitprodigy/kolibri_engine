@@ -214,7 +214,7 @@ SpatialHash_queryRegion(
                     bool is_duplicate = false;
                     size_t count = DynamicArray_length(query_results);
                     
-                    for (int i = 0; i < count; i++) {
+                    for (size_t i = 0; i < count; i++) {
                         if (query_results[i] == entry->data) {
                             is_duplicate = true;
                             break;

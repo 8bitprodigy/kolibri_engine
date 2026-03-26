@@ -72,3 +72,6 @@ fps_example
 EBOOT.PBP
 PARAM.SFO
 *.prx
+
+# dev tools
+.vscode
