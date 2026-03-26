@@ -60,6 +60,8 @@ extern "C"
 
 				return true;
 			}
+			
+			return false;
 		} 
 		else
 		{
@@ -198,7 +200,7 @@ extern "C"
 
 			float length = -INFINITY;
 
-			bool intersect = CheckCollisionRay2dRay2d(ray, edgeRay, &length);
+			CheckCollisionRay2dRay2d(ray, edgeRay, &length);
 
 			Vector2 nearest = Vector2Add(ray.Origin, Vector2Scale(ray.Direction, length));
 

@@ -356,7 +356,8 @@ EntityNode__remove(EntityNode *self)
 		*prev = self->prev,
 		*next = self->next;
 
-	DBG_OUT("EntityNode__remove: self=%p, prev=%p, next=%p", self, prev, next);
+	DBG_OUT("EntityNode__remove: self=%p, prev=%p, next=%p",
+		    (void*)self, (void*)prev, (void*)next);
 	
 	next->prev = prev;
 	prev->next = next;

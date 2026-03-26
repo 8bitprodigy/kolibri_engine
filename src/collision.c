@@ -371,7 +371,7 @@ CollisionScene__checkCollision(
 	);
 
 	/* Check AABB collision with each candidate */
-	for (int i = 0; i < DynamicArray_length(candidates); i++) {
+	for (size_t i = 0; i < DynamicArray_length(candidates); i++) {
 		Entity *other = candidates[i];
 		if (other == entity) continue; /* Skip self */
 		if (!other->collision_shape) continue;
@@ -813,7 +813,7 @@ CollisionScene__moveEntity(
 			bounds
 		);
     
-    for (int i = 0; i < DynamicArray_length(candidates); i++) {
+    for (size_t i = 0; i < DynamicArray_length(candidates); i++) {
         Entity *other = candidates[i];
         if (other == entity || !other->collision_shape) continue;
 
@@ -1095,7 +1095,7 @@ CollisionScene__raycast(CollisionScene *scene, K_Ray ray, Entity *ignore)
 			bbox
 		);
 	
-	for (int i = 0; i < DynamicArray_length(candidates); i++) {
+	for (size_t i = 0; i < DynamicArray_length(candidates); i++) {
 		Entity *entity = candidates[i];
 
 		/* Skip ignored entity */
