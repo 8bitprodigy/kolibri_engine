@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -28,7 +29,12 @@ LightningBeamInfo;
  *  LightningBeamData is just RibbonData — no extra fields needed.
  *  We alias it for clarity at the call site.
  */
-typedef RibbonData LightningBeamData;
+typedef struct
+{
+	RibbonData ribbon_data;
+	double     last_fired;
+}
+LightningBeamData;
 
 
 /* ------------------------------------------------------------------ */
@@ -54,7 +60,7 @@ static EntityVTable
 LightningBeam_Callbacks = {
 		.Setup       = NULL,
 		.Enter       = NULL,
-		.Update      = NULL,
+		.Update      = lightningBeamUpdate,
 		.Render      = lightningBeamRender,
 		.OnCollision = NULL,
 		.OnCollided  = NULL,
@@ -86,6 +92,19 @@ LightningBeam_Template = {
 /*------------------------------------------------------------------
 	Update callback
 ------------------------------------------------------------------*/
+static void
+lightningBeamUpdate(Entity *self, float delta)
+{
+	(void)delta;
+	LightningBeamData *data = (LightningBeamData*)self->local_data;
+
+	if (
+		Entity_getAge(self) - data->last_fired 
+		>= Engine_getTickLength(Entity_getEngine(self))
+	) {
+		self->visible = false;
+	}
+}
 
 /*------------------------------------------------------------------
 	Render callback
@@ -95,24 +114,16 @@ static void
 lightningBeamRender(Entity *self, float delta)
 {
     (void)delta;
-    LightningBeamData *data = (LightningBeamData*)self->local_data;
-    RibbonInfo        *info = ((LightningBeamInfo*)self->user_data)->ribbon_info;
+	RibbonData *data = &((LightningBeamData*)self->local_data)->ribbon_data;
+    RibbonInfo *info = ((LightningBeamInfo*)self->user_data)->ribbon_info;
 
     float 
 		age     = Entity_getAge(self),
-		timeout = 1.0f/60.0f;//Engine_getTickLength(Entity_getEngine(self));
-
-	DBG_OUT("Age: %.4f\tTimeout: %.4f", age, timeout);
-	
-	if (age >= timeout) {
-		self->active  = false;
-        self->visible = false;
-        Entity_free(self);
-        return;
-    }
+		timeout = Engine_getTickLength(Entity_getEngine(self));
 
     data->current_frame  = (size_t)(rand() % info->num_frames);
     data->scroll_offset  = (float)rand() / (float)RAND_MAX;
+    data->width_delta    = ((float)rand()/RAND_MAX);
     data->flip_u         = rand() % 2;
     data->flip_v         = rand() % 2;
 }
@@ -165,7 +176,7 @@ LightningBeamInfo_new(
 }
 
 
-void
+Entity *
 LightningBeam_new(
 	LightningBeamInfo *info,
 	Vector3            muzzle,
@@ -188,15 +199,18 @@ LightningBeam_new(
 	float   length = Vector3Length(diff);
 
 	LightningBeamData *data = (LightningBeamData*)beam->local_data;
-	*data = (LightningBeamData){
+	data->last_fired  = Entity_getAge(beam);
+	data->ribbon_data = (RibbonData){
 			.start         = muzzle,
 			.end           = endpoint,
 			.width_delta   = 0.0f,
 			.scroll_offset = 0.0f,
 			.colors        = NULL,
 			.offsets       = NULL,
-			.current_frame = 0,   /* unused — frame is randomized per draw */
+			.current_frame = 0,
 			.playing       = true,
+            .flip_u        = false,
+            .flip_v        = false,
 		};
 
 	beam->renderables[0]    = &info->renderable;
@@ -208,4 +222,30 @@ LightningBeam_new(
 	beam->solid             = false;
 
 	Entity_addToScene(beam, scene);
+	return beam;
+}
+
+
+void
+LightningBeam_fire(
+	LightningBeamInfo  *info,
+	Entity            **beam,
+	Vector3             muzzle,
+	Vector3             endpoint,
+	Engine             *engine,
+	Scene              *scene
+)
+{
+	if (!*beam || !(*beam)->active) {
+		*beam = LightningBeam_new(info, muzzle, endpoint, engine, scene);
+	}
+	LightningBeamData *data = (LightningBeamData*)(*beam)->local_data;
+	data->ribbon_data.start = muzzle;
+	data->ribbon_data.end   = endpoint;
+	data->last_fired        = Entity_getAge(*beam);
+	(*beam)->position       = Vector3Add(
+			muzzle,
+			Vector3Scale(Vector3Subtract(endpoint, muzzle), 0.5f)
+		);
+	(*beam)->visible        = true;
 }

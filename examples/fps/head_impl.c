@@ -398,7 +398,7 @@ PLAYER_INPUT: {
 				&weapon_Infos[data->current_weapon],
 				&data->weapon_data[data->current_weapon],
 				player,
-				camera->target,
+				camera->position,
 				Vector3Normalize(
 						Vector3Subtract(
 								camera->target, 

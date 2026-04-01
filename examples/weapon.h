@@ -5,6 +5,11 @@
 #include "projectile.h"
 
 
+#ifndef WEAPON_DATA_BUFFER_SIZE
+	#define WEAPON_DATA_BUFFER_SIZE 64
+#endif
+
+
 typedef enum
 {
 	ACTION_MANUAL,
@@ -25,6 +30,7 @@ WeaponInfo
 	union {
 		ProjectileInfo *projectile;
 		float           distance;
+        RibbonInfo     *beam;
 	};
 	float               refractory_period;
 	WeaponFireCallback  Fire;
@@ -39,7 +45,10 @@ WeaponData
 				  trigger_down,
 				  trigger_up,
 				  next_shot;
-	Any           data;
+	union {
+		Any       data;
+		char      data_buf[WEAPON_DATA_BUFFER_SIZE];
+	};
 	int           ammo;
 	bool          
 				 trigger_was_down,

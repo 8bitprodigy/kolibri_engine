@@ -52,20 +52,28 @@ EnemyInfo      *enemy_Infos;
 static Vector3
 getMuzzlePosition(Vector3 direction, Vector3 position)
 {
-	Vector3 
-		cam_right = Vector3Normalize(
-				Vector3CrossProduct(direction, V3_UP)
-			),
-		cam_up = Vector3Normalize(
-				Vector3CrossProduct(cam_right, direction)
-			);
-	return Vector3Add(
-			position,
-			Vector3Add(
-					Vector3Scale(cam_right, 0.3f),
-					Vector3Scale(cam_up,   -0.3f)
-				)
-		);
+    float yaw   = atan2f(direction.x, direction.z);
+    float pitch = asinf(-direction.y);
+
+    /* Yaw-only forward and right */
+    Vector3 yaw_forward = { sinf(yaw), 0.0f, cosf(yaw) };
+    Vector3 yaw_right   = { cosf(yaw), 0.0f, -sinf(yaw) };
+
+    /* Step 1: translate forward in yaw space */
+    Vector3 p = Vector3Add(position, Vector3Scale(yaw_forward, 0.25f));
+
+    /* Step 2: apply pitch rotation to get full forward/up/right */
+    Vector3 pitch_forward = Vector3Normalize(direction);
+    Vector3 pitch_up      = Vector3Normalize(
+            Vector3CrossProduct(yaw_right, pitch_forward)
+        );
+
+    /* Step 3: apply the final translation in pitched space */
+    p = Vector3Add(p, Vector3Scale(yaw_right,     -0.5f));
+    p = Vector3Add(p, Vector3Scale(pitch_up,       0.5f));
+    p = Vector3Add(p, Vector3Scale(pitch_forward,  1.0f));
+
+    return p;
 }
 
 /*
@@ -453,7 +461,7 @@ fireLightning(
 {
 	Engine      *engine    = Entity_getEngine(source);
 	Scene       *scene     = Entity_getScene( source);
-	const float  MAX_RANGE = 512.0f;
+	const float  MAX_RANGE = info->distance;
 	Vector3      muzzle    = getMuzzlePosition(direction, position);
 
 	CollisionResult result = Scene_raycast(
@@ -473,7 +481,14 @@ fireLightning(
             ? result.position
             : Vector3Add(position, Vector3Scale(direction, MAX_RANGE));
 
-    LightningBeam_new(lightning_Info, muzzle, endpoint, engine, scene);
+    LightningBeam_fire(
+			lightning_Info, 
+			(Entity**)&data->data.v, 
+			muzzle, 
+			endpoint, 
+			engine, 
+			scene
+		);
 }
 
 
@@ -880,13 +895,13 @@ Weapon_init(void)
 		.action_type       = ACTION_SEMIAUTO,
 	};
 	weapon_Infos[WEAPON_RAILGUN] = (WeaponInfo){
-		.projectile        = NULL,
+		.distance          = 512.0f,
 		.refractory_period = 1.5f,
 		.Fire              = fireRailgun,
 		.action_type       = ACTION_MANUAL,
 	};
 	weapon_Infos[WEAPON_LIGHTNING_GUN] = (WeaponInfo){
-		.projectile        = NULL,
+		.distance          = 512.0f,
 		.refractory_period = 1.0f/(float)tick_rate,
 		.Fire              = fireLightning,
 		.action_type       = ACTION_AUTOMATIC,

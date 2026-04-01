@@ -140,7 +140,12 @@ typedef enum
 }
 Attributes;
 
-typedef unsigned short AttributesLUT[ATTRIB_MAX_ATTRIBS];
+typedef struct
+{
+	uint32         magic_no;
+	unsigned short table[ATTRIB_MAX_ATTRIBS];
+}
+AttributesLUT;
 
 void *Attribute_get(Entity *entity, Attributes attribute);
 
@@ -185,6 +190,7 @@ extern int
 
 typedef struct
 {
+	AttributesLUT   attributes;
 	Renderable      renderables[MAX_RENDERABLES_PER_ENTITY];
 	float           lod_distances[MAX_RENDERABLES_PER_ENTITY];
 	int             num_renderables;

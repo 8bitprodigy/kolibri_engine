@@ -15,12 +15,21 @@ LightningBeamInfo *LightningBeamInfo_new(
 	size_t     num_frames
 );
 
-void LightningBeam_new(
+Entity *LightningBeam_new(
 	LightningBeamInfo *info,
 	Vector3            muzzle,
 	Vector3            endpoint,
 	Engine            *engine,
 	Scene             *scene
+);
+
+void LightningBeam_fire(
+	LightningBeamInfo  *info,
+	Entity            **beam,
+	Vector3             muzzle,
+	Vector3             endpoint,
+	Engine             *engine,
+	Scene              *scene
 );
 
 
